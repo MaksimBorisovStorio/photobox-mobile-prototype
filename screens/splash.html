@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Photobox</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Photobox">
+  <meta name="theme-color" content="#0E9E8E">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style>
+    html, body { background: #000; }
+  </style>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="../shared/navigation.js"></script>
+  <script type="text/babel" src="../shared/ios-frame.jsx"></script>
+  <script type="text/babel" src="splash.jsx"></script>
+  <script type="text/babel">
+    function useIsMobile() {
+      const [m, setM] = React.useState(() => window.matchMedia('(max-width:519px)').matches);
+      React.useEffect(() => {
+        const mql = window.matchMedia('(max-width:519px)');
+        const cb = e => setM(e.matches);
+        mql.addEventListener('change', cb);
+        return () => mql.removeEventListener('change', cb);
+      }, []);
+      return m;
+    }
+    function App() {
+      const mobile = useIsMobile();
+      if (mobile) return (
+        <div style={{ position:'fixed', inset:0, overflow:'hidden' }}>
+          <SplashScreen />
+        </div>
+      );
+      return (
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'100vh' }}>
+          <IOSDevice width={402} height={874} dark>
+            <SplashScreen />
+          </IOSDevice>
+        </div>
+      );
+    }
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
