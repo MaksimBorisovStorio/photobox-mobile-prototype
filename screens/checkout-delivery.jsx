@@ -1,8 +1,9 @@
 // screens/checkout-delivery.jsx
 function CheckoutDeliveryScreen() {
   const [addr, setAddr] = React.useState({
-    name: 'Sarah Johnson',
-    street: '14 Maple Street',
+    firstName: 'Sarah',
+    lastName: 'Johnson',
+    address1: '14 Maple Street',
     city: 'Amsterdam',
     postcode: '1012 AB',
     country: 'Netherlands',
@@ -70,8 +71,9 @@ function CheckoutDeliveryScreen() {
           Delivery address
         </div>
         <div style={{ margin:'0 16px 20px', background:'var(--color-surface)', borderRadius:22, overflow:'hidden' }}>
-          {field('Full name', 'name', 'Full name')}
-          {field('Street address', 'street', 'Street address')}
+          {field('First name', 'firstName', 'First name')}
+          {field('Last name', 'lastName', 'Last name')}
+          {field('Address line 1', 'address1', 'Address line 1')}
           {field('City', 'city', 'City')}
           {field('Postcode', 'postcode', 'Postcode')}
           <div style={{ padding:'12px 16px' }}>
