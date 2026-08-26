@@ -2022,15 +2022,8 @@ function ImagePickerScreen() {
           setReviewOpen(true);
         }}
         onContinue={() => {
-          const el = document.getElementById('toast');
-          if (el) {
-            el.style.opacity = '1';
-            el.style.transform = 'translate(-50%, 0)';
-            setTimeout(() => {
-              el.style.opacity = '0';
-              el.style.transform = 'translate(-50%, 8px)';
-            }, 1200);
-          }
+          sessionStorage.setItem('pb_nav', 'push');
+          window.location.href = '../screens/basket.html';
         }}
       />
 
@@ -2042,15 +2035,8 @@ function ImagePickerScreen() {
         onContinue={() => {
           setReviewOpen(false);
           setTimeout(() => {
-            const el = document.getElementById('toast');
-            if (el) {
-              el.style.opacity = '1';
-              el.style.transform = 'translate(-50%, 0)';
-              setTimeout(() => {
-                el.style.opacity = '0';
-                el.style.transform = 'translate(-50%, 8px)';
-              }, 1200);
-            }
+            sessionStorage.setItem('pb_nav', 'push');
+            window.location.href = '../screens/basket.html';
           }, 200);
         }}
         onRemove={(id) => togglePhoto(id)}
