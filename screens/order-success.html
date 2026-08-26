@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Photobox — Order Confirmed</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Photobox">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="../shared/styles.css">
+  <style> html, body { margin:0; padding:0; background:#F2F2F7; } ::-webkit-scrollbar{display:none;} </style>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="../shared/navigation.js"></script>
+  <script src="../shared/mock-data.js"></script>
+  <script type="text/babel" src="../shared/ios-frame.jsx"></script>
+  <script type="text/babel" src="order-success.jsx"></script>
+  <script type="text/babel">
+    function useIsMobile() {
+      const [m, setM] = React.useState(() => window.matchMedia('(max-width:519px)').matches);
+      React.useEffect(() => {
+        const mql = window.matchMedia('(max-width:519px)');
+        const cb = e => setM(e.matches);
+        mql.addEventListener('change', cb);
+        return () => mql.removeEventListener('change', cb);
+      }, []);
+      return m;
+    }
+    function App() {
+      const mobile = useIsMobile();
+      if (mobile) return (
+        <div style={{position:'fixed', inset:0, background:'#F2F2F7', overflow:'hidden'}}>
+          <OrderSuccessScreen />
+        </div>
+      );
+      return (
+        <div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',background:'#1C1C1E'}}>
+          <IOSDevice width={402} height={874}>
+            <OrderSuccessScreen />
+          </IOSDevice>
+        </div>
+      );
+    }
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
