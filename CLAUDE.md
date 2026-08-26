@@ -10,12 +10,50 @@ A full-flow **mobile web prototype** (mweb) of the Photobox app redesign. Built 
 
 ---
 
+## 🟢 Build Status: COMPLETE
+
+All 13 implementation tasks are done. Branch `feature/prototype-build` is demo-ready. Full E2E navigation verified. Final whole-branch code review passed (all findings fixed).
+
+**Git branch:** `feature/prototype-build`
+**Latest commit:** `ea8a51c` — fix: final review — log out action, position:relative, SW manifest, sign-in replace, splash crossorigin
+**Branch base:** `e485e79` (initial MERGE_BASE)
+
+### What's built
+
+| Screen | File | Build Status |
+|--------|------|-------------|
+| Splash | `screens/splash.html` + `splash.jsx` | ✅ Done |
+| Onboarding 1 | `screens/onboarding-1.html` + `.jsx` | ✅ Done |
+| Onboarding 2 | `screens/onboarding-2.html` + `.jsx` | ✅ Done |
+| Onboarding 3 | `screens/onboarding-3.html` + `.jsx` | ✅ Done |
+| Home | `screens/home.html` + `home.jsx` | ✅ Done |
+| Product — Photo Book | `screens/product-photobook.html` + `.jsx` | ✅ Done |
+| Editor — Format | `screens/editor-format.html` + `.jsx` | ✅ Done |
+| Editor — Configure | `screens/editor-configure.html` + `.jsx` | ✅ Done |
+| Image Picker | `image-picker/index.html` (pre-built, frozen) | ✅ Wired in |
+| Basket | `screens/basket.html` + `basket.jsx` | ✅ Done |
+| Checkout — Delivery | `screens/checkout-delivery.html` + `.jsx` | ✅ Done |
+| Checkout — Payment | `screens/checkout-payment.html` + `.jsx` | ✅ Done |
+| Order Success | `screens/order-success.html` + `.jsx` | ✅ Done |
+| Account | `screens/account.html` + `account.jsx` | ✅ Done |
+
+### Possible next tasks
+
+- **Figma fidelity pass** — query Figma node IDs (see table below) to tighten colors, spacing, typography to exact Figma spec. Screens built from verbal descriptions rather than direct Figma calls due to MCP availability.
+- **Transition polish** — add push/pop slide animations between screens (navigation.js stubs are in place; CSS transitions not yet wired to the iframe-swap mechanism).
+- **Dark mode for Editor screens** — editor-configure currently light mode; Figma spec says editor should be dark.
+- **My Photos tab** — home tab bar has a "My Photos" tab that navigates to `../image-picker/index.html`. If a standalone My Photos grid (distinct from the picker) is needed, create `screens/my-photos.html`.
+- **Deploy** — push to GitHub Pages / Netlify for iPhone testing. Current setup requires `python3 -m http.server 8080` + ngrok.
+- **Real Figma node check** — `editor-cover.html` referenced in the original plan was merged into `product-photobook.html` (it's the same cover-picker step); verify this matches stakeholder expectations.
+
+---
+
 ## Figma Source
 
-**File:** https://www.figma.com/design/IXnTCRYPVbCAEddEXJZALI/%F0%9F%8C%A0-Mobile-app-Future-vision  
-**Canvas:** "Final prototype" — node `451:13380`  
-**Design system prefix:** `PB3/`  
-**Theme:** Light mode (iOS conventions) — except Image Picker and Editor which are dark mode  
+**File:** https://www.figma.com/design/IXnTCRYPVbCAEddEXJZALI/%F0%9F%8C%A0-Mobile-app-Future-vision
+**Canvas:** "Final prototype" — node `451:13380`
+**Design system prefix:** `PB3/`
+**Theme:** Light mode (iOS conventions) — except Image Picker and Editor which are dark mode
 **Pricing locale:** Euros (€)
 
 > ⚠️ The Figma is a work-in-progress: some screens are incomplete or placeholder. Use it as the primary visual reference; where screens are missing or rough, infer from the PB3 design language. Always call `get_design_context` (with the `figma:figma-design-to-code` skill loaded) on specific node IDs to get exact colors/spacing before implementing a screen.
@@ -24,23 +62,23 @@ A full-flow **mobile web prototype** (mweb) of the Photobox app redesign. Built 
 
 | Screen | Figma Node | Status |
 |--------|-----------|--------|
-| Splash screen | `451:13758` | ✅ Complete |
-| Onboarding slide 1 (emotional) | `451:13808` | ✅ Complete |
-| Onboarding slide 2 (emotional) | `451:13823` | ✅ Complete |
-| Onboarding slide 3 (inspire) | `451:13841` | ✅ Complete |
-| Home screen | `451:13862` | ✅ Complete (390×1920 scrollable) |
-| Photo book — cover picker | `451:13381` | ✅ Complete |
-| Photo book — format chooser | `451:13426` | ✅ Complete |
-| Photo book — configure (scrollable) | `451:13491` | ✅ Complete (very tall: 2643px) |
-| Photo book — configure variant | `451:13606` | ✅ Complete |
-| Photo book — CTA screen | `451:13721` | ✅ Complete |
-| Account / Profile | `451:14038` | ✅ Complete |
-| Album / My trips | `451:14202` | ✅ Complete |
-| My Photos (image grid) | `451:14403` | ✅ Complete |
-| Basket | — | 🚧 Stub in Figma — design close to PB3 system |
-| Checkout (delivery) | — | 🚧 Stub in Figma |
-| Checkout (payment) | — | 🚧 Stub in Figma |
-| Order success | — | 🚧 Stub in Figma |
+| Splash screen | `451:13758` | ✅ Built (Figma not queried — values inferred) |
+| Onboarding slide 1 (emotional) | `451:13808` | ✅ Built (Figma not queried) |
+| Onboarding slide 2 (emotional) | `451:13823` | ✅ Built (Figma not queried) |
+| Onboarding slide 3 (inspire) | `451:13841` | ✅ Built (Figma not queried) |
+| Home screen | `451:13862` | ✅ Built (Figma not queried) |
+| Photo book — cover picker | `451:13381` | ✅ Built (Figma not queried) |
+| Photo book — format chooser | `451:13426` | ✅ Built (Figma not queried) |
+| Photo book — configure (scrollable) | `451:13491` | ✅ Built (Figma not queried) |
+| Photo book — configure variant | `451:13606` | ✅ Built (Figma not queried) |
+| Photo book — CTA screen | `451:13721` | ✅ Built (Figma not queried) |
+| Account / Profile | `451:14038` | ✅ Built (Figma not queried) |
+| Album / My trips | `451:14202` | ⬜ Not built (no screen in current flow) |
+| My Photos (image grid) | `451:14403` | ⬜ Not built (image-picker used instead) |
+| Basket | — | ✅ Built (PB3 style, no Figma node) |
+| Checkout (delivery) | — | ✅ Built (PB3 style, no Figma node) |
+| Checkout (payment) | — | ✅ Built (PB3 style, no Figma node) |
+| Order success | — | ✅ Built (PB3 style, no Figma node) |
 | Image Picker | Pre-built prototype | ✅ Complete — see `image-picker/` |
 
 ---
@@ -48,24 +86,22 @@ A full-flow **mobile web prototype** (mweb) of the Photobox app redesign. Built 
 ## Tech Stack
 
 ### The Pattern
-All screens use **React 18 via CDN** (loaded from unpkg, no build step), with JSX compiled in-browser by Babel Standalone. This is the same pattern as the existing `image-picker/` prototype.
+All screens use **React 18 via CDN** (loaded from unpkg, no build step), with JSX compiled in-browser by Babel Standalone.
 
 ```html
-<script src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
-<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
-<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
-<!-- then load shared components -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+<!-- then shared components — ORDER MATTERS -->
+<script src="../shared/navigation.js"></script>
+<script src="../shared/mock-data.js"></script>
 <script type="text/babel" src="../shared/ios-frame.jsx"></script>
-<script type="text/babel" src="../shared/navigation.js"></script>
 <!-- then the screen component -->
 <script type="text/babel" src="screen-name.jsx"></script>
 ```
 
-### Why React via CDN (not pure vanilla)
-The `image-picker/ios-frame.jsx` provides a polished **iOS component library** (status bar, nav bar, device frame, liquid glass pills, keyboard) that all screens should reuse. React makes this trivially composable with zero build tooling.
-
 ### No build step
-- No npm, no webpack, no Vite
+- No npm, no webpack, no Vite, no TypeScript
 - Open any `.html` file directly in a browser or serve with `python3 -m http.server 8080`
 - The project must work when saved to iPhone home screen (PWA, offline-capable)
 
@@ -83,12 +119,12 @@ The `image-picker/ios-frame.jsx` provides a polished **iOS component library** (
 MEGAPROTOTYPE/
 ├── CLAUDE.md                    ← this file — auto-loaded context
 ├── manifest.json                ← root PWA manifest (Photobox app)
-├── service-worker.js            ← offline caching for all screens
+├── service-worker.js            ← offline caching — PRECACHE lists all screens
 ├── index.html                   ← entry point → redirects to splash
 ├── app_icon.png                 ← Photobox app icon (180×180 for touch icon)
 │
 ├── shared/
-│   ├── ios-frame.jsx            ← iOS component library (from image-picker)
+│   ├── ios-frame.jsx            ← iOS component library
 │   │                               Exports: IOSDevice, IOSStatusBar, IOSNavBar,
 │   │                               IOSGlassPill, IOSList, IOSListRow, IOSKeyboard
 │   ├── navigation.js            ← screen transition engine (push/pop/modal/replace)
@@ -96,38 +132,72 @@ MEGAPROTOTYPE/
 │   └── mock-data.js             ← all mock: products, user, orders, basket
 │
 ├── screens/
-│   ├── splash.html              ← Figma 451:13758
-│   ├── onboarding-1.html        ← Figma 451:13808
-│   ├── onboarding-2.html        ← Figma 451:13823
-│   ├── onboarding-3.html        ← Figma 451:13841
-│   ├── home.html                ← Figma 451:13862 (scrollable, 1920px tall)
-│   ├── product-photobook.html   ← Figma 451:13381 + 451:13426
-│   ├── editor-cover.html        ← Figma 451:13381
-│   ├── editor-format.html       ← Figma 451:13426
-│   ├── editor-configure.html    ← Figma 451:13491 (very long scroll)
-│   ├── basket.html              ← 🚧 design from PB3 system
-│   ├── checkout-delivery.html   ← 🚧 design from PB3 system
-│   ├── checkout-payment.html    ← 🚧 design from PB3 system
-│   ├── order-success.html       ← 🚧 design from PB3 system
-│   └── account.html             ← Figma 451:14038
+│   ├── splash.html + splash.jsx
+│   ├── onboarding-1.html + onboarding-1.jsx
+│   ├── onboarding-2.html + onboarding-2.jsx
+│   ├── onboarding-3.html + onboarding-3.jsx
+│   ├── home.html + home.jsx
+│   ├── product-photobook.html + product-photobook.jsx
+│   ├── editor-format.html + editor-format.jsx
+│   ├── editor-configure.html + editor-configure.jsx
+│   ├── basket.html + basket.jsx
+│   ├── checkout-delivery.html + checkout-delivery.jsx
+│   ├── checkout-payment.html + checkout-payment.jsx
+│   ├── order-success.html + order-success.jsx
+│   └── account.html + account.jsx
 │
 └── image-picker/                ← Pre-built prototype — DO NOT MODIFY
     ├── index.html               ← Entry point for image picker screen
-    ├── image-picker.jsx         ← Full image picker component (2164 lines)
+    ├── image-picker.jsx         ← Full image picker component (~2164 lines)
     ├── ios-frame.jsx            ← Local copy of iOS component library
     ├── manifest.webmanifest
     └── photos.js                ← Mock photo data (370+ photos via picsum.photos)
 ```
 
-> **⚠️ `image-picker/` is frozen.** It is a complete, polished standalone prototype. When the main flow reaches the image picker step, navigate to `../image-picker/index.html`. Do not copy or re-implement its logic.
+> **⚠️ `image-picker/` is frozen.** When the main flow reaches the image picker step, navigate to `../image-picker/index.html`. The only permitted change is the `onContinue` handler — it must navigate back to `../screens/basket.html` (already done).
+
+---
+
+## Known Implementation Decisions & Gotchas
+
+### Image picker → basket navigation
+The image-picker has no `navigation.js` loaded, so `window.navigation` doesn't exist there. The `onContinue` handler uses raw navigation:
+```js
+sessionStorage.setItem('pb_nav', 'push');
+window.location.href = '../screens/basket.html';
+```
+
+### Every screen root div needs `position:'relative'`
+CTAs are `position:'absolute'; bottom:0` — they anchor to the nearest `position:relative` ancestor. Without it on the root div, CTAs can escape to the IOSDevice frame boundary on desktop. Every screen component's outermost `<div>` must have `position:'relative'`.
+
+### Back button vs general tappable elements
+- **Back/icon buttons**: `scale(0.9)` on pointerDown
+- **All other tappable elements** (CTAs, cards, rows): `scale(0.97)` on pointerDown
+- Both need: `onPointerUp/Leave` → `scale(1)`, `transition:'transform 140ms ease'`
+
+### IOSListRow does not accept a `style` prop
+When you need custom styling on a list row (e.g. red "Log out" text), render it as a plain `<div>` with manual press state handlers instead of using `IOSListRow`.
+
+### Checkout payment — intentional hardcoded values
+`checkout-payment.jsx` hardcodes `€24.99`, `€4.99`, `€29.98` rather than reading `window.MOCK.basket`. This is by design — `mock-data.js` is not loaded on that screen. Values match the mock exactly. Do not add the mock-data dependency unless you want dynamic cart support.
+
+### Dependency load order in HTML files
+This exact order is required in every screen's HTML:
+1. `styles.css` (link tag)
+2. React CDN script
+3. ReactDOM CDN script
+4. Babel CDN script
+5. `navigation.js` (plain script)
+6. `mock-data.js` (plain script — omit if screen doesn't use `window.MOCK`)
+7. `ios-frame.jsx` (text/babel)
+8. `screen-name.jsx` (text/babel)
+9. Inline mount script (text/babel — contains `useIsMobile`, `App`, `ReactDOM.createRoot`)
 
 ---
 
 ## Design System
 
 ### Colors
-Confirm exact hex values from Figma using `get_design_context` on the relevant screen nodes. The palette below is approximate based on visual inspection:
-
 ```css
 /* shared/styles.css */
 :root {
@@ -223,16 +293,12 @@ All transitions are handled by `shared/navigation.js`.
 | Replace | Fade crossfade | 400ms | `ease` | Splash → Onboarding |
 | Dismiss | Slide down | 320ms | `cubic-bezier(0.4, 0, 0.2, 1)` | Close modal |
 
-### Spring Physics
-For interactive elements, use spring-like cubic-bezier — `cubic-bezier(0.34, 1.3, 0.64, 1)` for snappy bouncy feel. For selection states, scale transforms.
-
 ### Navigation API
 ```js
-// In any screen component:
-navigation.push('../screens/product-photobook.html');   // push new screen
-navigation.pop();                                        // go back
-navigation.modal('../screens/basket.html');             // slide up as sheet
-navigation.replace('../screens/onboarding-1.html');    // replace (no back)
+window.navigation.push('product-photobook.html');     // push new screen
+window.navigation.pop();                               // go back
+window.navigation.modal('basket.html');               // slide up as sheet
+window.navigation.replace('onboarding-1.html');       // replace (no back)
 ```
 
 ### User Journey Flow
@@ -241,25 +307,25 @@ splash.html
   └─(replace)─> onboarding-1.html
                 └─(push)─> onboarding-2.html
                            └─(push)─> onboarding-3.html
-                                     └─(push)─> home.html
+                                     └─(replace)─> home.html
                                                 ├─(push)─> product-photobook.html
-                                                │          └─(push)─> editor-cover.html
-                                                │                     └─(push)─> editor-format.html
-                                                │                                └─(push)─> editor-configure.html
-                                                │                                           └─(push)─> ../image-picker/index.html
-                                                │                                                      └─(push)─> basket.html
-                                                │                                                                 └─(push)─> checkout-delivery.html
-                                                │                                                                            └─(push)─> checkout-payment.html
-                                                │                                                                                       └─(replace)─> order-success.html
-                                                │                                                                                                    └─(push)─> home.html
+                                                │          └─(push)─> editor-format.html
+                                                │                     └─(push)─> editor-configure.html
+                                                │                                └─(push)─> ../image-picker/index.html
+                                                │                                           └─(location.href)─> basket.html
+                                                │                                                               └─(push)─> checkout-delivery.html
+                                                │                                                                          └─(push)─> checkout-payment.html
+                                                │                                                                                     └─(replace)─> order-success.html
+                                                │                                                                                                  └─(push)─> home.html
                                                 └─(push)─> account.html
+                                                           └─(replace)─> onboarding-1.html (log out)
 ```
 
 ---
 
 ## Shared Component Library (`shared/ios-frame.jsx`)
 
-Copied from `image-picker/ios-frame.jsx`. Exports via `Object.assign(window, {...})`:
+Exports via `Object.assign(window, {...})`:
 
 | Component | Props | Description |
 |-----------|-------|-------------|
@@ -268,7 +334,7 @@ Copied from `image-picker/ios-frame.jsx`. Exports via `Object.assign(window, {..
 | `IOSNavBar` | `title, dark, trailingIcon` | iOS nav bar with liquid glass pills + large title |
 | `IOSGlassPill` | `dark, style` | Liquid glass pill container |
 | `IOSList` | `header, dark` | Inset grouped list card (border-radius 26px) |
-| `IOSListRow` | `title, detail, icon, chevron, isLast, dark` | Single list row (52px tall) |
+| `IOSListRow` | `title, detail, icon, chevron, isLast, dark` | Single list row (52px tall) — no `style` prop; use plain div for custom row styles |
 | `IOSKeyboard` | `dark` | Full iOS keyboard with liquid glass |
 
 **Usage:** On mobile, render screen content directly in `position:fixed; inset:0`. On desktop (≥520px), wrap in `<IOSDevice>` for iPhone preview frame.
@@ -298,16 +364,11 @@ Copied from `image-picker/ios-frame.jsx`. Exports via `Object.assign(window, {..
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Photobox">
-<meta name="theme-color" content="#0E9E8E">
-<link rel="apple-touch-icon" href="/app_icon.png">
 <link rel="manifest" href="/manifest.json">
 ```
 
 ### service-worker.js
-Precaches all screen HTML files and shared assets for offline use. Uses cache-first strategy. Register from `index.html`:
-```js
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('/service-worker.js');
-```
+Precaches all 14 screen HTML files, all 14 JSX files, 4 shared assets, manifest.json, and 4 image-picker files. Cache name `photobox-v1`. Cache-first strategy.
 
 ---
 
@@ -321,47 +382,42 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('/service-wor
   <meta charset="utf-8">
   <title>Photobox — [Screen Name]</title>
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-  <!-- PWA tags -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Photobox">
   <link rel="manifest" href="/manifest.json">
-  <!-- Styles -->
   <link rel="stylesheet" href="../shared/styles.css">
-  <!-- React via CDN (no build step) -->
-  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
-  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
-  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
+  <style> html, body { margin:0; padding:0; background:#F2F2F7; } ::-webkit-scrollbar{display:none;} </style>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
 </head>
 <body>
   <div id="root"></div>
-  <!-- Shared components (must load before screen JSX) -->
-  <script type="text/babel" src="../shared/ios-frame.jsx"></script>
   <script src="../shared/navigation.js"></script>
   <script src="../shared/mock-data.js"></script>
-  <!-- Screen component -->
+  <script type="text/babel" src="../shared/ios-frame.jsx"></script>
   <script type="text/babel" src="screen-name.jsx"></script>
-  <!-- Mount -->
   <script type="text/babel">
     function useIsMobile() {
-      const [m, setM] = React.useState(() => window.matchMedia('(max-width: 519px)').matches);
+      const [m, setM] = React.useState(() => window.matchMedia('(max-width:519px)').matches);
       React.useEffect(() => {
-        const mql = window.matchMedia('(max-width: 519px)');
-        const cb = (e) => setM(e.matches);
+        const mql = window.matchMedia('(max-width:519px)');
+        const cb = e => setM(e.matches);
         mql.addEventListener('change', cb);
         return () => mql.removeEventListener('change', cb);
       }, []);
       return m;
     }
     function App() {
-      const isMobile = useIsMobile();
-      if (isMobile) return (
-        <div style={{ position:'fixed', inset:0, background:'#fff', overflow:'hidden' }}>
+      const mobile = useIsMobile();
+      if (mobile) return (
+        <div style={{position:'fixed', inset:0, background:'#F2F2F7', overflow:'hidden'}}>
           <ScreenComponent />
         </div>
       );
       return (
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'100vh', background:'#0E0E10' }}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',background:'#1C1C1E'}}>
           <IOSDevice width={402} height={874}>
             <ScreenComponent />
           </IOSDevice>
@@ -374,89 +430,44 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('/service-wor
 </html>
 ```
 
-### CSS Body Reset
-```css
-html, body {
-  margin: 0; padding: 0;
-  background: #fff;                         /* or #000 for dark screens */
-  font-family: var(--font);
-  -webkit-font-smoothing: antialiased;
-  overscroll-behavior: none;
-  -webkit-tap-highlight-color: transparent;
-}
-```
-
 ### Safe Area Insets
-Always account for Dynamic Island and home indicator:
 ```css
-padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
-padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 28px);
+/* Top — below Dynamic Island / status bar */
+padding-top: calc(env(safe-area-inset-top, 44px) + 8px);
+
+/* Bottom — above home indicator / CTA gradient */
+padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
 ```
 
 ### Interactive Elements (buttons, tiles)
 ```js
-// Scale on press — apply to all tappable elements
-onPointerDown={(e) => e.currentTarget.style.transform = 'scale(0.97)'}
-onPointerUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
-onPointerLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-// With transition: 'transform 140ms ease'
+// Regular tappable elements (cards, CTAs, list rows):
+onPointerDown={e => e.currentTarget.style.transform = 'scale(0.97)'}
+onPointerUp={e => e.currentTarget.style.transform = 'scale(1)'}
+onPointerLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+// style: { transition: 'transform 140ms ease' }
+
+// Back buttons / icon buttons:
+onPointerDown={e => e.currentTarget.style.transform = 'scale(0.9)'}
+onPointerUp={e => e.currentTarget.style.transform = 'scale(1)'}
+onPointerLeave={e => e.currentTarget.style.transform = 'scale(1)'}
 ```
 
-### Mock Data
-All product data, user info, order history live in `shared/mock-data.js`. Exposed as `window.MOCK`. Images use `picsum.photos` (same as image-picker). Product images use consistent seeds so they look intentional.
+### Mock Data (`window.MOCK`)
+```
+window.MOCK.user            → { name, email, avatar, memberSince }
+window.MOCK.categories      → [ { id, label, icon, from } ]
+window.MOCK.featuredProjects → [ { id, title, subtitle, thumb, type } ]
+window.MOCK.memories        → [ { id, title, thumb, count } ]
+window.MOCK.photobook       → { coverTypes, formats, pageOptions, paperOptions }
+window.MOCK.basket          → { items: [{ id, type, spec, thumb, qty, price }], subtotal, delivery, total }
+window.MOCK.order           → { number, estimatedDelivery, items, total }
+window.MOCK.account         → { orders: [{ id, title, date, status, thumb }] }
+```
 
 ---
 
-## Screen-Specific Notes
-
-### Splash Screen
-- Full-bleed gradient background (teal → dark teal, confirm exact from Figma node `451:13758`)
-- Photobox logo centered (SVG, white)
-- Animated: logo fades in with subtle scale (0.9 → 1.0), then after 2s auto-advances via `navigation.replace`
-- No status bar visible (hide with `black-translucent`)
-
-### Onboarding (3 screens)
-- Consistent layout: full-bleed photo/illustration top half, text + CTA bottom half
-- Progress dots at bottom (active dot = teal, inactive = white/40%)
-- "Continue" button = full-width teal pill
-- Last screen has "Get started" CTA
-- Figma nodes: `451:13808`, `451:13823`, `451:13841`
-
-### Home Screen
-- Scrollable (1920px content area in Figma node `451:13862`)
-- Sections: horizontal product category pills, "Create" cards, "Memories" carousel, "Ideas" grid
-- Sticky tab bar at bottom: Home, Create, My Photos, Account (4 tabs)
-- Tab bar uses liquid glass effect
-
-### Photo Book Editor (multi-step)
-- Step 1: Cover type picker (`451:13381`)
-- Step 2: Format chooser (`451:13426`)
-- Step 3: Configuration — long scroll with lay-flat add-on, size, paper options (`451:13491`)
-- Progress stepper shown in nav bar
-- "Start creating →" CTA navigates to Image Picker
-
-### Image Picker
-- **Use the existing `image-picker/` prototype as-is**
-- Navigate to it: `navigation.push('../image-picker/index.html')`
-- The picker's "Continue" button should navigate back to basket
-- Dark mode throughout
-- Features: swipe-to-select, smart select (AI), sort/filter sheet, fullscreen preview, super-scroll scrubber
-
-### Basket / Checkout
-- Not in Figma yet — design in PB3 style (white surfaces, teal CTAs, iOS list rows)
-- Basket: order summary, quantity controls, price breakdown, "Proceed to checkout" CTA
-- Checkout delivery: address form with iOS-style text inputs, delivery options
-- Checkout payment: card form (no real payment — mock "Pay" button)
-- Order success: large checkmark animation, order number, "Continue shopping" → home
-
-### Account Screen
-- Figma node `451:14038`
-- Sections: My account, Preferences, Support, Account actions (logout)
-- Uses `IOSList` / `IOSListRow` components
-
----
-
-## Working with This Project
+## Running & Testing
 
 ### Running locally
 ```bash
@@ -466,29 +477,25 @@ python3 -m http.server 8080
 ```
 
 ### Testing on iPhone
-1. Serve locally with ngrok or similar, OR deploy to GitHub Pages / Netlify
+1. Serve locally with ngrok, OR deploy to GitHub Pages / Netlify
 2. Open URL in Safari on iPhone
 3. Share → Add to Home Screen
 4. Launch from home screen for fullscreen PWA experience
 
-### Implementing a screen
-1. Load the `figma:figma-design-to-code` skill before calling Figma tools
-2. Call `get_design_context` on the screen's Figma node ID (see table above)
-3. Build the React component in a `.jsx` file alongside the `.html` shell
-4. Keep all interactive states (hover/press/active) matching iOS conventions
-5. Test at 390px width (mobile) and ≥520px (desktop preview)
-
 ### Adding a new screen
 1. Create `screens/screen-name.html` using the standard HTML structure above
-2. Create `screens/screen-name.jsx` with the screen React component
-3. Add it to the navigation flow in this doc and in `shared/navigation.js`
-4. Add to service worker precache list
+2. Create `screens/screen-name.jsx` with the screen React component (root div must have `position:'relative'`)
+3. Wire navigation in the calling screen
+4. Add `'/screens/screen-name.html'` and `'/screens/screen-name.jsx'` to `service-worker.js` PRECACHE
 
-### Key quality checks before considering a screen done
-- [ ] Status bar reads correctly (light/dark per screen)
-- [ ] Safe area insets applied (no content hidden by Dynamic Island or home indicator)
+### Quality checklist for any screen change
+- [ ] Root div has `position:'relative'`
+- [ ] Status bar `<IOSStatusBar dark={false/true} />` present
+- [ ] Safe area insets applied top and bottom
+- [ ] All tappable elements have `onPointerDown/Up/Leave` scale handlers
+- [ ] Back buttons use `scale(0.9)`, all others `scale(0.97)`
 - [ ] Tap targets ≥ 44×44pt
-- [ ] All interactive elements have press states (scale 0.97)
-- [ ] Transitions to/from this screen work correctly
-- [ ] Desktop preview shows in IOSDevice frame
+- [ ] Scrollbar hidden: `scrollbarWidth:'none'`
+- [ ] Desktop preview shows in `<IOSDevice width={402} height={874}>`
 - [ ] No horizontal overflow
+- [ ] New HTML file added to service-worker.js PRECACHE
