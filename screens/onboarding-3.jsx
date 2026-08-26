@@ -87,7 +87,7 @@ function OnboardingScreen() {
 
           {/* Sign in link */}
           <div
-            onClick={() => window.navigation.push('home.html')}
+            onClick={() => window.navigation.replace('home.html')}
             onPointerDown={e => e.currentTarget.style.opacity = '0.6'}
             onPointerUp={e => e.currentTarget.style.opacity = '1'}
             onPointerLeave={e => e.currentTarget.style.opacity = '1'}

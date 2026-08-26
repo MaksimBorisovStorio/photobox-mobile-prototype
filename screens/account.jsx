@@ -85,13 +85,18 @@ function AccountScreen() {
 
         {/* Account actions */}
         <IOSList header="Account" dark={false}>
-          <div style={{
+          <div
+            onClick={() => window.navigation.replace('../screens/onboarding-1.html')}
+            onPointerDown={e => e.currentTarget.style.transform = 'scale(0.97)'}
+            onPointerUp={e => e.currentTarget.style.transform = 'scale(1)'}
+            onPointerLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+            style={{
             display: 'flex', alignItems: 'center', minHeight: 52,
             padding: '0 16px', position: 'relative',
             fontFamily: '-apple-system, system-ui', fontSize: 17,
             letterSpacing: -0.43,
             color: 'var(--color-destructive)',
-            cursor: 'pointer',
+            cursor: 'pointer', transition: 'transform 140ms ease',
           }}>
             <div style={{ flex: 1 }}>Log out</div>
           </div>

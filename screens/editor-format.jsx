@@ -4,7 +4,7 @@ function EditorFormatScreen() {
   const { photobook } = window.MOCK;
 
   return (
-    <div style={{ width:'100%', height:'100%', background:'var(--color-bg)', display:'flex', flexDirection:'column' }}>
+    <div style={{ position:'relative', width:'100%', height:'100%', background:'var(--color-bg)', display:'flex', flexDirection:'column' }}>
       <IOSStatusBar dark={false} />
 
       {/* Nav bar with progress */}

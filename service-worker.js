@@ -3,6 +3,7 @@ const CACHE = 'photobox-v1';
 const PRECACHE = [
   '/',
   '/index.html',
+  '/manifest.json',
   '/shared/styles.css',
   '/shared/navigation.js',
   '/shared/mock-data.js',
