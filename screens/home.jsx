@@ -103,7 +103,7 @@ function FeaturedSection() {
           <div
             key={proj.id}
             onClick={() => window.navigation.push('product-photobook.html')}
-            onPointerDown={e => e.currentTarget.style.transform = 'scale(0.98)'}
+            onPointerDown={e => e.currentTarget.style.transform = 'scale(0.97)'}
             onPointerUp={e => e.currentTarget.style.transform = 'scale(1)'}
             onPointerLeave={e => e.currentTarget.style.transform = 'scale(1)'}
             style={{
@@ -225,8 +225,8 @@ function TabBar({ activeTab, onTabChange }) {
       position: 'absolute', bottom: 0, left: 0, right: 0,
       height: 'calc(49px + env(safe-area-inset-bottom, 0px))',
       paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-      backdropFilter: 'blur(20px) saturate(180%)',
-      WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+      backdropFilter: 'blur(12px) saturate(180%)',
+      WebkitBackdropFilter: 'blur(12px) saturate(180%)',
       background: 'rgba(249,249,249,0.78)',
       borderTop: '0.5px solid rgba(0,0,0,0.12)',
       display: 'flex', alignItems: 'flex-start',
@@ -240,9 +240,13 @@ function TabBar({ activeTab, onTabChange }) {
             if (tab.id === 'account') window.navigation.push('account.html');
             if (tab.id === 'photos') window.navigation.push('../image-picker/index.html');
           }}
+          onPointerDown={e => e.currentTarget.style.transform = 'scale(0.97)'}
+          onPointerUp={e => e.currentTarget.style.transform = 'scale(1)'}
+          onPointerLeave={e => e.currentTarget.style.transform = 'scale(1)'}
           style={{
             flex: 1, height: 49, border: 'none', background: 'transparent', cursor: 'pointer',
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
+            transition: 'transform 140ms ease',
           }}
         >
           <tab.Icon active={activeTab === tab.id} />
