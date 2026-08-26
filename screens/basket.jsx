@@ -7,7 +7,7 @@ function BasketScreen() {
   const total = (parseFloat(subtotal) + basket.delivery).toFixed(2);
 
   return (
-    <div style={{ width:'100%', height:'100%', background:'var(--color-bg)', display:'flex', flexDirection:'column' }}>
+    <div style={{ width:'100%', height:'100%', background:'var(--color-bg)', display:'flex', flexDirection:'column', position:'relative' }}>
       <IOSStatusBar dark={false} />
 
       {/* Nav bar */}
@@ -115,12 +115,21 @@ function BasketScreen() {
         {/* Promo code */}
         <div style={{ margin:'12px 16px 0', background:'var(--color-surface)', borderRadius:22, overflow:'hidden' }}>
           <div
-            onPointerDown={e => e.currentTarget.style.background = 'rgba(0,0,0,0.03)'}
-            onPointerUp={e => e.currentTarget.style.background = 'transparent'}
-            onPointerLeave={e => e.currentTarget.style.background = 'transparent'}
+            onPointerDown={e => {
+              e.currentTarget.style.transform = 'scale(0.97)';
+              e.currentTarget.style.background = 'rgba(0,0,0,0.03)';
+            }}
+            onPointerUp={e => {
+              e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.background = 'transparent';
+            }}
+            onPointerLeave={e => {
+              e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.background = 'transparent';
+            }}
             style={{
               display:'flex', alignItems:'center', justifyContent:'space-between',
-              padding:'14px 16px', cursor:'pointer', transition:'background 100ms ease',
+              padding:'14px 16px', cursor:'pointer', transition:'transform 140ms ease, background 100ms ease',
             }}
           >
             <span style={{ fontSize:16, color:'#000' }}>Add promo code</span>
