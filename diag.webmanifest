@@ -1,0 +1,14 @@
+{
+  "name": "PB Diag",
+  "short_name": "PB Diag",
+  "start_url": "./diag.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FF0033",
+  "theme_color": "#FF0033",
+  "icons": [
+    { "src": "./app_icon.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "./app_icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "scope": "./"
+}

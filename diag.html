@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PB Viewport Diag</title>
+<!-- Identical viewport/meta configuration to the app screens. -->
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PB Diag">
+<link rel="manifest" href="diag.webmanifest">
+<link rel="apple-touch-icon" href="app_icon.png">
+<style>
+  /* html/body background is BRIGHT RED on purpose: any strip of red visible at an
+     edge is page background OUTSIDE the position:fixed box — i.e. a letterboxed
+     region, which is exactly the "gap" being investigated. */
+  html, body { margin:0; padding:0; background:#FF0033; height:100%; }
+  * { box-sizing:border-box; }
+  #box {
+    position:fixed; inset:0;
+    background:#FFFFFF;
+    border:4px solid #FF00FF;      /* magenta = bounds of position:fixed; inset:0 */
+    overflow:auto;
+    font:11px/1.35 ui-monospace,Menlo,monospace; color:#000;
+    padding:calc(env(safe-area-inset-top,0px) + 8px) 10px 10px;
+  }
+  /* yellow = where 100vh ends */
+  #vh { position:fixed; left:0; right:0; top:calc(100vh - 4px); height:4px; background:#FFD400; z-index:5; }
+  /* green = where the bottom safe-area inset begins */
+  #sa { position:fixed; left:0; right:0; bottom:env(safe-area-inset-bottom,0px); height:4px; background:#00C853; z-index:5; }
+  /* blue = where 100dvh ends */
+  #dvh { position:fixed; left:0; right:0; top:calc(100dvh - 4px); height:4px; background:#0066FF; z-index:5; }
+  b { display:inline-block; min-width:132px; color:#555; font-weight:600; }
+  .k { color:#0a7; font-weight:700; }
+  .bad { color:#c00; font-weight:700; }
+  #probe { position:absolute; visibility:hidden;
+           padding: env(safe-area-inset-top,0px) env(safe-area-inset-right,0px)
+                    env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px); }
+  button { font:600 13px/1 -apple-system,system-ui; padding:9px 12px; margin:4px 4px 0 0;
+           border-radius:8px; border:1px solid #999; background:#eee; }
+  h1 { font:700 14px/1.2 -apple-system,system-ui; margin:0 0 6px; }
+  .legend { margin:8px 0 6px; font-size:10px; color:#444; }
+</style>
+</head>
+<body>
+<div id="probe"></div>
+<div id="vh"></div><div id="dvh"></div><div id="sa"></div>
+<div id="box">
+  <h1>Photobox viewport diagnostic</h1>
+  <div class="legend">
+    RED strip = page background outside the fixed box (the gap).
+    MAGENTA = edges of <code>position:fixed;inset:0</code>.
+    YELLOW = 100vh end. BLUE = 100dvh end. GREEN = bottom safe-area inset.
+  </div>
+  <pre id="out">measuring…</pre>
+  <button id="nocover">remove viewport-fit=cover</button>
+  <button id="cover">re-add viewport-fit=cover</button>
+  <button id="again">re-measure</button>
+</div>
+<script>
+var BUILD = 'diag-1';
+function px(el){ var r = el.getBoundingClientRect(); return Math.round(r.width)+'x'+Math.round(r.height)+' top '+Math.round(r.top)+' bottom '+Math.round(r.bottom); }
+function unit(u){
+  var d = document.createElement('div');
+  d.style.cssText = 'position:absolute;visibility:hidden;width:1px;height:'+u;
+  document.body.appendChild(d);
+  var h = d.getBoundingClientRect().height;
+  d.remove();
+  return Math.round(h*100)/100;
+}
+function row(k,v){ return '<b>'+k+'</b>'+v; }
+function measure(){
+  var cs = getComputedStyle(document.getElementById('probe'));
+  var box = document.getElementById('box');
+  var bodyCS = getComputedStyle(document.body);
+  var htmlCS = getComputedStyle(document.documentElement);
+  var vv = window.visualViewport;
+  var insets = [cs.paddingTop, cs.paddingRight, cs.paddingBottom, cs.paddingLeft].join(' / ');
+  var vh = unit('100vh'), dvh = unit('100dvh'), svh = unit('100svh'), lvh = unit('100lvh'),
+      fa = unit('-webkit-fill-available');
+  var boxRect = box.getBoundingClientRect();
+  var lines = [
+    row('build', BUILD),
+    row('standalone', String(navigator.standalone) + '  (display-mode:standalone = ' +
+        (window.matchMedia('(display-mode: standalone)').matches) + ')'),
+    row('screen', screen.width+'x'+screen.height+'  dpr '+window.devicePixelRatio),
+    row('window.inner', window.innerWidth+'x'+window.innerHeight),
+    row('window.outer', window.outerWidth+'x'+window.outerHeight),
+    row('docEl.client', document.documentElement.clientWidth+'x'+document.documentElement.clientHeight),
+    row('visualViewport', vv ? Math.round(vv.width)+'x'+Math.round(vv.height)+' offTop '+vv.offsetTop+' scale '+vv.scale : 'n/a'),
+    row('env insets T/R/B/L', '<span class="'+(parseFloat(cs.paddingBottom)>0?'k':'bad')+'">'+insets+'</span>'),
+    row('100vh / 100dvh', vh+' / '+dvh),
+    row('100svh / 100lvh', svh+' / '+lvh),
+    row('-webkit-fill-avail', fa),
+    row('fixed inset:0 box', px(box)),
+    row('  → box.bottom vs screen', Math.round(boxRect.bottom)+' vs inner '+window.innerHeight),
+    row('html height', htmlCS.height+'   body height '+bodyCS.height),
+    row('body transform', bodyCS.transform),
+    row('body animation', bodyCS.animationName+' '+bodyCS.animationFillMode),
+    row('viewport meta', document.querySelector('meta[name=viewport]').content)
+  ];
+  document.getElementById('out').innerHTML = lines.join('\n');
+
+  // Does the phone have the new stylesheet + service worker build?
+  fetch('shared/styles.css?cb='+Math.random()).then(function(r){return r.text();}).then(function(t){
+    var n = (t.match(/#root > \* \{ animation/g)||[]).length;
+    add(row('styles.css nav rules', n===4 ? '<span class="k">4/4 on #root &gt; * (NEW build)</span>'
+                                          : '<span class="bad">'+n+'/4 — OLD build on device</span>'));
+  }).catch(function(e){ add(row('styles.css fetch', 'failed: '+e.message)); });
+  fetch('service-worker.js?cb='+Math.random()).then(function(r){return r.text();}).then(function(t){
+    var m = t.match(/photobox-v\d+/);
+    add(row('service-worker cache', m ? m[0] : '?'));
+  }).catch(function(){});
+  if (navigator.serviceWorker) {
+    navigator.serviceWorker.getRegistrations().then(function(rs){
+      add(row('SW registrations', rs.length ? rs.map(function(r){
+        return (r.active&&r.active.scriptURL||'').replace(location.origin,'') + ' [' +
+               (r.active?r.active.state:'none') + ']'; }).join(', ') : 'none'));
+    });
+  }
+  if (window.caches) caches.keys().then(function(k){ add(row('caches', k.join(', ')||'none')); });
+}
+function add(html){ document.getElementById('out').innerHTML += '\n' + html; }
+function setViewport(content){
+  document.querySelector('meta[name=viewport]').setAttribute('content', content);
+  setTimeout(measure, 400);
+}
+document.getElementById('again').onclick = measure;
+document.getElementById('nocover').onclick = function(){
+  setViewport('width=device-width,initial-scale=1,user-scalable=no'); };
+document.getElementById('cover').onclick = function(){
+  setViewport('width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no'); };
+window.addEventListener('resize', function(){ setTimeout(measure, 200); });
+setTimeout(measure, 250);
+</script>
+</body>
+</html>
