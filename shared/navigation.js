@@ -7,6 +7,24 @@
 
   function setDir(d) { sessionStorage.setItem('pb_nav', d); }
 
+  /* The exit animations run on the screen wrapper, never on <body> — same reason
+     as the enter animations in styles.css: a transform on <body> makes it the
+     containing block for the wrapper's `position:fixed; inset:0`, and in the iOS
+     standalone PWA <body>'s box is shorter than the screen, so the page would
+     shrink off the bottom edge for the duration of the transition.
+     Set `style.animation` only; cssText would wipe the wrapper's React styles. */
+  function animateOut(keyframes, css, ms) {
+    if (!document.getElementById('pb-nav-' + keyframes)) {
+      const s = document.createElement('style');
+      s.id = 'pb-nav-' + keyframes;
+      s.textContent = css;
+      document.head.appendChild(s);
+    }
+    const root = document.getElementById('root');
+    const el = (root && root.firstElementChild) || document.body;
+    el.style.animation = keyframes + ' ' + ms + 'ms cubic-bezier(0.4,0,0.2,1) both';
+  }
+
   window.navigation = {
     /** Push a new screen (slide in from right) */
     push(url) {
@@ -15,15 +33,8 @@
     },
     /** Go back (slide in from left — previous page animates in) */
     pop() {
-      document.body.style.cssText =
-        'animation: slideOutRight 280ms cubic-bezier(0.4,0,0.2,1) both;';
-      // Define slideOutRight inline if styles.css isn't loaded yet
-      if (!document.getElementById('pb-nav-style')) {
-        const s = document.createElement('style');
-        s.id = 'pb-nav-style';
-        s.textContent = '@keyframes slideOutRight{from{transform:translateX(0)}to{transform:translateX(100%)}}';
-        document.head.appendChild(s);
-      }
+      animateOut('slideOutRight',
+        '@keyframes slideOutRight{from{transform:translateX(0)}to{transform:translateX(100%)}}', 280);
       setDir('pop');
       setTimeout(() => window.history.back(), 270);
     },
@@ -34,14 +45,8 @@
     },
     /** Dismiss a sheet (slide down, then go back) */
     dismiss() {
-      document.body.style.cssText =
-        'animation: slideOutDown 300ms cubic-bezier(0.4,0,0.2,1) both;';
-      if (!document.getElementById('pb-nav-style2')) {
-        const s = document.createElement('style');
-        s.id = 'pb-nav-style2';
-        s.textContent = '@keyframes slideOutDown{from{transform:translateY(0)}to{transform:translateY(100%)}}';
-        document.head.appendChild(s);
-      }
+      animateOut('slideOutDown',
+        '@keyframes slideOutDown{from{transform:translateY(0)}to{transform:translateY(100%)}}', 300);
       setDir('pop');
       setTimeout(() => window.history.back(), 290);
     },

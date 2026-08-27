@@ -180,12 +180,34 @@ sessionStorage.setItem('pb_nav', 'push');
 window.location.href = '../screens/basket.html';
 ```
 
-### `html, body { height: 100% }` in styles.css is load-bearing — do not remove
-The `[data-nav]` push/pop/modal animations put a `transform` on `<body>`, which makes
-body the containing block for every screen's `position:fixed; inset:0` wrapper. With
-auto height, body's content box is 0px tall (its only child is out of flow), so every
-pushed screen collapsed to 390×0 and rendered **blank**. Only `replace` (fadeIn, no
-transform) escaped it. Fixed by giving html/body a definite viewport height.
+### ⚠️ Never animate `<body>` — the nav transitions run on `#root > *`
+`animation-fill-mode: both` keeps the last keyframe applied **forever**, so a
+`transform: translateX(0)` on `<body>` is permanent, not just for the 320ms. A
+transformed `<body>` is the containing block for every screen's
+`position:fixed; inset:0` wrapper — and in the **iOS standalone PWA the layout
+viewport that `height: 100%` resolves against is shorter than the screen that fixed
+positioning reaches**. So every screen came up ~34pt short with a band of body
+background under it: the reported "gap at the bottom". The image picker was the only
+screen unaffected, because it loads neither `styles.css` nor `navigation.js` and so
+its wrapper stays fixed to the real viewport.
+
+Both the enter animations (`styles.css`, `[data-nav='…'] #root > *`) and the exit
+animations (`navigation.js` → `animateOut`) therefore target the **screen wrapper**,
+never `<body>`. That is safe because a fixed element's own transform does not affect
+its own box — it stays flush to all four physical edges throughout the transition.
+
+Two consequences to respect:
+- `animateOut` sets `style.animation` only. The old code used `style.cssText`, which
+  on the wrapper would wipe React's inline `position:fixed`/background.
+- `html, body { height: 100% }` is no longer load-bearing (it used to be the
+  workaround for the collapse-to-0 symptom of the same bug) but is harmless and kept.
+
+Verified with all 13 screens in a 390×844 iframe, with `html, body` squeezed to 790px
+to simulate the iOS short layout viewport: every wrapper still measures 390×844 at
+`top: 0`, `animation` on `<body>` is `none` and `transform` on `<body>` is `none`.
+The splash→onboarding `replace` path was checked separately (`fadeIn` lands on the
+wrapper), and `pop()` was checked to animate the wrapper while leaving its React
+inline styles intact.
 
 ### Every screen root div needs `position:'relative'`
 CTAs are `position:'absolute'; bottom:0` — they anchor to the nearest `position:relative` ancestor. Without it on the root div, CTAs can escape to the IOSDevice frame boundary on desktop. Every screen component's outermost `<div>` must have `position:'relative'`.
@@ -1007,7 +1029,7 @@ Exports via `Object.assign(window, {...})`:
 
 ### service-worker.js
 Precaches every screen HTML + JSX, the shared assets (incl. fonts and splash SVGs),
-manifest.json and the image-picker files. Cache name `photobox-v4`.
+manifest.json and the image-picker files. Cache name `photobox-v16`.
 
 **Strategy: network-first, cache fallback** — and same-origin requests are fetched
 with `cache: 'no-store'`. Both parts are deliberate:

@@ -158,10 +158,12 @@
 *, *::before, *::after { box-sizing: border-box; }
 html, body {
   margin: 0; padding: 0;
-  /* Definite viewport height is REQUIRED: the [data-nav] push/pop/modal
-     animations put a transform on <body>, which makes it the containing block
-     for the screens' `position:fixed; inset:0` wrapper. With auto height that
-     wrapper collapses to 0px and the screen renders blank. */
+  /* Kept as a definite height so any in-flow content has a viewport-sized box to
+     resolve against. It is NO LONGER load-bearing for the screen wrappers: the
+     [data-nav] animations are applied to `#root > *` (the wrapper itself), not to
+     <body>, so nothing in the ancestor chain becomes a containing block for their
+     `position:fixed; inset:0`. See the navigation block at the bottom of this file
+     — do not move those animations back onto <body>. */
   height: 100%;
   font-family: var(--font);
   -webkit-font-smoothing: antialiased;
@@ -191,15 +193,25 @@ html, body {
 /* ── Navigation transition animations ── */
 /* Direction is set on <html data-nav="push|pop|modal|replace"> before page load */
 
+/* ⚠️ These animate `#root > *` — the screen wrapper — and MUST NOT be moved back
+   onto <body>. `animation-fill-mode: both` leaves the last keyframe applied
+   forever, so a transform on <body> is permanent, and a transformed <body> is the
+   containing block for the wrapper's `position:fixed; inset:0`. In the iOS
+   standalone PWA the layout viewport that <body>'s `height:100%` resolves against
+   is SHORTER than the screen that fixed positioning reaches, so every screen came
+   up ~34pt short with a band of body background under it. Animating the wrapper
+   instead is safe: a fixed element's own transform does not affect its own box, so
+   it stays flush to all four physical screen edges throughout the transition. */
+
 @keyframes slideInRight  { from { transform: translateX(100%); }  to { transform: translateX(0); } }
 @keyframes slideInLeft   { from { transform: translateX(-30%); }  to { transform: translateX(0); } }
 @keyframes slideUp       { from { transform: translateY(100%); }  to { transform: translateY(0); } }
 @keyframes fadeIn        { from { opacity: 0; }                   to { opacity: 1; } }
 
-[data-nav='push']    body { animation: slideInRight 320ms cubic-bezier(0.32, 0.72, 0.24, 1) both; }
-[data-nav='pop']     body { animation: slideInLeft  300ms cubic-bezier(0.32, 0.72, 0.24, 1) both; }
-[data-nav='modal']   body { animation: slideUp      380ms cubic-bezier(0.34, 1.05, 0.64, 1) both; }
-[data-nav='replace'] body { animation: fadeIn       400ms ease both; }
+[data-nav='push']    #root > * { animation: slideInRight 320ms cubic-bezier(0.32, 0.72, 0.24, 1) both; }
+[data-nav='pop']     #root > * { animation: slideInLeft  300ms cubic-bezier(0.32, 0.72, 0.24, 1) both; }
+[data-nav='modal']   #root > * { animation: slideUp      380ms cubic-bezier(0.34, 1.05, 0.64, 1) both; }
+[data-nav='replace'] #root > * { animation: fadeIn       400ms ease both; }
 /* 'dismiss' pages slide DOWN before history.back() — handled in JS, no CSS needed */
 
 /* Shared interactive press state */
