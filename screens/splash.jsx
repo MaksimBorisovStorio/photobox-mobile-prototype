@@ -1,4 +1,6 @@
 // screens/splash.jsx
+// Figma: "splashscreen" — node 451:13758 (Final prototype canvas)
+// Geometry below is taken verbatim from the Figma frame (390×844 baseline).
 function SplashScreen() {
   const { useEffect } = React;
 
@@ -10,36 +12,32 @@ function SplashScreen() {
     return () => clearTimeout(t);
   }, []);
 
+  // Radial wash — node 451:13760, gradient copied from Figma dev mode.
+  const wash = 'radial-gradient(661.83% 92.48% at 50% 50%, var(--pb-wash-stops))';
+
   return (
     <div style={{
-      width: '100%', height: '100%',
-      background: 'linear-gradient(160deg, #0E9E8E 0%, #065E57 60%, #032E2A 100%)',
-      display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
-      animation: 'splashLogoIn 600ms cubic-bezier(0.34, 1.3, 0.64, 1) 200ms both',
+      position: 'relative', width: '100%', height: '100%',
+      background: '#EBF7F8', overflow: 'hidden',
     }}>
       <style>{`
-        @keyframes splashLogoIn {
-          from { opacity:0; transform:scale(0.88); }
-          to   { opacity:1; transform:scale(1); }
+        @keyframes pbSplashIn {
+          from { opacity: 0; transform: scale(0.94); }
+          to   { opacity: 1; transform: scale(1); }
         }
       `}</style>
 
-      {/* Photobox logo — sparkle SVG + wordmark */}
+      {/* Teal wash */}
+      <div style={{ position: 'absolute', inset: 0, background: wash }} />
+
+      {/* Logo lockup — node 451:13761: 157×41, centred, top 401/844 */}
       <div style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
+        position: 'absolute', left: 'calc(50% + 0.5px)', top: '47.51%',
+        transform: 'translateX(-50%)',
       }}>
-        {/* Sparkle / star icon */}
-        <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
-          <path d="M26 4L29.5 20.5L46 24L29.5 27.5L26 44L22.5 27.5L6 24L22.5 20.5L26 4Z"
-                fill="white" opacity="0.95"/>
-        </svg>
-        {/* Wordmark */}
-        <span style={{
-          fontFamily: '-apple-system, "SF Pro Display", system-ui',
-          fontSize: 32, fontWeight: 700, color: '#FFFFFF',
-          letterSpacing: '-0.5px',
-        }}>photobox</span>
+        <div style={{ animation: 'pbSplashIn 700ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both' }}>
+          <PhotoboxLogo scale={1} glow />
+        </div>
       </div>
     </div>
   );

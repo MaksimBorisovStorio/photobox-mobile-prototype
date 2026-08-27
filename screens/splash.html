@@ -11,7 +11,7 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="../shared/styles.css">
   <style>
-    html, body { background: #000; }
+    html, body { background: #EBF7F8; }
   </style>
   <script crossorigin="anonymous" src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
   <script crossorigin="anonymous" src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
@@ -21,6 +21,7 @@
   <div id="root"></div>
   <script src="../shared/navigation.js"></script>
   <script type="text/babel" src="../shared/ios-frame.jsx"></script>
+  <script type="text/babel" src="../shared/brand.jsx"></script>
   <script type="text/babel" src="splash.jsx"></script>
   <script type="text/babel">
     function useIsMobile() {
@@ -36,13 +37,13 @@
     function App() {
       const mobile = useIsMobile();
       if (mobile) return (
-        <div style={{ position:'fixed', inset:0, overflow:'hidden' }}>
+        <div style={{ position:'fixed', inset:0, background:'#EBF7F8', overflow:'hidden' }}>
           <SplashScreen />
         </div>
       );
       return (
         <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'100vh' }}>
-          <IOSDevice width={402} height={874} dark>
+          <IOSDevice width={402} height={874}>
             <SplashScreen />
           </IOSDevice>
         </div>
