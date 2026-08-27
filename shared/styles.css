@@ -1,5 +1,23 @@
 /* shared/styles.css */
 :root {
+  /* Figma design tokens (exact names from the PB3 library) */
+  --Extended-brand-colours-Secondary-500: #007377;
+  --colour-foreground-fg-secondary: #007377;
+  --colour-foreground-fg-black: #333333;
+  --functional-colours-grey-50: #F4F4F4;
+  --colour-foreground-fg-white: #FFFFFF;
+
+  /* Brand wash — one shared stop list; each screen supplies its own geometry.
+     Splash (451:13758): radial-gradient(661.83% 92.48% at 50% 50%, …)
+     Onboarding (451:13808): radial-gradient(815.74% 113.98% at 50% 88.68%, …)
+     Both sit on a #EBF7F8 base. */
+  --pb-wash-stops:
+    var(--Extended-brand-colours-Secondary-500, #007377) 0%,
+    rgba(0, 142, 147, 0.89) 12.04%,
+    rgba(144, 206, 208, 0.43) 41.2%,
+    rgba(207, 234, 235, 0.19) 59.07%,
+    rgba(255, 255, 255, 0.00) 100%;
+
   /* Brand */
   --color-primary: #0E9E8E;
   --color-primary-dark: #0A7A6E;
@@ -40,10 +58,46 @@
   --r-xl: 28px; --r-full: 9999px;
 }
 
+/* Brand wordmark face — Teachers (Google Fonts, OFL), self-hosted so the
+   splash logo renders with no network round-trip. Variable weight 400–800. */
+@font-face {
+  font-family: 'Teachers';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: block;
+  src: url('assets/teachers-variable-latin.woff2') format('woff2');
+}
+
+/* Onboarding display face. Figma specifies "Google Sans Flex", which Google does
+   not distribute on Google Fonts; DM Sans is the closest self-hosted stand-in.
+   To go exact: drop google-sans-flex.woff2 into shared/assets/ and uncomment the
+   block below — it is first in the font stack, so it wins automatically. */
+/*
+@font-face {
+  font-family: 'Google Sans Flex';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: block;
+  src: url('assets/google-sans-flex.woff2') format('woff2');
+}
+*/
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 100 1000;
+  font-display: block;
+  src: url('assets/dmsans-variable-latin.woff2') format('woff2');
+}
+
 /* Reset */
 *, *::before, *::after { box-sizing: border-box; }
 html, body {
   margin: 0; padding: 0;
+  /* Definite viewport height is REQUIRED: the [data-nav] push/pop/modal
+     animations put a transform on <body>, which makes it the containing block
+     for the screens' `position:fixed; inset:0` wrapper. With auto height that
+     wrapper collapses to 0px and the screen renders blank. */
+  height: 100%;
   font-family: var(--font);
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
