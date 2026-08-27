@@ -43,7 +43,6 @@ All 13 implementation tasks are done. Branch `feature/prototype-build` is demo-r
 - **Transition polish** — add push/pop slide animations between screens (navigation.js stubs are in place; CSS transitions not yet wired to the iframe-swap mechanism).
 - **Editor tools** — Photos, Arrange, Themes, Style, AI help and Options are inert by request. The card's settings icon and the header's Continue arrow are inert for the same reason.
 - **My Photos tab** — home tab bar has a "My Photos" tab that navigates to `../image-picker/index.html`. If a standalone My Photos grid (distinct from the picker) is needed, create `screens/my-photos.html`.
-- **Deploy** — push to GitHub Pages / Netlify for iPhone testing. Current setup requires `python3 -m http.server 8080` + ngrok.
 - **Real Figma node check** — `editor-cover.html` referenced in the original plan was merged into `product-photobook.html` (it's the same cover-picker step); verify this matches stakeholder expectations.
 
 ---
@@ -1130,6 +1129,34 @@ window.MOCK.account         → { orders: [{ id, title, date, status, thumb }] }
 
 ## Running & Testing
 
+### Live deployment
+**https://maksimborisovstorio.github.io/photobox-mobile-prototype/**
+
+GitHub Pages, served from branch `feature/prototype-build`, path `/`. The repo was made
+public to enable it — Pages on a private repo needs a paid plan. Note that a Pages site
+is publicly reachable **either way**; going public additionally exposes the source and
+git history.
+
+`.nojekyll` at the repo root stops Jekyll from processing the tree.
+
+⚠️ **Paths must stay relative.** Pages serves a project site from `/<repo>/`, so a
+root-absolute path resolves *above* the app and 404s. Everything was converted:
+`index.html` (manifest, touch icon, SW registration, the splash redirect), the
+`<link rel="manifest">` in all 13 screens, `manifest.json` (`start_url`, `scope`,
+icons), and all 104 `service-worker.js` precache entries — those resolve against the
+worker's own URL, so they work at a root or a subpath. The SW's fetch handler and
+`c.add()` already work off the request URL and needed no change. Verify any new
+absolute path by serving the **parent** directory and loading `/<dir>/index.html`.
+
+To redeploy: commit and push to `feature/prototype-build`; Pages rebuilds in ~20s.
+
+### Testing on iPhone
+Open the URL above in Safari → Share → Add to Home Screen → launch from the icon for
+the fullscreen PWA. It is served over HTTPS, so the service worker registers and the
+flow works offline after the first visit. If a stale build appears, relaunch twice (the
+first load installs the new worker, the second is served by it) or delete and re-add
+the icon.
+
 ### Running locally
 ```bash
 cd /Users/mborisov/Desktop/test/MEGAPROTOTYPE
@@ -1137,11 +1164,6 @@ python3 -m http.server 8080
 # Open http://localhost:8080
 ```
 
-### Testing on iPhone
-1. Serve locally with ngrok, OR deploy to GitHub Pages / Netlify
-2. Open URL in Safari on iPhone
-3. Share → Add to Home Screen
-4. Launch from home screen for fullscreen PWA experience
 
 ### Adding a new screen
 1. Create `screens/screen-name.html` using the standard HTML structure above
