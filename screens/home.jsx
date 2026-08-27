@@ -4,7 +4,7 @@ function HomeScreen() {
   const [activeTab, setActiveTab] = React.useState('home');
 
   return (
-    <div style={{ width:'100%', height:'100%', position:'relative', background:'var(--color-bg)' }}>
+    <div style={{ width:'100%', height:'100%', position:'relative', background:'#F1F6F6' }}>
       {/* Scrollable content — sits above tab bar */}
       <div style={{
         position: 'absolute',
@@ -14,22 +14,68 @@ function HomeScreen() {
         overflowX: 'hidden',
         WebkitOverflowScrolling: 'touch',
         scrollbarWidth: 'none',
+        // Explicit stacking context: lets the wash sit at z-index -1 *inside* the
+        // scroller, above its own background but below every in-flow section.
+        isolation: 'isolate',
       }}>
-        {/* Status bar spacer */}
-        <div style={{ height: 'calc(env(safe-area-inset-top, 44px) + 12px)' }} />
-
-        {/* Large title */}
+        {/* Brand wash — Figma node 451:13863: 390×429 at the top, same stop list
+            as splash/onboarding but centred on the top-left corner (6, 0), so the
+            deep teal sits in the corner and fades away across and down the header.
+            It lives INSIDE the scroller: as a child of the screen root it stayed
+            pinned to the viewport and read as sticky. Absolute children of a
+            scroll container scroll with its content (unlike position:fixed). */}
         <div style={{
-          padding: '4px 16px 0',
-          fontFamily: '-apple-system, "SF Pro Display", system-ui',
-          fontSize: 34, fontWeight: 700, letterSpacing: '-0.4px',
-          color: '#000',
+          position: 'absolute', top: 0, left: 0, width: '100%', height: 429,
+          background: 'radial-gradient(702.33% 98.14% at 1.54% 0%, var(--pb-wash-stops))',
+          pointerEvents: 'none', zIndex: -1,
+        }} />
+
+        {/* Header — Figma node 451:13865. Container 451:13864 pads pt56/px20 and
+            carries a backdrop-blur; the blur is skipped here because the only
+            thing behind it is the smooth wash, where it is a no-op that would
+            cost a stacking context. */}
+        <div style={{
+          position: 'relative',
+          padding: '0 20px',
+          paddingTop: 'max(56px, calc(env(safe-area-inset-top, 44px) + 12px))',
+          display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
         }}>
-          Create
+          <PhotoboxLogo scale={2 / 3} />
+          <GlassIconButton label="Notifications">
+            <img src="../shared/assets/icon-notification.svg" alt=""
+                 width={24} height={24} style={{ display: 'block' }} />
+          </GlassIconButton>
         </div>
 
-        {/* Category pills */}
-        <CategorySection />
+        {/* Glass cards — Figma nodes 451:13876/13877: 267×136, r24, white hairline,
+            white radial fill at 90%. Content for these comes later. */}
+        <div style={{
+          position: 'relative',
+          display: 'flex', gap: 8, alignItems: 'center',
+          // overflow-x:auto forces overflow-y to compute to auto/hidden — it cannot
+          // be visible — so the cards' shadow needs room *inside* the padding box
+          // or it gets clipped at the bottom edge. 20px covers the shadow's reach
+          // (offset 4 + blur 16 - spread 1); marginBottom drops to 4 to keep the
+          // 24px gap to the Create section.
+          padding: '24px 20px 20px', marginBottom: 4,
+          overflowX: 'auto', overflowY: 'hidden',
+          scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch',
+        }}>
+          {[0, 1].map(i => (
+            <div key={i} style={{
+              flex: '0 0 auto', width: 267, height: 136, borderRadius: 24,
+              border: '1px solid #FFFFFF',
+              boxShadow: '0px 4px 16px -1px rgba(0,77,74,0.1)',
+              // Figma fills at 90% opacity; folded into the stops so the hairline
+              // border stays fully opaque.
+              background: 'radial-gradient(92.88% 65.46% at 47.94% -27.94%,' +
+                          ' rgba(255,255,255,0.432) 0%, rgba(255,255,255,0.9) 100%)',
+            }} />
+          ))}
+        </div>
+
+        {/* Create — Figma node 367:6068 */}
+        <CreateSection />
 
         {/* Featured projects */}
         <FeaturedSection />
@@ -50,44 +96,110 @@ function HomeScreen() {
   );
 }
 
-function CategorySection() {
-  const { categories } = window.MOCK;
+// Create section — Figma node 367:6068 (title 378:6773 + grid 367:6472).
+// Section: 350 wide inside the page's 20px gutters, py 16, 16px gap to the grid.
+// Grid: 2 equal columns, 12px gaps → cards are (350-12)/2 = 169 wide at 390.
+const CREATE_CARDS = [
+  { id: 'photobooks', title: 'Photo books', from: '\u20AC 14,99', img: 'create-photo-books.png' },
+  { id: 'walldecor',  title: 'Wall decor',  from: '\u20AC 14,99', img: 'create-wall-decor.png' },
+  { id: 'calendars',  title: 'Calendars',   from: '\u20AC 14,99', img: 'create-calendars.png', inset: true },
+  { id: 'prints',     title: 'Prints',      from: '\u20AC 14,99', img: 'create-prints.png' },
+  { id: 'mugs',       title: 'Mugs',        from: '\u20AC 14,99', img: 'create-mugs.png' },
+  // Figma reuses the calendars artwork for Gifts (both point at the same fill).
+  { id: 'gifts',      title: 'Gifts',       from: '\u20AC 14,99', img: 'create-calendars.png', inset: true },
+];
+
+function CreateSection() {
   return (
-    <div style={{ marginTop: 16 }}>
-      <div style={{ padding: '0 16px 12px', fontSize: 22, fontWeight: 700, color: '#000', letterSpacing: '-0.3px' }}>
-        Shop
-      </div>
-      <div style={{
-        display: 'flex', gap: 10,
-        overflowX: 'auto', scrollbarWidth: 'none',
-        WebkitOverflowScrolling: 'touch',
-        padding: '0 16px 4px',
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 16,
+      padding: '16px 20px', boxSizing: 'border-box',
+    }}>
+      <p style={{
+        margin: 0, width: '100%',
+        fontFamily: PB_DISPLAY, fontWeight: 700, fontSize: 24,
+        lineHeight: '40px', letterSpacing: '-0.24px',
+        color: 'var(--colour-foreground-fg-black, #333)',
       }}>
-        {categories.map(cat => (
-          <button
-            key={cat.id}
-            onClick={() => cat.id === 'photobooks' && window.navigation.push('product-photobook.html')}
-            onPointerDown={e => e.currentTarget.style.transform = 'scale(0.97)'}
-            onPointerUp={e => e.currentTarget.style.transform = 'scale(1)'}
-            onPointerLeave={e => e.currentTarget.style.transform = 'scale(1)'}
-            style={{
-              flexShrink: 0,
-              display: 'flex', flexDirection: 'column', alignItems: 'center',
-              gap: 6, padding: '14px 16px',
-              background: 'var(--color-surface)', borderRadius: 16,
-              border: 'none', cursor: 'pointer',
-              boxShadow: '0 1px 4px rgba(0,0,0,0.07)',
-              transition: 'transform 140ms ease',
-              minWidth: 76,
-            }}
-          >
-            <span style={{ fontSize: 26 }}>{cat.icon}</span>
-            <span style={{ fontSize: 12, fontWeight: 600, color: '#000', whiteSpace: 'nowrap' }}>{cat.label}</span>
-            <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>from {cat.from}</span>
-          </button>
-        ))}
+        Create
+      </p>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+        gap: 12,
+      }}>
+        {CREATE_CARDS.map(c => <CreateCard key={c.id} {...c} />)}
       </div>
     </div>
+  );
+}
+
+// Card — Figma component 367:6422: white, r16, clipped; image box is a 171:165
+// aspect strip, then a fixed 64px caption block padded 16 at the sides and bottom.
+function CreateCard({ id, title, from, img, inset }) {
+  // Only photo books has a destination in the prototype so far.
+  const onOpen = () => {
+    if (id === 'photobooks') window.navigation.push('product-photobook.html');
+  };
+  return (
+    <button
+      onClick={onOpen}
+      onPointerDown={e => { e.currentTarget.style.transform = 'scale(0.97)'; }}
+      onPointerUp={e => { e.currentTarget.style.transform = 'scale(1)'; }}
+      onPointerLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
+      style={{
+        background: '#FFFFFF', borderRadius: 16, overflow: 'hidden',
+        // Not in the Figma card component (367:6422) — its gaps render as flat
+        // #F1F6F6 with no falloff at any edge. This is the same card shadow the
+        // design uses on the top banners (404:6794) and the Ideas cards (367:6246).
+        boxShadow: '0px 4px 16px -1px rgba(0,77,74,0.1)',
+        border: 'none', padding: 0, cursor: 'pointer',
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        transition: 'transform 140ms ease', textAlign: 'center',
+        WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      {/* image — node 367:6386 */}
+      <div style={{
+        position: 'relative', width: '100%', aspectRatio: '171 / 165',
+        overflow: 'hidden', flexShrink: 0,
+      }}>
+        <img
+          src={`../shared/assets/${img}`}
+          alt=""
+          style={inset
+            // Figma places this fill at a sub-rect rather than filling the box.
+            ? { position: 'absolute', left: '14.04%', top: '12.58%',
+                width: '71.93%', height: '74.84%', display: 'block' }
+            : { position: 'absolute', inset: 0, width: '100%', height: '100%',
+                objectFit: 'cover', display: 'block' }}
+        />
+      </div>
+
+      {/* caption — node 367:6408 */}
+      <div style={{
+        width: '100%', height: 64, boxSizing: 'border-box', flexShrink: 0,
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        padding: '0 16px 16px',
+      }}>
+        <p style={{
+          margin: 0, width: '100%',
+          fontFamily: PB_DISPLAY, fontWeight: 600, fontSize: 16,
+          lineHeight: '20px', letterSpacing: '-0.16px',
+          color: 'var(--colour-foreground-fg-black, #333)',
+        }}>{title}</p>
+        <p style={{
+          margin: 0, width: '100%',
+          fontFamily: '-apple-system, "SF Pro Text", system-ui, sans-serif',
+          fontSize: 13, lineHeight: '28px',
+          color: 'var(--colour-foreground-fg-secondary, #007377)',
+        }}>
+          <span style={{ fontWeight: 510 }}>from </span>
+          <span style={{ fontWeight: 700 }}>{from}</span>
+        </p>
+      </div>
+    </button>
   );
 }
 
