@@ -180,34 +180,58 @@ sessionStorage.setItem('pb_nav', 'push');
 window.location.href = '../screens/basket.html';
 ```
 
+### ⚠️ The screen wrapper is sized `height: 100vh` — NOT `inset: 0`
+`black-translucent` shifts the iOS web view **up** under the status bar without
+growing it. So in the standalone PWA the layout viewport is `screen − top inset`
+tall and sits at physical y=0, orphaning a band at the bottom equal to the **top**
+inset. `position: fixed` obeys that short viewport; `100vh` does not. Measured on
+device (iPhone 430×932, `diag.html`):
+
+| | value |
+|---|---|
+| `screen` | 430×**932** |
+| `window.inner` / `docEl.client` / `visualViewport` | 430×**873** |
+| `position:fixed; inset:0` box | 430×**873**, top 0, bottom 873 |
+| `env()` insets T/R/B/L | **59** / 0 / 34 / 0 |
+| `100vh` / `100lvh` | **932** / 932 |
+| `100dvh` / `100svh` | 872.98 / 872.98 |
+
+932 − 873 = 59 = exactly the top inset. Hence every screen's mobile wrapper is
+`position:'fixed', top:0, left:0, right:0, height:'100vh'`. Do not "tidy" that back
+to `inset: 0`, and do not reach for `dvh`/`svh` — both are the *short* viewport here;
+only `vh`/`lvh` are the full screen.
+
+Consequences worth knowing:
+- **A fixed box taller than the layout viewport adds no page scroll** — fixed
+  elements don't contribute to scrollable overflow. Verified: a 932px fixed box in a
+  786px viewport leaves `documentElement.scrollHeight` at 786.
+- `html, body { height: 100% }` stays at the short 873. That is deliberate: making it
+  `100vh` would give the document 59px of real scroll. Nothing reads body's box.
+- Bottom-anchored CTAs now land where the design intends. They pad by
+  `env(safe-area-inset-bottom)` (34), so they used to sit 93px above the screen
+  bottom; now it is the correct 34.
+- **The image picker was never immune** — it has the identical 59px shortfall, but its
+  page background and wrapper are both `#000`, so the band is invisible. Its wrapper
+  is still `inset: 0`; `image-picker/` is frozen, so this was left alone. The visible
+  symptom there is only that its bottom bar sits 59px high.
+
 ### ⚠️ Never animate `<body>` — the nav transitions run on `#root > *`
+Separate from the gap above, and still a real hazard.
 `animation-fill-mode: both` keeps the last keyframe applied **forever**, so a
-`transform: translateX(0)` on `<body>` is permanent, not just for the 320ms. A
-transformed `<body>` is the containing block for every screen's
-`position:fixed; inset:0` wrapper — and in the **iOS standalone PWA the layout
-viewport that `height: 100%` resolves against is shorter than the screen that fixed
-positioning reaches**. So every screen came up ~34pt short with a band of body
-background under it: the reported "gap at the bottom". The image picker was the only
-screen unaffected, because it loads neither `styles.css` nor `navigation.js` and so
-its wrapper stays fixed to the real viewport.
+`transform: translateX(0)` on `<body>` is permanent, not just for the 320ms — and a
+transformed `<body>` is the containing block for every screen's fixed wrapper. Both
+the enter animations (`styles.css`, `[data-nav='…'] #root > *`) and the exit
+animations (`navigation.js` → `animateOut`) therefore target the **screen wrapper**.
+That is safe because a fixed element's own transform does not affect its own box.
 
-Both the enter animations (`styles.css`, `[data-nav='…'] #root > *`) and the exit
-animations (`navigation.js` → `animateOut`) therefore target the **screen wrapper**,
-never `<body>`. That is safe because a fixed element's own transform does not affect
-its own box — it stays flush to all four physical edges throughout the transition.
-
-Two consequences to respect:
 - `animateOut` sets `style.animation` only. The old code used `style.cssText`, which
   on the wrapper would wipe React's inline `position:fixed`/background.
-- `html, body { height: 100% }` is no longer load-bearing (it used to be the
-  workaround for the collapse-to-0 symptom of the same bug) but is harmless and kept.
+- `html, body { height: 100% }` used to be load-bearing as a workaround for the
+  collapse-to-0 symptom of this; it no longer is, but is harmless and kept.
 
-Verified with all 13 screens in a 390×844 iframe, with `html, body` squeezed to 790px
-to simulate the iOS short layout viewport: every wrapper still measures 390×844 at
-`top: 0`, `animation` on `<body>` is `none` and `transform` on `<body>` is `none`.
-The splash→onboarding `replace` path was checked separately (`fadeIn` lands on the
-wrapper), and `pop()` was checked to animate the wrapper while leaving its React
-inline styles intact.
+Verified across all 13 screens: `animation` and `transform` on `<body>` are both
+`none`, the splash→onboarding `replace` path lands `fadeIn` on the wrapper, and
+`pop()` animates the wrapper while leaving its React inline styles intact.
 
 ### Every screen root div needs `position:'relative'`
 CTAs are `position:'absolute'; bottom:0` — they anchor to the nearest `position:relative` ancestor. Without it on the root div, CTAs can escape to the IOSDevice frame boundary on desktop. Every screen component's outermost `<div>` must have `position:'relative'`.
@@ -997,7 +1021,9 @@ Exports via `Object.assign(window, {...})`:
 | `IOSKeyboard` | `dark` | Full iOS keyboard with liquid glass |
 | `IOSProgressiveBlur` | `scrim` | Three-stage progressive blur scrim, top-down — the image picker's header effect |
 
-**Usage:** On mobile, render screen content directly in `position:fixed; inset:0`. On desktop (≥520px), wrap in `<IOSDevice>` for iPhone preview frame.
+**Usage:** On mobile, render screen content directly in
+`position:fixed; top:0; left:0; right:0; height:100vh` (see the viewport gotcha —
+`inset: 0` is 59px short in the iOS PWA). On desktop (≥520px), wrap in `<IOSDevice>` for iPhone preview frame.
 
 ---
 
@@ -1029,7 +1055,7 @@ Exports via `Object.assign(window, {...})`:
 
 ### service-worker.js
 Precaches every screen HTML + JSX, the shared assets (incl. fonts and splash SVGs),
-manifest.json and the image-picker files. Cache name `photobox-v16`.
+manifest.json and the image-picker files. Cache name `photobox-v17`.
 
 **Strategy: network-first, cache fallback** — and same-origin requests are fetched
 with `cache: 'no-store'`. Both parts are deliberate:
@@ -1094,7 +1120,7 @@ delete and re-add the icon.
     function App() {
       const mobile = useIsMobile();
       if (mobile) return (
-        <div style={{position:'fixed', inset:0, background:'#F2F2F7', overflow:'hidden'}}>
+        <div style={{position:'fixed', top:0, left:0, right:0, height:'100vh', background:'#F2F2F7', overflow:'hidden'}}>
           <ScreenComponent />
         </div>
       );
@@ -1194,6 +1220,7 @@ python3 -m http.server 8080
 4. Add `'/screens/screen-name.html'` and `'/screens/screen-name.jsx'` to `service-worker.js` PRECACHE
 
 ### Quality checklist for any screen change
+- [ ] Mobile wrapper is `position:'fixed', top:0, left:0, right:0, height:'100vh'` — not `inset: 0`
 - [ ] Root div has `position:'relative'`
 - [ ] Status bar `<IOSStatusBar dark={false/true} />` present
 - [ ] Safe area insets applied top and bottom
