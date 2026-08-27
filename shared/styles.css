@@ -6,6 +6,9 @@
   --colour-foreground-fg-black: #333333;
   --functional-colours-grey-50: #F4F4F4;
   --colour-foreground-fg-white: #FFFFFF;
+  /* Editor (451:15574): the toolbar/card grey and the Continue button's wash */
+  --colour-foreground-fg-grey: #CCCCCC;
+  --extended-brand-colours-secondary-300: #62B5B8;
 
   /* Brand wash — one shared stop list; each screen supplies its own geometry.
      Splash (451:13758): radial-gradient(661.83% 92.48% at 50% 50%, …)
@@ -87,6 +90,68 @@
   font-weight: 100 1000;
   font-display: block;
   src: url('assets/dmsans-variable-latin.woff2') format('woff2');
+}
+
+/* Photo-source page collection covers (Figma 451:14202). Each cover card carries its
+   own display face; these are the Google Fonts (OFL) the node names, self-hosted as
+   latin subsets so the PWA still renders them offline. Two faces in the node are not
+   free — BBH Bogle ("CANADA") and AmstelvarAlpha (the dark "Berlin") — and fall back
+   to Big Shoulders Display and Basic respectively. */
+@font-face {
+  font-family: 'Big Shoulders Display';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('assets/pb-font-bigshoulders.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Alumni Sans';
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url('assets/pb-font-alumnisans.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Borel';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('assets/pb-font-borel.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Caveat';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('assets/pb-font-caveat.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Basic';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('assets/pb-font-basic.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Coustard';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('assets/pb-font-coustard.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Changa One';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('assets/pb-font-changaone.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Darumadrop One';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('assets/pb-font-darumadrop.woff2') format('woff2');
 }
 
 /* Reset */

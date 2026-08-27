@@ -55,9 +55,13 @@
 <body>
   <div id="root"></div>
 
-  <script src="photos.js?v=16"></script>
-  <script type="text/babel" src="ios-frame.jsx?v=16"></script>
-  <script type="text/babel" src="image-picker.jsx?v=16"></script>
+  <script src="photos.js?v=17"></script>
+  <script type="text/babel" src="ios-frame.jsx?v=17"></script>
+  <!-- Shared glass button, so the Back control matches the editor header.
+       brand.jsx has no dependencies of its own and declares nothing this
+       file already uses. -->
+  <script type="text/babel" src="../shared/brand.jsx?v=17"></script>
+  <script type="text/babel" src="image-picker.jsx?v=17"></script>
 
   <script type="text/babel">
     function useIsMobile() {

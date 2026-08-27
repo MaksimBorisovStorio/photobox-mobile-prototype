@@ -333,6 +333,63 @@ function IOSKeyboard({ dark = false }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────
+// Press feedback
+// ─────────────────────────────────────────────────────────────
+// Spread onto any tappable element: `{...press(0.97)}` for cards, CTAs and rows,
+// `{...press(0.9)}` for back and icon buttons. Lives here rather than per screen
+// because each text/babel file is its own classic script, so two screens declaring
+// a top-level `const press` would collide in the global lexical scope.
+const press = scale => ({
+  onPointerDown: e => { e.currentTarget.style.transform = `scale(${scale})`; },
+  onPointerUp: e => { e.currentTarget.style.transform = 'scale(1)'; },
+  onPointerLeave: e => { e.currentTarget.style.transform = 'scale(1)'; },
+});
+
+// ─────────────────────────────────────────────────────────────
+// Progressive blur scrim
+// ─────────────────────────────────────────────────────────────
+// Lifted from the image picker's header (image-picker/image-picker.jsx ~1850), which
+// is the nicest progressive blur in the prototype. The trick is that the three masks
+// *overlap* in a staircase rather than tiling end-to-end, so each blur stage hands
+// off to the next with no visible seam:
+//
+//   blur(16px) sat 160%   opaque 0 → 35%,  gone by 60%
+//   blur(8px)  sat 150%   opaque 25 → 60%, gone by 85%
+//   blur(3px)             opaque 50 → 85%, gone by 100%
+//
+// Stops are percentages on purpose: the fade then always ends exactly at the
+// element's bottom edge, however tall the safe-area inset makes it. (The editor's
+// *toolbar* is the opposite case — there the stops must be px, because percentages
+// scale with the container and drag the strong layers up over the spreads.)
+//
+// `scrim` is painted on top of the blur. Keep it translucent — an opaque top stop
+// hides the very blur it is sitting on, which is the whole point of the effect.
+const IOS_BLUR_STAIRCASE = [
+  { blur: 16, filter: 'blur(16px) saturate(160%)', stops: '0%, rgba(0,0,0,1) 35%, rgba(0,0,0,0) 60%' },
+  { blur: 8,  filter: 'blur(8px) saturate(150%)',  stops: '25%, rgba(0,0,0,1) 60%, rgba(0,0,0,0) 85%' },
+  { blur: 3,  filter: 'blur(3px)',                 stops: '50%, rgba(0,0,0,1) 85%, rgba(0,0,0,0) 100%' },
+];
+
+function IOSProgressiveBlur({ scrim }) {
+  return (
+    <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+      {IOS_BLUR_STAIRCASE.map(l => {
+        const mask = `linear-gradient(to bottom, rgba(0,0,0,1) ${l.stops})`;
+        return (
+          <div key={l.blur} style={{
+            position: 'absolute', inset: 0,
+            backdropFilter: l.filter, WebkitBackdropFilter: l.filter,
+            maskImage: mask, WebkitMaskImage: mask,
+          }} />
+        );
+      })}
+      {scrim && <div style={{ position: 'absolute', inset: 0, background: scrim }} />}
+    </div>
+  );
+}
+
 Object.assign(window, {
   IOSDevice, IOSStatusBar, IOSNavBar, IOSGlassPill, IOSList, IOSListRow, IOSKeyboard,
+  IOSProgressiveBlur, press,
 });

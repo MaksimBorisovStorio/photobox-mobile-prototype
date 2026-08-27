@@ -8,8 +8,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Photobox">
   <meta name="theme-color" content="#0E9E8E">
-  <link rel="apple-touch-icon" href="/image-picker/app_icon.png">
-  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="app_icon.png">
+  <link rel="manifest" href="manifest.json">
   <style>
     html, body { margin:0; padding:0; background:#000; }
   </style>
@@ -17,10 +17,10 @@
 <body>
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/service-worker.js');
+      navigator.serviceWorker.register('service-worker.js');
     }
     // Immediately redirect to splash
-    window.location.replace('/screens/splash.html');
+    window.location.replace('screens/splash.html');
   </script>
 </body>
 </html>

@@ -1764,6 +1764,18 @@ function ImagePickerScreen() {
   const selectionCount = selected.size;
   const headerCondensed = scrollY > 30;
 
+  // Continue hands the selection back to the editor, which then offers to auto-fill.
+  // sourcePhotos is built date-ascending, so filtering it puts the photos in
+  // chronological order regardless of the order they were tapped in — which is what
+  // the editor's auto-fill prompt promises. navigation.js is not loaded here, so the
+  // transition flag is set by hand; 'pop' because this returns to the editor.
+  const handoffToEditor = () => {
+    const chosen = sourcePhotos.filter(p => selected.has(p.id)).map(p => p.src);
+    sessionStorage.setItem('pb_photos', JSON.stringify(chosen));
+    sessionStorage.setItem('pb_nav', 'pop');
+    window.location.href = '../screens/editor.html';
+  };
+
   // Most-recent-first selected photos for the pill stack
   const recentPhotos = useMemo(() => {
     const byId = new Map(sourcePhotos.map(p => [p.id, p]));
@@ -1885,9 +1897,19 @@ function ImagePickerScreen() {
           padding: '8px 12px 0',
           gap: 4,
         }}>
-          <HeaderIconButton ariaLabel="Back">
+          {/* Back — same liquid glass as the editor header (shared/brand.jsx), at 36
+              to keep this header's tighter metrics. navigation.js is not loaded in
+              this directory, so the transition flag is set by hand, exactly as
+              onContinue below does it. */}
+          <GlassIconButton
+            size={36} radius={18} gloss tint="rgba(0,0,0,0.25)" label="Back"
+            onClick={() => {
+              sessionStorage.setItem('pb_nav', 'pop');
+              window.location.href = '../screens/photo-sources.html';
+            }}
+          >
             <IconBack size={26} color="#fff" />
-          </HeaderIconButton>
+          </GlassIconButton>
 
           <div style={{
             position: 'absolute', left: 0, right: 0,
@@ -2022,8 +2044,7 @@ function ImagePickerScreen() {
           setReviewOpen(true);
         }}
         onContinue={() => {
-          sessionStorage.setItem('pb_nav', 'push');
-          window.location.href = '../screens/basket.html';
+          handoffToEditor();
         }}
       />
 
@@ -2034,10 +2055,7 @@ function ImagePickerScreen() {
         onClose={() => setReviewOpen(false)}
         onContinue={() => {
           setReviewOpen(false);
-          setTimeout(() => {
-            sessionStorage.setItem('pb_nav', 'push');
-            window.location.href = '../screens/basket.html';
-          }, 200);
+          setTimeout(handoffToEditor, 200);
         }}
         onRemove={(id) => togglePhoto(id)}
         onPreview={(id) => setPreviewId(id)}

@@ -28,8 +28,8 @@ All 13 implementation tasks are done. Branch `feature/prototype-build` is demo-r
 | Onboarding 3 | `screens/onboarding-3.html` + `.jsx` | ✅ Done — **Figma-verified** (node `451:13823`) |
 | Home | `screens/home.html` + `home.jsx` | 🟡 Header + Create grid **Figma-verified** (`451:13862` / `367:6068`); Memories, Ideas, tab bar still the old build |
 | Product — Photo Book | `screens/product-photobook.html` + `.jsx` | ✅ Rebuilt — **Figma-verified** (node `406:7183`) |
-| Editor — Format | `screens/editor-format.html` + `.jsx` | ✅ Done |
-| Editor — Configure | `screens/editor-configure.html` + `.jsx` | ✅ Done |
+| Editor | `screens/editor.html` + `editor.jsx` | ✅ Built — **Figma-verified** (node `451:15574`) |
+| Photo sources | `screens/photo-sources.html` + `.jsx` | ✅ Built — node `451:14202`; 2 of 8 covers verifiable, see below |
 | Image Picker | `image-picker/index.html` (pre-built, frozen) | ✅ Wired in |
 | Basket | `screens/basket.html` + `basket.jsx` | ✅ Done |
 | Checkout — Delivery | `screens/checkout-delivery.html` + `.jsx` | ✅ Done |
@@ -41,7 +41,7 @@ All 13 implementation tasks are done. Branch `feature/prototype-build` is demo-r
 
 - **Figma fidelity pass** — query Figma node IDs (see table below) to tighten colors, spacing, typography to exact Figma spec. Screens built from verbal descriptions rather than direct Figma calls due to MCP availability.
 - **Transition polish** — add push/pop slide animations between screens (navigation.js stubs are in place; CSS transitions not yet wired to the iframe-swap mechanism).
-- **Dark mode for Editor screens** — editor-configure currently light mode; Figma spec says editor should be dark.
+- **Editor tools** — Photos, Arrange, Themes, Style, AI help and Options are inert by request. The card's settings icon and the header's Continue arrow are inert for the same reason.
 - **My Photos tab** — home tab bar has a "My Photos" tab that navigates to `../image-picker/index.html`. If a standalone My Photos grid (distinct from the picker) is needed, create `screens/my-photos.html`.
 - **Deploy** — push to GitHub Pages / Netlify for iPhone testing. Current setup requires `python3 -m http.server 8080` + ngrok.
 - **Real Figma node check** — `editor-cover.html` referenced in the original plan was merged into `product-photobook.html` (it's the same cover-picker step); verify this matches stakeholder expectations.
@@ -72,8 +72,9 @@ All 13 implementation tasks are done. Branch `feature/prototype-build` is demo-r
 | Photo book — configure (scrollable) | `451:13491` | ✅ Built (Figma not queried) |
 | Photo book — configure variant | `451:13606` | ✅ Built (Figma not queried) |
 | Photo book — CTA screen | `451:13721` | ✅ Built (Figma not queried) |
+| Editor | `451:15574` | ✅ Built — matches Figma (pixel-diffed; see below) |
 | Account / Profile | `451:14038` | ✅ Built (Figma not queried) |
-| Album / My trips | `451:14202` | ⬜ Not built (no screen in current flow) |
+| Photo sources (Album / My trips) | `451:14202` | ✅ Built — Albums grid exact; 6 of 8 covers unverifiable |
 | My Photos (image grid) | `451:14403` | ⬜ Not built (image-picker used instead) |
 | Basket | — | ✅ Built (PB3 style, no Figma node) |
 | Checkout (delivery) | — | ✅ Built (PB3 style, no Figma node) |
@@ -146,8 +147,8 @@ MEGAPROTOTYPE/
 │   ├── onboarding-3.html + onboarding-3.jsx
 │   ├── home.html + home.jsx
 │   ├── product-photobook.html + product-photobook.jsx
-│   ├── editor-format.html + editor-format.jsx
-│   ├── editor-configure.html + editor-configure.jsx
+│   ├── editor.html + editor.jsx
+│   ├── photo-sources.html + photo-sources.jsx
 │   ├── basket.html + basket.jsx
 │   ├── checkout-delivery.html + checkout-delivery.jsx
 │   ├── checkout-payment.html + checkout-payment.jsx
@@ -162,7 +163,12 @@ MEGAPROTOTYPE/
     └── photos.js                ← Mock photo data (370+ photos via picsum.photos)
 ```
 
-> **⚠️ `image-picker/` is frozen.** When the main flow reaches the image picker step, navigate to `../image-picker/index.html`. The only permitted change is the `onContinue` handler — it must navigate back to `../screens/basket.html` (already done).
+> **⚠️ `image-picker/` is frozen.** When the main flow reaches the image picker step, navigate to `../image-picker/index.html`. Two changes have been made on request, and they are the only ones:
+> 1. `onContinue` hands the selection to the editor (`sessionStorage.pb_photos`) and
+>    returns to `../screens/editor.html` — it used to jump straight to the basket.
+> 2. The **Back** button is now the shared glass control and navigates up to
+>    `../screens/photo-sources.html`. `index.html` loads `../shared/brand.jsx` for it,
+>    and the `?v=` query on its scripts was bumped to 17.
 
 ---
 
@@ -416,13 +422,410 @@ Not in the design, and flagged as such in code:
   block reads €44.99 for Large / Landscape / Hardcover / Layflat, so the
   increments in `SIZE_BASE` / `COVER_ADD` / `LAYFLAT_ADD` are reverse-engineered
   to hit that exact total (29.99 + 10 + 5). Replace them once real pricing exists.
-- **CTA target.** "Start create" goes to `editor-configure.html`, skipping
-  `editor-format.html` — that screen is now redundant since format is chosen here.
+- **CTA target.** "Start create" goes to `editor.html`. It first writes the resolved
+  selection to `sessionStorage.pb_book` via `bookConfig()` — title, page count, total
+  and the page dimensions in cm — because the editor needs all four and recomputing
+  them there would duplicate `SIZES` / `SIZE_BASE` / `COVER_ADD`. The old
+  `editor-format.html` and `editor-configure.html` step-3-of-3 screens are deleted:
+  format, cover and size are all chosen here now.
 - **Selected state and the toggle.** Exports carry only the unselected/off state,
   so both are drawn in code (teal fill + check; 55×32 track).
 
 Every price in the design reads "From €24.99" on every card while the hero says
 "Start from €14.99" — kept verbatim rather than invented around.
+
+### Editor page (Figma `451:15574`)
+
+One tall scrolling canvas on a 375 frame: sticky header (`451:15677`) → details card
+(`451:15649`) → cover (`451:15622`) → inner spreads (`451:15591`) with an add-spread
+pill between each pair (`451:15602`) → sticky toolbar (`490:17058`, row `490:17059`).
+
+**Sheet geometry is driven by `aspect-ratio`, not pixel maths.** Each sheet is
+`padding: 4` around one interior box of `aspect-ratio: 2·pageW/pageH` — two leaves
+wide. That makes the cover and every inner spread exactly the same height without
+measuring the container, and it scales from the design's 336 sheet (19.5 gutters on
+375) to any phone width. Leaves are 50% each, padded 8 on the outer edge and 12 on
+the gutter edge (mirrored), which lands the photo well 12 from the sheet edge and 8
+from the spine on both sides — matching the node.
+
+**Block rhythm.** Sheets are 71px apart in the node (172 → 243). A block is the sheet
+plus its 24px caption strip, so the column gap is **47** and the add-spread pill is
+`bottom: -31`, overhanging into the gap. That reproduces the node exactly, including
+the 7px where the pill overlaps the caption above it.
+
+**Leaves.** Left leaves are `#F5F5F5` and right leaves white throughout the node —
+gutter shading, not content. Page order is `[inside front | 1]`, `[2|3]` … `[24 |
+inside back]`, so a 24-page book is 13 spreads. The trailing `[24 | inside back]`
+pair is an extension; the node only ever shows the front of the book.
+
+**Dot canvas:** 2×2 dots on an 18px grid, 4px in from the frame edge, `#272727` —
+measured off the node's render, not guessed. It rides the *content* so the spreads
+read as sitting on a canvas while it scrolls. `background-origin` must be
+`border-box`: the default `padding-box` re-phases the grid against the safe-area
+padding above it.
+
+**Progressive blur** on both the header and the toolbar. The header uses the shared
+`IOSProgressiveBlur` (see below); the toolbar has its own bottom-up variant.
+The node specifies a flat `backdrop-blur(10px)` for the toolbar;
+that was replaced on request with five doubling layers masked up from the bottom, same
+technique as the product page's review header. Verified against the node: the blur +
+dark wash band matches within **1–4/255** at every sampled row from the top of the
+band to the bottom.
+
+**The toolbar row scrolls horizontally by design.** Six 68pt tools (474px with gaps
+and padding) overflow any phone width — which is what the node is already doing, its
+row being clipped at the frame edge. Verified by hit-testing all six with
+`elementFromPoint` after scrolling the row fully right. A `139px + safe-area` spacer
+closes the content so the last spread is not trapped under the bar.
+
+#### ⚠️ `mix-blend-mode` cannot blend across a composited layer boundary
+
+The Continue button (`451:15685`) is specified as `rgba(0,115,119,0.5)` on
+`color-dodge` over `#62b5b8` on `soft-light`. Implemented literally it rendered
+**(42,139,142) against the node's (11,41,42)** — roughly 3× too bright. Nothing in
+the ancestor chain isolates the blend (checked every computed `isolation`, `opacity`,
+`filter`, `backdrop-filter`, `mask` and `transform`): Chrome promotes the scroller to
+its own composited layer because of the dot canvas and the backdrop filters, and
+`mix-blend-mode` silently falls back to blending against *nothing* rather than
+reaching across the layer. The measured value matches an `isolation: isolate` group
+almost exactly, which is the tell.
+
+Two conclusions worth keeping:
+- Do not rely on `mix-blend-mode` reaching content in a scroll container or behind a
+  `backdrop-filter` sibling. It will look right in a minimal test page and wrong in
+  situ.
+- CSS and Figma disagree on this blend even in isolation — the literal recipe
+  measures (19,58,61) where the node samples (11,41,42). So the blend was not the
+  more faithful option either.
+
+Replaced with `rgba(0,66,68,0.5)`, derived from the node's own pixels: over the
+header's (24,24,24) it lands on (12,45,46), the mean of the node's interior, and it
+stays 50% translucent so it still reacts to its backdrop. Averaged over the whole
+disc the button now matches within **~5/255** on both interior and rim.
+
+### Photo sources page (Figma `451:14202`)
+Sits between the editor's upload sheet and `image-picker/`, which is really just one
+album ("Trip to Barcelona"). Structure: header with the source pill (`451:14361`) →
+Collections row (`451:14203` / row `451:14213`) → Albums grid (`451:14372`). Any cover
+or album tile opens the picker; back pops to the editor. The **Camera Roll pill is
+inert** — the node only carries its one state and no source list exists in the Figma.
+
+The node's own 48px status bar is replaced by the safe-area inset; the 44px control row
+and its 12px tail are the node's, which puts Collections at y=104 and Albums at y=494
+exactly as the node has them.
+
+**Albums grid is exact.** 2 columns, 12px gaps, 166 tiles at r16, expressed as
+`aspect-ratio: 1` so they track the 343 content width. The People-and-pets tile is four
+76px circles on `rgba(17,17,17,0.5)`; ⚠️ the node's `Ellipse22..25` run **clockwise**
+(top-left, top-right, bottom-**right**, bottom-left), not in reading order.
+
+#### ⚠️ Figma clips exports to the containing frame
+The Collections row is 1729 wide inside a 375 frame, and **every** export route —
+`get_screenshot`, `get_screenshot` with `contentsOnly`, and `download_assets` — returns
+only the part of a node that falls inside its frame. Cards fully off-frame come back as
+1×1 images. So there is no way to obtain the artwork for six of the eight covers, and
+no way to *see* them either: only Canada and Italy were ever rendered for reference.
+The other six are reconstructed from the node's code alone and are **unverified**.
+(`use_figma` + `exportAsync` would sidestep the clipping, but returns megabytes of
+base64; the alternative — temporarily turning off `clipsContent` — would mean editing
+the user's Figma file.)
+
+#### Covers: what is real and what is substituted
+Cards are data-driven (`COLLECTIONS` in `photo-sources.jsx`): photo, blur bands,
+display lines, month caption. The recurring device is a **blur band** — a
+backdrop-filtered strip whose gradient carries almost no colour, used to lift the
+display type off the photo; `flip` mirrors it, as the node does on every top band.
+
+- **Radius.** Canada and Italy are r24 with a 2px rim; the six off-frame cards still
+  carry an older r14.385 / 0.599px rim. Standardised on the pair the designer left
+  visible, which also matches the app's other card radii.
+- **Three photo fills are empty placeholders in the file** (Berlin, Guadalupe's first
+  layer, Tim). Berlin borrows the Canada photo — visibly the wrong picture, and the
+  first thing to replace. Guadalupe uses its second layer, which is real.
+- **Two faces in the node are not free**: BBH Bogle ("CANADA") falls back to Big
+  Shoulders Display, AmstelvarAlpha (the dark "Berlin") to Basic. The other eight are
+  Google Fonts (OFL), self-hosted as latin subsets in `shared/assets/pb-font-*.woff2`
+  (216KB total) so the PWA still renders them offline — declared in `styles.css`.
+- **Jane and Tim.** `451:14291` / `451:14353` are hand-drawn white **outline drawings
+  of a figure**, not photo frames — masking a fill through them produces an outline,
+  not a framed photo. The node paints a cut-out photo over the outline plus several
+  more doodles; that stack is not reproducible blind (the photo fills are white-backed
+  rather than transparent, Tim's is empty, and the doodles were never rendered). Both
+  cards are the flat colour, the name and the drawing, which is the character the node
+  carries.
+- **Cappadocia carries an added blur band.** Its node bands leave the top clear and its
+  photo is a white-background shot, so the white wordmark was unreadable. It reuses the
+  same blur-band device the node applies to four of the other cards, tinted enough to
+  hold type. Flagged in code as an addition.
+- The ambient glow behind the row is the node's own `451:14204`: the first two covers
+  duplicated at `blur(146.85px)`. Kept, but it is a large filter region — the first
+  thing to drop if scroll performance suffers on device.
+
+Verified: 8 covers in a scrolling row (1761 > viewport), all eight faces load, no
+horizontal page overflow, back pops, covers and tiles push to the picker.
+
+#### Back buttons use the shared glass control
+Both this page and the picker's "Trip to Barcelona" header use `GlassIconButton` with
+`gloss` and the editor's `rgba(0,0,0,0.25)` tint, so all three screens' back controls
+match. Neither is in the Figma — the node gives this page a bare 24px chevron and the
+picker a transparent 36px button.
+
+- **Sources page:** 40×40 at `left: 16`, matching the editor's header metrics. That
+  nudges the glyph 8px right of the node's position, which is the price of the shared
+  control.
+- **Picker:** kept at 36×36 / r18 to preserve that header's tighter metrics, and only
+  the Back button was changed — `HeaderIconButton` still serves the other three header
+  controls untouched. Its rim reads dimmer than elsewhere at rest because the backdrop
+  behind it is solid black; it lifts once photos scroll under the header.
+- **`navigation.js` is not loaded in `image-picker/`**, so Back sets the transition flag
+  by hand and assigns `location.href`, exactly as `onContinue` does — not
+  `history.back()`, which would skip the animation on a bfcache restore and leave the
+  flag in `sessionStorage` to misdirect the next navigation. Verified: the landed page
+  comes up with `data-nav="pop"`.
+
+#### `press()` moved to `shared/ios-frame.jsx`
+Two screens now need the press-scale handlers, and each `text/babel` file is its own
+classic script — so two top-level `const press` declarations would collide in the
+global lexical scope, the same trap as `PB_DISPLAY`. It is defined once in
+`ios-frame.jsx` and exported. `onboarding-shell.jsx` keeps a function-local copy, which
+merely shadows it.
+
+#### Upload prompt action sheet (Figma `451:15887`)
+Overlay `451:16012` / sheet `451:16013`. Presented over the editor the moment the
+screen lands — an empty book has nothing to work on until photos exist. Sequence is
+`wait → open → closing → gone`, with a 300ms wait so the push transition finishes
+before the sheet rises; it still reads as arriving with the screen.
+
+- **Overlay:** `rgba(0,0,0,0.6)` + `backdrop-filter: blur(5px)`, `zIndex: 20` so it
+  covers the header and toolbar (both `zIndex: 6`). Verified by hit-testing: a point
+  over the editor returns the dialog while it is open, and the scroller again once it
+  is dismissed.
+- **Sheet:** 362 tall, top corners r24, `drop-shadow(0 -12px 9.3px rgba(0,0,0,0.65))`.
+- **The fill is an ellipse centred on the sheet's own top edge.** Figma exports it as
+  an SVG `radialGradient` with `gradientTransform="matrix(0 11.1 -36.918 0.22841 188 0)"`
+  at `r=10`, which decodes to semi-axes of 369.18 × 111 about (188, 0) on a 375×362
+  sheet — i.e. `radial-gradient(98.45% 30.66% at 50.13% 0%, rgba(0,0,0,0.2) 0%, #111 100%)`.
+  The centre stop is **deliberately translucent**, so the blurred editor reads faintly
+  through the top of the sheet. Do not flatten it to a solid fill.
+- **Layout:** `paddingTop: 43`, content block (gap 24: 24px upload icon, SF Pro Display
+  Bold 22/28 title, SF Pro Text 16/21 `#ccc` body), then `marginTop: auto` and the
+  button block with `padding: 24px 19px 0`. On the node's 362 sheet that lands the
+  buttons at y=220, which is where the node has them, while still adapting if the copy
+  rewraps at another width.
+- **Buttons:** "Select photos" `#F0F0F0` + 1px white; "Start from empty book" `#333` +
+  1px `#464646` + `inset 0 0 27px rgba(0,0,0,0.25)`. Both r55, `16px 24px`.
+
+Pixel-diffed against the node's render: sheet fills within 1–5/255 at every sample,
+the scrim over the editor exact at (93,93,93), and both button fills exact.
+
+**Wiring.** "Select photos" pushes `../image-picker/index.html`. "Start from empty
+book" and a tap on the scrim both dismiss (the scrim is the iOS-standard escape and
+lands on the same outcome as the explicit skip). The sheet shows on **every** mount,
+not once per session — landing on the editor is what triggers it.
+
+⚠️ The picker's `onContinue` still goes to `../screens/basket.html`, so
+editor → picker → Continue lands in the basket rather than back in the editor. That is
+the pre-existing wiring and was left alone; changing it is the one permitted edit to
+the frozen picker, and would want a `sessionStorage` flag so home → My Photos →
+Continue still reaches the basket.
+
+⚠️ This node is a later iteration than `451:15574` and disagrees with it: the details
+card is `#323232` / h53 / pl8 (vs `#272727` + `#363636` / pl12), the toolbar labels are
+white rather than `#ccc`, "AI help" has become "Smart Fill", "Arrange" is misspelled
+"Arenge", and the Photos tool carries an orange `#F4633A` count badge reading 24. The
+editor still follows `451:15574`; none of that was carried over.
+
+#### Photos tool, filled state (Figma `451:15722`, icon `451:15725`)
+Once anything has been uploaded, the flat Photos glyph is replaced by four scattered
+thumbnails with an orange count badge. It keys off **`pb_uploaded`, not `pb_placed`** —
+photos declined for auto-fill are still uploaded and still belong in that count.
+
+The node's four tiles sit in flex-centring wrappers sized to each rotated tile's
+bounding box (12 × (|cos| + |sin|)), which is awkward to carry over directly, so
+`PHOTO_TILES` reduces them to a plain 12×12 tile plus a rotation about the same centre:
+
+| centre | rotation |
+|--------|----------|
+| 8.05, 4.95 | −6.04° |
+| 18.55, 4.57 | +6.63° |
+| 8.03, 15.96 | −4.30° |
+| 18.80, 15.94 | +10.62° |
+
+Painted in node order, so the lower two overlap the upper two. Thumbnails are the first
+four uploaded photos; a tile with no photo keeps the node's `#D9D9D9` fill.
+
+⚠️ **The badge breaks out of its icon box** — 23×15 at (16, −7), so 13px right and 7px
+above a 26×24 container. The tool row is a horizontal scroller, and `overflow-x: auto`
+forces `overflow-y` to auto/hidden — it can never be `visible` — so the row would slice
+the badge off. Fixed with `padding: '8px 8px 0'` on the row; padding-top only, because
+the row is anchored by `bottom`, so the tools do not move. Verified by rect: badge top
+720 against the row's clip edge at 719.
+
+The badge width is a **minimum** rather than the node's fixed 23, with 4px side padding,
+so a three-digit count fits instead of spilling. Checked at 4, 26 and 128.
+
+⚠️ This node is another toolbar iteration and disagrees with `451:15574` on the toolset —
+Photos, Add photo, Add text, Layout, Stickers, Smart Design, Ask AI (seven, laid out
+`gap: 8` from the left rather than justified). Only the Photos icon was taken from it;
+the toolbar still follows `451:15574`.
+
+#### Auto-fill prompt (Figma `451:15751`) and the photo handoff
+The picker's Continue no longer jumps to the basket. It writes the selection to
+`sessionStorage.pb_photos` and returns to the editor, which then offers to place them.
+
+**One sheet shell, two prompts.** `ActionSheet` carries the overlay, the fill, the
+shadow and both animations; `UploadSheet` (362 tall) and `AutofillSheet` (332) supply
+only their own body. The two nodes' radial fills decode to different pixel radii —
+369.18 × 111 on 362, 369.18 × 101.8 on 332 — but land on the *same* percentages, so one
+`SHEET_FILL` string serves both. Their buttons differ and the difference is passed in
+per call: the upload sheet's carry a rim and an inset shadow, the auto-fill sheet's are
+flat (pure white / flat `#333`).
+
+**Chronological order is real, not a label.** The prompt promises chronological order,
+so the handoff filters `sourcePhotos` — which `photos.js` builds date-ascending — rather
+than using `order`, the tap sequence. Verified: tapping p473, p480, p443, p482 hands
+over `PHOTOS[]` positions 442, 472, 479, 481, strictly ascending.
+
+**Three storage keys, because uploaded and placed are not the same thing.**
+- `pb_photos` — the incoming selection. Consumed on read, and its presence is what
+  decides which prompt opens: photos waiting → auto-fill, nothing uploaded yet →
+  upload, otherwise → none.
+- `pb_uploaded` — everything the picker has handed over, written as soon as it arrives
+  and regardless of how the prompt is answered: **declining auto-fill still leaves the
+  photos uploaded.** This is what the Photos tool's thumbnails and count show.
+- `pb_placed` — what is actually on the pages. Durable, so a reload keeps the filled
+  book instead of re-asking. `added` is re-derived from its length so a reloaded book
+  keeps the spreads auto-fill appended.
+
+**Placement.** One photo per page, `photos[n - 1]` for page *n*. The cover is left
+alone: it is not a page, and spending photo 1 on it would leave the last page empty.
+The inside-front and inside-back leaves carry no page number, so they stay empty too.
+A selection longer than the book **grows it by whole spreads**, priced with the same
+`EXTRA_SPREAD_PRICE` as a manually added spread — 30 photos into a 24-page book gives
+30 pages at €48.99. A shorter selection leaves the tail empty.
+
+Verified end to end: empty book → upload prompt (362); pick 5 in the picker → Continue →
+editor with `data-nav="pop"` and "You uploaded 5 photos"; "Yes, auto-fill" places all 30
+of a 30-photo selection, grows the book and persists; reload keeps the photos and shows
+no prompt; "No, I'll place them myself" dismisses and places nothing.
+
+⚠️ **The checkout chain is now orphaned.** `basket → checkout-delivery →
+checkout-payment → order-success` are all built but no longer reachable: the picker used
+to be the only way in, and the editor's Continue arrow is still inert by request.
+Pointing that arrow at `basket.html` is a one-line change when wanted.
+
+#### Header progressive blur — reused from the image picker
+`IOSProgressiveBlur` in `shared/ios-frame.jsx` is the image picker's header effect
+(`image-picker/image-picker.jsx` ~1850) extracted so the editor can share it rather
+than copy it. The picker file itself stays frozen.
+
+The trick is that the three masks **overlap in a staircase** rather than tiling
+end-to-end, so each blur stage hands off to the next with no visible seam:
+
+| layer | mask |
+|-------|------|
+| `blur(16px) saturate(160%)` | opaque 0 → 35%, gone by 60% |
+| `blur(8px) saturate(150%)` | opaque 25 → 60%, gone by 85% |
+| `blur(3px)` | opaque 50 → 85%, gone by 100% |
+
+**Percentage stops are correct here** — the fade then always ends exactly at the
+element's bottom edge however tall the safe-area inset makes the header. This is the
+opposite of the editor's *toolbar*, where the stops must be px because percentages
+scale with the container and drag the strong layers up over the spreads. Both are in
+this file; do not "unify" them onto one unit without re-checking.
+
+**The scrim must stay translucent.** The node's own gradient starts at a fully opaque
+`rgb(20,20,20)`, which would hide the very blur it sits on. The header keeps the
+node's colours and 0.3%/96% stop positions but drops the top stop to 55% alpha. At
+rest the header is dark-on-dark so this reads identically to the node — verified, the
+resting ramp matches its shape (19→24 in the node, 25→30 here, the constant offset
+being the 103-vs-147 header height without safe-area insets). The difference only
+shows when a white spread scrolls under it, which is exactly when the blur should be
+visible.
+
+#### `GlassIconButton` gained `tint`, `accent`, `width` and `gloss`
+The brief asks for the home header's liquid glass on the editor's icon buttons, but
+that recipe's near-clear `rgba(255,255,255,0.03)` interior vanishes on a near-black
+backdrop. `tint` carries the node's `rgba(0,0,0,0.25)` scrim, `accent` takes the
+Continue button's teal wash, and `width` makes the 88×40 undo/redo pill. All four
+default to the previous values, so the home header is untouched.
+
+`gloss` is the fuller iOS-26 treatment, on for all three editor header buttons:
+
+| layer | what it does |
+|-------|--------------|
+| `blur(14px) saturate(180%)` | saturate is safe here only because the backdrop is near-black and has almost nothing to boost — on home's teal it drove the interior cyan |
+| lensed rim | three inset shadows (1px hairline, 7px bloom, 18px inner falloff) — **inset shadows, not a radial-gradient**, so the same layer follows `border-radius` for both the 40px circles and the 88×40 pill |
+| specular sweep | `linear-gradient(35deg, …)` bright at both ends, clear through the middle; 35° puts the strong catch on the bottom-left arc, matching the light direction established by the home mock |
+| edge | `1px solid rgba(255,255,255,0.10)` plus a hard specular inset (0.42 bottom-left / 0.14 top-right) |
+| drop shadow | without it the button reads as a hole cut in the header rather than an object on it |
+
+Two things to keep in mind if you touch it:
+- **Normal compositing, not `plus-lighter`.** The default recipe uses plus-lighter for
+  its rim, but in the editor the scroller is a separate composited layer and
+  plus-lighter cannot blend across it (see above).
+- **Gloss puts a floor under the interior.** The sweep adds roughly +23 to every
+  channel, so the Continue button now measures (30,61,62) against the node's
+  (21,53,54) — about +8, and the node's red is simply unreachable under any positive
+  tint. The rim is far brighter than the node, which has no rim at all there; that is
+  the requested effect, not a drift. Chasing the node's flat numbers would mean
+  removing the gloss.
+
+Home's bell is deliberately left on the default recipe — it was pixel-matched to its
+own design mock (within ~5/255). Pass `gloss` there too if the glossier look should
+carry across the app.
+
+#### Why the glass is hand-built and not a library
+Every refraction-based liquid-glass library — `liquid-glass-react`,
+`@developer-hub/liquid-glass`, shuding's `liquid-glass` — gets its lensing from
+`backdrop-filter: url(#svgFilter)`. WebKit's `backdrop-filter` accepts filter
+*functions* only, not `url()` references, so that technique silently no-ops on the
+iPhone PWA this prototype targets. The remainder are npm/React-bundler packages, and
+this project has no build step and must precache for offline. Hence the layered CSS
+above, which works in both engines.
+
+#### Design inconsistencies in the node, and what was chosen
+The editor frame is WIP and contradicts itself in four places:
+- **Two sheet variants.** `451:15592` is flat white with a 1px/3px shadow; the other
+  three spreads *and* the cover are `#F8F8F8` + 1px `rgba(0,0,0,0.25)` + r2 + a 4px
+  shadow. Took the majority. The hairline is an inset shadow, not a border, so the
+  4px inner padding still measures from the outer edge as it does in Figma.
+- **Two add-spread pills.** `451:15587` is `#272727`/r12 with a `#363636` border;
+  `451:15602` and its two siblings are `#333` full pills. Took the majority
+  (confirmed by sampling the render: 39,39,39 at r≈12 vs 51,51,51 at r≈19).
+- **Square leaves on a "Large Portrait" book.** The node's leaves are 164×164 while
+  its own card reads "Large Portrait photo book". The brief asks the spreads to
+  represent the format chosen on the previous step, so the format wins — `pageW/pageH`
+  comes from `sessionStorage.pb_book`.
+- **€42.99 on the card vs €44.99 in the product page's review block** for the same
+  configuration. The live computed total is used so the editor agrees with the review
+  the user just saw; €42.99 survives only as the fallback when `editor.html` is opened
+  directly.
+
+Not in the design, and flagged as such in code:
+- **Sixth toolbar tool.** The node shows five (Photos, Arrange, Themes, Style, AI
+  help) with the row clipped at the frame edge; the brief lists Options as the sixth,
+  drawn with the design's own `icon/Options` asset. Label copy is the node's
+  "AI help", not the brief's paraphrase "Ask AI".
+- **Add-spread actually inserts a spread**, bumping the page count and the price by a
+  reverse-engineered `EXTRA_SPREAD_PRICE`, on the same footing as the product page's
+  `SIZE_BASE` / `COVER_ADD`. Because every leaf is an empty placeholder, inserting at
+  position *i* renders identically to appending, so the state is a plain counter.
+- **`[n | inside back cover]`** closing spread, as above.
+
+Inert by request: all six tools, the card's settings icon, the header's Continue arrow
+and the undo/redo pill (the node ships its redo glyph already in the `#333` disabled
+state). Only the close button navigates — `navigation.pop()`.
+
+### Testing a mobile layout in headless Chrome
+`--window-size=375,1366` does **not** give a 375px layout: headless Chrome clamps the
+viewport to a 500px minimum, so the page lays out at 500 and the screenshot merely
+crops it — which reads convincingly as a broken layout. Render the screen inside an
+exactly-sized `<iframe>` on a harness page instead; the iframe gets a real 390×844
+viewport. `env(safe-area-inset-*)` is 0 there, so the header measures 103 tall rather
+than the node's 147 — expect that difference when diffing against Figma.
+Also note `requestAnimationFrame` does not advance under `--virtual-time-budget`;
+chain `setTimeout` instead.
 
 ### Create grid geometry (Figma `367:6068`)
 Section is 350 wide inside the page's 20px gutters, `py 16`, 16px gap under the
@@ -536,10 +939,18 @@ splash.html
                            └─(push)─> onboarding-3.html
                                      └─(replace)─> home.html
                                                 ├─(push)─> product-photobook.html
-                                                │          └─(push)─> editor-format.html
-                                                │                     └─(push)─> editor-configure.html
-                                                │                                └─(push)─> ../image-picker/index.html
-                                                │                                           └─(location.href)─> basket.html
+                                                │          └─(push)─> editor.html  ← Continue arrow inert
+                                                │                     └─ upload sheet "Select photos"
+                                                │                        └─(push)─> photo-sources.html
+                                                │                                   └─(push)─> ../image-picker/index.html
+                                                │                                              ├─(back)─> photo-sources.html
+                                                │                                              └─(Continue)─> editor.html
+                                                │                                                 └─ auto-fill prompt → book filled
+                                                │
+                                                │  ⚠️ basket → checkout → payment → success is
+                                                │  currently unreachable: the picker no longer
+                                                │  jumps to the basket and the editor's Continue
+                                                │  arrow is still inert.
                                                 │                                                               └─(push)─> checkout-delivery.html
                                                 │                                                                          └─(push)─> checkout-payment.html
                                                 │                                                                                     └─(replace)─> order-success.html
@@ -563,6 +974,7 @@ Exports via `Object.assign(window, {...})`:
 | `IOSList` | `header, dark` | Inset grouped list card (border-radius 26px) |
 | `IOSListRow` | `title, detail, icon, chevron, isLast, dark` | Single list row (52px tall) — no `style` prop; use plain div for custom row styles |
 | `IOSKeyboard` | `dark` | Full iOS keyboard with liquid glass |
+| `IOSProgressiveBlur` | `scrim` | Three-stage progressive blur scrim, top-down — the image picker's header effect |
 
 **Usage:** On mobile, render screen content directly in `position:fixed; inset:0`. On desktop (≥520px), wrap in `<IOSDevice>` for iPhone preview frame.
 

@@ -2,14 +2,28 @@
   "name": "Photobox",
   "short_name": "Photobox",
   "description": "Create beautiful photo products",
-  "start_url": "/index.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#000000",
   "theme_color": "#0E9E8E",
   "icons": [
-    { "src": "/image-picker/app_icon.png", "sizes": "180x180", "type": "image/png" },
-    { "src": "/image-picker/app_icon.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/image-picker/app_icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
-  ]
+    {
+      "src": "./app_icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "./app_icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "./app_icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "scope": "./"
 }

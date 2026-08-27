@@ -57,7 +57,18 @@ function PhotoboxLogo({ scale = 1, glow = false, assetBase = '../shared/assets' 
 // shine, hairline rim), with the rim and tint pushed brighter because it sits on
 // the deep teal header rather than a light surface.
 // Figma node 451:13873: 24px icon + 8px padding, radius 20.
-function GlassIconButton({ children, size = 40, radius = 20, onClick, label }) {
+//
+// `tint` and `accent` exist for the editor header (node 451:15678), which uses the
+// same glass on a near-black backdrop: there the interior needs the design's
+// rgba(0,0,0,0.25) scrim to read at all, and the Continue button adds a teal
+// colour-dodge/soft-light pair on top. Both default to the home-header values so
+// existing call sites are unchanged.
+// `gloss` switches on the fuller iOS-26-style treatment used by the editor header:
+// a lensed rim, a specular sweep and a 1px 10%-white edge. See the note below on why
+// this is hand-built rather than pulled from a liquid-glass library.
+function GlassIconButton({ children, size = 40, radius = 20, onClick, label,
+                           tint = 'rgba(255,255,255,0.03)', accent = null,
+                           width, gloss = false }) {
   return (
     <button
       type="button"
@@ -67,36 +78,80 @@ function GlassIconButton({ children, size = 40, radius = 20, onClick, label }) {
       onPointerUp={e => { e.currentTarget.style.transform = 'scale(1)'; }}
       onPointerLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
       style={{
-        width: size, height: size, borderRadius: radius,
+        width: width || size, height: size, borderRadius: radius,
         position: 'relative', overflow: 'hidden', border: 'none', padding: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         background: 'transparent', cursor: 'pointer',
         transition: 'transform 140ms ease',
         WebkitTapHighlightColor: 'transparent',
+        // Real glass sits above its surface; without a drop shadow the button reads
+        // as a hole cut in the header rather than an object on top of it.
+        ...(gloss ? { boxShadow: '0 4px 10px rgba(0,0,0,0.45), 0 1px 2px rgba(0,0,0,0.35)' } : null),
       }}
     >
-      {/* Blur + tint. No saturate(): sampling the design mock, the glass interior
-          is colour-neutral against the teal behind it (delta ≈ -3,-5,-5), whereas
-          IOSGlassPill's saturate(180%) drove it cyan (-37,+21,+23). */}
+      {/* Blur + tint. No saturate() in the default recipe: sampling the design mock,
+          the glass interior is colour-neutral against the teal behind it
+          (delta ≈ -3,-5,-5), whereas IOSGlassPill's saturate(180%) drove it cyan
+          (-37,+21,+23). Under `gloss` the backdrop is near-black, where saturate has
+          almost nothing to act on, so it is safe to add for the little it gives. */}
       <div style={{
         position: 'absolute', inset: 0, borderRadius: 'inherit',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-        background: 'rgba(255,255,255,0.03)',
+        backdropFilter: gloss ? 'blur(14px) saturate(180%)' : 'blur(12px)',
+        WebkitBackdropFilter: gloss ? 'blur(14px) saturate(180%)' : 'blur(12px)',
+        background: tint,
       }} />
-      {/* Shine + rim, composited with plus-lighter. The mock's rim lifts the
-          backdrop by a near-equal +21/+19/+19 — a normal white overlay on teal
-          cannot do that (it would read roughly +21/+9/+9, weighted to red),
-          because plus-lighter adds each channel instead of interpolating toward
-          white. The highlight sits on the bottom-left arc, so the brighter inset
-          is offset left/down and the top-right one is dimmer. */}
-      <div style={{
-        position: 'absolute', inset: 0, borderRadius: 'inherit',
-        mixBlendMode: 'plus-lighter',
-        boxShadow: 'inset 1.5px -1.5px 1.5px rgba(255,255,255,0.10),' +
-                   ' inset -1px 1px 1.5px rgba(255,255,255,0.04)',
-        border: '0.5px solid rgba(255,255,255,0.11)',
-      }} />
+      {/* Optional accent wash (editor Continue button — node 451:15685). */}
+      {accent}
+
+      {gloss ? (
+        <React.Fragment>
+          {/* Lensed rim. Apple's glass brightens where the bevel bends light, which
+              is the single biggest cue that it is glass and not a frosted panel.
+              Built from inset shadows rather than a radial-gradient so it follows
+              border-radius — the same layer then works for the 40px circles and the
+              88×40 undo/redo pill. */}
+          <div aria-hidden style={{
+            position: 'absolute', inset: 0, borderRadius: 'inherit',
+            boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.07),' +
+                       ' inset 0 0 7px 1px rgba(255,255,255,0.07),' +
+                       ' inset 0 0 18px -6px rgba(255,255,255,0.16)',
+          }} />
+          {/* Specular sweep — bright at both ends, clear through the middle. Light
+              comes from the lower left, per the mock finding above, so 35deg puts
+              the strong end at the bottom-left arc and a weaker catch opposite. */}
+          <div aria-hidden style={{
+            position: 'absolute', inset: 0, borderRadius: 'inherit',
+            background: 'linear-gradient(35deg,' +
+                        ' rgba(255,255,255,0.30) 0%, rgba(255,255,255,0.10) 18%,' +
+                        ' rgba(255,255,255,0) 42%, rgba(255,255,255,0) 60%,' +
+                        ' rgba(255,255,255,0.06) 84%, rgba(255,255,255,0.22) 100%)',
+          }} />
+          {/* Edge: the requested 1px / 10% white, plus the hard specular highlight
+              riding just inside it. Normal compositing, not plus-lighter — Chrome
+              promotes the scroller to its own layer, and plus-lighter cannot blend
+              across a composited layer boundary (see CLAUDE.md). */}
+          <div aria-hidden style={{
+            position: 'absolute', inset: 0, borderRadius: 'inherit',
+            border: '1px solid rgba(255,255,255,0.10)',
+            boxShadow: 'inset 1.5px -1.5px 1px rgba(255,255,255,0.42),' +
+                       ' inset -1.5px 1.5px 1px rgba(255,255,255,0.14)',
+          }} />
+        </React.Fragment>
+      ) : (
+        /* Shine + rim, composited with plus-lighter. The mock's rim lifts the
+           backdrop by a near-equal +21/+19/+19 — a normal white overlay on teal
+           cannot do that (it would read roughly +21/+9/+9, weighted to red),
+           because plus-lighter adds each channel instead of interpolating toward
+           white. The highlight sits on the bottom-left arc, so the brighter inset
+           is offset left/down and the top-right one is dimmer. */
+        <div aria-hidden style={{
+          position: 'absolute', inset: 0, borderRadius: 'inherit',
+          mixBlendMode: 'plus-lighter',
+          boxShadow: 'inset 1.5px -1.5px 1.5px rgba(255,255,255,0.10),' +
+                     ' inset -1px 1px 1.5px rgba(255,255,255,0.04)',
+          border: '0.5px solid rgba(255,255,255,0.11)',
+        }} />
+      )}
       <span style={{ position: 'relative', zIndex: 1, display: 'flex' }}>{children}</span>
     </button>
   );

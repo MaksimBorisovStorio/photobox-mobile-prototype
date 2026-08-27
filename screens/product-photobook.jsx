@@ -331,6 +331,23 @@ function summarise({ format, cover, size, shape, colour, layflat }) {
   };
 }
 
+// Handed to the editor, which reads it back out of sessionStorage. It needs the
+// resolved title, page count, price and page proportions; recomputing them there
+// would mean duplicating SIZES / SIZE_BASE / COVER_ADD.
+function bookConfig(sel) {
+  const fmt = FORMATS.find(f => f.id === sel.format);
+  const siz = SIZES[sel.format].find(z => z.id === sel.size);
+  const dim = /(\d+)\s*x\s*(\d+)/.exec(siz.dim);
+  return {
+    title: `${siz.title} ${fmt.title} photo book`,
+    // Nothing in the flow picks a page count yet, so every book starts on the
+    // number the editor node shows (451:15652).
+    pages: 24,
+    total: summarise(sel).total,
+    pageW: Number(dim[1]), pageH: Number(dim[2]),
+  };
+}
+
 // Condensed summary bar: the review block's headline and price only, pinned to
 // the bottom while the user is still choosing. It hides as soon as the full
 // review block scrolls into view so the two never show at once.
@@ -676,7 +693,11 @@ function ProductPhotobookScreen() {
             innerRef={reviewRef}
             format={format} cover={cover} size={size}
             shape={shape} colour={colour} layflat={layflat}
-            onStart={() => window.navigation.push('editor-configure.html')}
+            onStart={() => {
+              const sel = { format, cover, size, shape, colour, layflat };
+              sessionStorage.setItem('pb_book', JSON.stringify(bookConfig(sel)));
+              window.navigation.push('editor.html');
+            }}
           />
         )}
       </div>
