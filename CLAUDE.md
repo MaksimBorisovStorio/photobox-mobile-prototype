@@ -22,12 +22,12 @@ All 13 implementation tasks are done. Branch `feature/prototype-build` is demo-r
 
 | Screen | File | Build Status |
 |--------|------|-------------|
-| Splash | `screens/splash.html` + `splash.jsx` | ✅ Done |
-| Onboarding 1 | `screens/onboarding-1.html` + `.jsx` | ✅ Done |
-| Onboarding 2 | `screens/onboarding-2.html` + `.jsx` | ✅ Done |
-| Onboarding 3 | `screens/onboarding-3.html` + `.jsx` | ✅ Done |
-| Home | `screens/home.html` + `home.jsx` | ✅ Done |
-| Product — Photo Book | `screens/product-photobook.html` + `.jsx` | ✅ Done |
+| Splash | `screens/splash.html` + `splash.jsx` | ✅ Done — **Figma-verified** (node `451:13758`) |
+| Onboarding 1 | `screens/onboarding-1.html` + `.jsx` | ✅ Done — **Figma-verified** (node `451:13808`) |
+| Onboarding 2 | `screens/onboarding-2.html` + `.jsx` | ✅ Done — **Figma-verified** (node `451:13841`) |
+| Onboarding 3 | `screens/onboarding-3.html` + `.jsx` | ✅ Done — **Figma-verified** (node `451:13823`) |
+| Home | `screens/home.html` + `home.jsx` | 🟡 Header + Create grid **Figma-verified** (`451:13862` / `367:6068`); Memories, Ideas, tab bar still the old build |
+| Product — Photo Book | `screens/product-photobook.html` + `.jsx` | ✅ Rebuilt — **Figma-verified** (node `406:7183`) |
 | Editor — Format | `screens/editor-format.html` + `.jsx` | ✅ Done |
 | Editor — Configure | `screens/editor-configure.html` + `.jsx` | ✅ Done |
 | Image Picker | `image-picker/index.html` (pre-built, frozen) | ✅ Wired in |
@@ -62,12 +62,12 @@ All 13 implementation tasks are done. Branch `feature/prototype-build` is demo-r
 
 | Screen | Figma Node | Status |
 |--------|-----------|--------|
-| Splash screen | `451:13758` | ✅ Built (Figma not queried — values inferred) |
-| Onboarding slide 1 (emotional) | `451:13808` | ✅ Built (Figma not queried) |
-| Onboarding slide 2 (emotional) | `451:13823` | ✅ Built (Figma not queried) |
-| Onboarding slide 3 (inspire) | `451:13841` | ✅ Built (Figma not queried) |
-| Home screen | `451:13862` | ✅ Built (Figma not queried) |
-| Photo book — cover picker | `451:13381` | ✅ Built (Figma not queried) |
+| Splash screen | `451:13758` | ✅ Built — matches Figma (pixel-diffed, mean Δ 1.6/255) |
+| Onboarding slide 1 (emotional) | `451:13808` | ✅ Built — matches Figma |
+| Onboarding slide 3 (notifications) | `451:13823` | ✅ Built — matches Figma |
+| Onboarding slide 2 (collections) | `451:13841` | ✅ Built — matches Figma (node not queried; shares slide 1/3 layout) |
+| Home screen | `451:13862` | 🟡 Header + Create match Figma; Memories/Ideas/tab bar not yet reworked |
+| Photo book page | `406:7183` | ✅ Built — matches Figma (hero `406:7432`, options `406:7220`) |
 | Photo book — format chooser | `451:13426` | ✅ Built (Figma not queried) |
 | Photo book — configure (scrollable) | `451:13491` | ✅ Built (Figma not queried) |
 | Photo book — configure variant | `451:13606` | ✅ Built (Figma not queried) |
@@ -124,6 +124,14 @@ MEGAPROTOTYPE/
 ├── app_icon.png                 ← Photobox app icon (180×180 for touch icon)
 │
 ├── shared/
+│   ├── assets/                  ← brand assets exported from Figma
+│   │   ├── teachers-variable-latin.woff2   ← wordmark face (self-hosted, offline-safe)
+│   │   ├── splash-star-*.svg    ← 5-layer glowing sparkle (base + 4 glow bleeds)
+│   │   ├── icon-notification.svg
+│   │   └── create-*.png         ← 5 product shots for the Create grid (transparent)
+│   ├── brand.jsx                ← PhotoboxLogo (scale-driven), GlassIconButton
+│   ├── onboarding-shell.jsx     ← shared onboarding layout: OnboardingShell,
+│   │                               GalleryIndicator, PB_DISPLAY font stack
 │   ├── ios-frame.jsx            ← iOS component library
 │   │                               Exports: IOSDevice, IOSStatusBar, IOSNavBar,
 │   │                               IOSGlassPill, IOSList, IOSListRow, IOSKeyboard
@@ -166,6 +174,13 @@ The image-picker has no `navigation.js` loaded, so `window.navigation` doesn't e
 sessionStorage.setItem('pb_nav', 'push');
 window.location.href = '../screens/basket.html';
 ```
+
+### `html, body { height: 100% }` in styles.css is load-bearing — do not remove
+The `[data-nav]` push/pop/modal animations put a `transform` on `<body>`, which makes
+body the containing block for every screen's `position:fixed; inset:0` wrapper. With
+auto height, body's content box is 0px tall (its only child is out of flow), so every
+pushed screen collapsed to 390×0 and rendered **blank**. Only `replace` (fadeIn, no
+transform) escaped it. Fixed by giving html/body a definite viewport height.
 
 ### Every screen root div needs `position:'relative'`
 CTAs are `position:'absolute'; bottom:0` — they anchor to the nearest `position:relative` ancestor. Without it on the root div, CTAs can escape to the IOSDevice frame boundary on desktop. Every screen component's outermost `<div>` must have `position:'relative'`.
@@ -264,6 +279,218 @@ This exact order is required in every screen's HTML:
 | Subhead | 15px | 400 | -0.24px | Supporting text |
 | Footnote | 13px | 400 | -0.08px | Captions, metadata |
 | Caption | 12px | 400 | 0 | Fine print |
+
+### Brand wash gradient
+`shared/styles.css` holds the stop list once as `--pb-wash-stops`; each screen
+supplies its own geometry so the same wash can be re-centred per screen:
+```js
+// splash (451:13758) — centred
+'radial-gradient(661.83% 92.48% at 50% 50%, var(--pb-wash-stops))'
+// onboarding (451:13808) — pushed down, deep teal behind the white copy
+'radial-gradient(815.74% 113.98% at 50% 88.68%, var(--pb-wash-stops))'
+```
+Both sit on a `#EBF7F8` base. Stops come from Figma dev-mode CSS (5 stops); the
+Figma canvas paint has 3 extra mid stops, worth ~Δ9/255 in the mid-band.
+
+### Onboarding display font
+Figma specifies **Google Sans Flex**, which Google does not distribute on Google
+Fonts. `shared/assets/dmsans-variable-latin.woff2` (DM Sans, OFL) is the
+self-hosted stand-in and is second in the `PB_DISPLAY` stack. To go exact: drop
+`google-sans-flex.woff2` into `shared/assets/` and uncomment its `@font-face` in
+`styles.css` — it is first in the stack, so it takes over automatically.
+
+### Onboarding copy & the two documented deviations
+Copy is verbatim from the Figma nodes (slide 1 keeps Figma's explicit line break;
+all three CTAs read "Continue"). Two values intentionally differ from the node,
+both consequences of the Google Sans Flex substitution or of leading:
+
+- **Subhead leading 24px, not Figma's inherited 40px.** 40px is invisible on
+  one-line copy but blows out the moment the body wraps. Because the panel is
+  bottom-anchored, tightening the line box pulled the stack 15px down, so the copy
+  block carries `marginBottom: 8` and an internal gap of 24 (Figma: 16). Verified
+  against the Figma render: headline within 1px, subhead and CTA exact.
+- **Headline tracking -0.2px.** DM Sans is a shade wider than Google Sans Flex —
+  slide 3's second line measured exactly 350px against 350px available and wrapped
+  to a third line. Remove this once the real font is in place.
+
+### A full-bleed wash must live INSIDE the scroller
+Home's gradient was a child of the screen root, sibling to the scroll container —
+so it never moved and read as sticky while everything else scrolled past it. It has
+to be a child of the scroller: absolutely positioned children of a scroll container
+scroll with its content (unlike `position: fixed`).
+
+That move brings a paint-order trap. An `absolute; z-index: 0` element paints in the
+positioned-descendants layer, which is *above* in-flow non-positioned siblings — so
+the wash would veil every section under it. The fix is `z-index: -1` on the wash
+plus `isolation: isolate` on the scroller; the isolation is what guarantees the
+negative z-index resolves inside the scroller (above its own background, below its
+content) instead of escaping to an ancestor stacking context and vanishing behind
+the page background. No per-section z-index needed.
+
+Verified by hit-testing: `elementFromPoint` over the "Create" heading returns the
+heading, not the wash, and the wash's viewport offset tracks `-scrollTop` exactly.
+
+### `backdrop-filter` needs an explicit z-order
+The onboarding panel's blur lives on its own `position:absolute; z-index:0` layer
+with a `linear-gradient` mask that ramps it in over 96px — a plain
+`backdrop-filter` on the panel leaves a visible hard seam at its top edge. The
+content blocks each carry `position:relative; z-index:1`; without that the
+absolutely-positioned blur layer paints *over* the text and blurs it away.
+
+### Photo book page — option flow (Figma `406:7183`)
+One tall scrolling page on a 402 frame with **24px gutters**: hero (`406:7432`) →
+three option sections (`406:7220`, gap 48, padding 40/24) → Lay-flat upsell
+(`406:7296`) → "Review your choice" (`406:7306`).
+
+⚠️ `get_metadata` reports `406:7306` as an **empty frame with no children** — it is
+not. It holds the whole review block (scrim, composed title, price, "Start create"
+button). Always confirm with `get_design_context` before concluding a frame is
+empty. The review block is full-bleed (breaks out of the 24px gutters), 542 tall
+with 24px top corners, and only renders once every option is chosen; its
+background is four copies of the same photo whose export is byte-identical to
+`pb-shot-a.jpg`, so no extra file was added, and it follows the chosen format. Card rows scroll horizontally *by design* — 3×245 +
+2×12 = 759 overflows the 354 content width. Rows bleed past the gutters
+(`margin: 0 -24px; padding: 0 24px 10px`) so cards reach the screen edge and the
+card shadow is not clipped.
+
+Card is 245×303.779 (size row: 261×343.779, 245×343.779, 245×303.779), r20,
+`0px 4px 4px -4px rgba(0,0,0,0.25)`, with a `blur(25px)` gradient scrim caption.
+Figma layers the **same photo two or three times** at specific transforms (zoomed
+backdrop + product on top); those percentages are carried over per card in `SHOTS`
+rather than collapsed into `object-fit`.
+
+**Condensed summary bar.** While options are still being chosen, a sticky bar
+(`#F4F4F4`, 24px top corners, upward shadow) pins the review headline and price to
+the bottom. It appears **as soon as a format is picked** and fills in as choices are
+made (one line until a cover is chosen, two after). An `IntersectionObserver` rooted
+on the scroller hides it the moment the full review block scrolls into view, so the
+two never show together.
+
+Because the label reads "From", a partial selection shows the cheapest option still
+consistent with it — `min(SIZE_BASE) + min(COVER_ADD)` for format-only, which lands
+on €24.99 and so agrees with the option cards — converging on the exact total once
+everything is set. Bar and block both read one `summarise()` helper, so they cannot
+drift apart. Not in the design — added on request.
+
+⚠️ Because the bar is absolutely positioned **over** the scroller, the content
+needs matching room at the end — otherwise the last revealed section is trapped
+under it with no scroll left. That bit the colour swatches: at max scroll 56px of
+the swatch row sat behind the bar and could not be reached. A
+`calc(112px + env(safe-area-inset-bottom, 0px))` spacer is rendered while
+`format && !complete`; once complete the 542-tall review block follows and the bar
+hides as it scrolls in, so no spacer is needed there. Verified by hit-testing every
+swatch with `elementFromPoint` at maximum scroll.
+
+**Progressive blur on the review header.** The node specifies
+`backdrop-blur-[0px]`, so this was added on request. A single `backdrop-filter` is
+uniform and leaves a hard edge where it stops, so five layers of doubling blur
+(1→16px) are stacked, each masked to a shorter band near the top; the blur
+accumulates to roughly 31px at the very top and eases out before the scrim ends.
+
+Two things to know if you touch it:
+- **Use px mask stops, not percentages.** Percentages scale with the container, so
+  changing its height drags the strong layers down over the product photo.
+- **The effect reaches much further than the masks suggest** — each layer blurs the
+  already-blurred composite beneath it, and a layer's blur samples past its own
+  mask. Nominal stops ending at 290px measured as heavy blur out to 288px and only
+  clear at 312px, which softened the book photo. The stops therefore end well above
+  the scrim's 243px bottom. Verified by diffing per-band gradient energy against a
+  `backdrop-filter: none` control: 12–32% of detail retained through the text
+  region, 100% from 240px down.
+
+**Progressive reveal state machine:** Format → cover type → (if Cut-out: shape,
+then colour) → size → Lay-flat + enabled CTA. Each reveal calls `scrollIntoView`.
+Changing format clears the chosen size (sizes are format-dependent); changing away
+from Cut-out clears shape and colour.
+
+Not in the design, and flagged as such in code:
+- **Cut-out shape + cover colour sections.** Shape reuses the card pattern with
+  placeholder artwork; colour is a swatch row using PB3 tokens.
+- **Size matrix per format.** The design names Extra large 39×29 and Large 28×21;
+  portrait and square rotate those, and a Medium was added. All three size cards
+  are 343.779 tall — the design's third one is 303.779 and sits centred in the row
+  (`y=20`), but that is its mislabelled "Soft cover" placeholder, so a real third
+  size matches its siblings. Medium reuses the Large photo: the design only ships
+  two size shots.
+- **Price model.** Every option card reads a flat "From €24.99" while the review
+  block reads €44.99 for Large / Landscape / Hardcover / Layflat, so the
+  increments in `SIZE_BASE` / `COVER_ADD` / `LAYFLAT_ADD` are reverse-engineered
+  to hit that exact total (29.99 + 10 + 5). Replace them once real pricing exists.
+- **CTA target.** "Start create" goes to `editor-configure.html`, skipping
+  `editor-format.html` — that screen is now redundant since format is chosen here.
+- **Selected state and the toggle.** Exports carry only the unselected/off state,
+  so both are drawn in code (teal fill + check; 55×32 track).
+
+Every price in the design reads "From €24.99" on every card while the hero says
+"Start from €14.99" — kept verbatim rather than invented around.
+
+### Create grid geometry (Figma `367:6068`)
+Section is 350 wide inside the page's 20px gutters, `py 16`, 16px gap under the
+title. Grid is 2 equal columns with 12px gaps, so cards come out **169×227.1** at
+390 (`(350-12)/2 = 169`; image strip is a `171/165` aspect = 163.07, plus a fixed
+64px caption). Card r16, white; title 16/600/20 −0.16 `#333`; price 13/28 in
+`#007377` with "from " at weight 510 and the amount bold.
+
+Two faithful oddities carried over from the design: **Gifts reuses the Calendars
+artwork** (both fills point at the same image in Figma), and the Calendars/Gifts
+fills are placed at a sub-rect (`left 14.04% top 12.58% w 71.93% h 74.84%`) rather
+than filling the box — the PNGs are transparent, so `object-fit: cover` is wrong
+for them.
+
+Only the Photo books card navigates (→ `product-photobook.html`); the other five
+have no destination in the prototype yet.
+
+**Card shadow is an addition, not from the node.** `367:6422` has no shadow, and
+Figma's own render of the grid shows flat `#F1F6F6` in the gaps with no falloff at
+any card edge. The cards use `0px 4px 16px -1px rgba(0,77,74,0.1)` — the same card
+shadow the design applies to the top banners (`404:6794`) and Ideas cards
+(`367:6246`) — because the flat version read as a bug.
+
+### A horizontal scroller clips its cards' shadows
+`overflow-x: auto` forces `overflow-y` to compute to auto/hidden — it can never be
+`visible` — so a shadowed card inside a horizontal scroller gets its shadow sliced
+off at the bottom edge. Give the scroller bottom padding at least as deep as the
+shadow's reach (offset + blur − spread; 20px for the brand card shadow) and take
+the same amount off its bottom margin to keep the intended gap.
+
+### `PB_DISPLAY` lives in brand.jsx, and load order matters
+Each `text/babel` file is evaluated as its own classic script, so two top-level
+`const PB_DISPLAY` declarations collide in the global lexical scope. It is defined
+once in `shared/brand.jsx`; `onboarding-shell.jsx` consumes the global, so **every
+page loading the shell must load `brand.jsx` first**.
+
+### PhotoboxLogo is scale-driven — one set of numbers, two screens
+The home header lockup (`451:13866`) is *exactly* the splash lockup (`451:13761`)
+at 2/3: verified by extracting both star path exports and confirming every
+coordinate differs by exactly 1.5×, and the wordmark's size/leading/tracking are
+2/3 of splash's (37.319→24.88, 24.88→16.586, -1.4928→-0.9952). So `PhotoboxLogo`
+takes a `scale` and one SVG serves both. `glow` adds the four splash glow layers;
+the home header uses the base glyph only.
+
+### Liquid glass: use plus-lighter for the rim, and no saturate()
+Sampling the design mock against its own backdrop:
+
+| patch | mock | IOSGlassPill recipe |
+|-------|------|---------------------|
+| interior | −3, −5, −5 | −37, +21, +23 |
+| rim | +21, +19, +19 | +66, +49, +49 |
+
+Two findings, both in `GlassIconButton`:
+- **Drop `saturate(180%)`** on a teal backdrop. The mock's glass is colour-neutral
+  to what's behind it; saturate drove the interior cyan.
+- **Blend the rim with `plus-lighter`.** The mock lifts all three channels almost
+  equally (+21/+19/+19). A normal white overlay on teal *cannot* do that — it
+  interpolates toward white, so it lands around +21/+9/+9, weighted to red.
+  plus-lighter adds channels instead, which reproduces it.
+
+The highlight sits on the **bottom-left** arc, not the top-left. Final match is
+within ~5/255 on every sampled patch.
+
+### Brand wordmark
+The Photobox wordmark is **Teachers SemiBold (600)** — a Google Font (OFL), self-hosted
+at `shared/assets/teachers-variable-latin.woff2` and declared as `@font-face` in
+`shared/styles.css`. Use `fontFamily: '"Teachers", -apple-system, system-ui, sans-serif'`.
+Splash lockup is 157×41 at y=401/844, wordmark 37.319px / -1.4928px tracking.
 
 ### Liquid Glass Effect
 Used on nav bars, pills, and sheets (already implemented in `ios-frame.jsx`):
@@ -368,7 +595,29 @@ Exports via `Object.assign(window, {...})`:
 ```
 
 ### service-worker.js
-Precaches all 14 screen HTML files, all 14 JSX files, 4 shared assets, manifest.json, and 4 image-picker files. Cache name `photobox-v1`. Cache-first strategy.
+Precaches every screen HTML + JSX, the shared assets (incl. fonts and splash SVGs),
+manifest.json and the image-picker files. Cache name `photobox-v4`.
+
+**Strategy: network-first, cache fallback** — and same-origin requests are fetched
+with `cache: 'no-store'`. Both parts are deliberate:
+
+- It used to be **cache-first**, which froze the prototype. Once the SW was
+  installed, editing a screen file changed *nothing* in the browser — not on
+  reload, not even for `fetch()` — because the response came from `photobox-v1`
+  forever. The cache only refreshed when `service-worker.js` itself changed.
+- Plain `fetch(e.request)` under network-first is *still* not enough: it can be
+  answered from the browser's HTTP cache, which hides local edits just as well.
+  Same-origin fetches therefore bypass it; the CDN (React/Babel) keeps normal
+  caching since those URLs are immutable.
+- `install` caches entries one-by-one via `allSettled`, not `addAll` — one bad
+  path used to reject the whole batch and leave the cache empty.
+
+Offline still works: every successful fetch refreshes its cache entry.
+
+**If a stale build appears in the browser:** hard-reload twice (the first load
+installs the new worker, the second is served by it), or DevTools → Application →
+Storage → Clear site data. For the iPhone home-screen PWA, relaunch it twice, or
+delete and re-add the icon.
 
 ---
 
