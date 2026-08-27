@@ -19,8 +19,14 @@
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('service-worker.js');
     }
-    // Immediately redirect to splash
-    window.location.replace('screens/splash.html');
+    // TEMPORARY (bottom-gap investigation): land on the viewport diagnostic so it
+    // measures inside the standalone PWA. "continue to prototype" sets the flag.
+    // Revert this to the plain splash redirect once the gap is understood.
+    if (sessionStorage.getItem('pb_skip_diag')) {
+      window.location.replace('screens/splash.html');
+    } else {
+      window.location.replace('diag.html');
+    }
   </script>
 </body>
 </html>

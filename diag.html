@@ -16,6 +16,7 @@
      region, which is exactly the "gap" being investigated. */
   html, body { margin:0; padding:0; background:#FF0033; height:100%; }
   * { box-sizing:border-box; }
+  #root { width:100%; }
   #box {
     position:fixed; inset:0;
     background:#FFFFFF;
@@ -45,7 +46,7 @@
 <body>
 <div id="probe"></div>
 <div id="vh"></div><div id="dvh"></div><div id="sa"></div>
-<div id="box">
+<div id="root"><div id="box">
   <h1>Photobox viewport diagnostic</h1>
   <div class="legend">
     RED strip = page background outside the fixed box (the gap).
@@ -56,9 +57,11 @@
   <button id="nocover">remove viewport-fit=cover</button>
   <button id="cover">re-add viewport-fit=cover</button>
   <button id="again">re-measure</button>
-</div>
+  <button id="injectcss" style="background:#ffe9b0">1. inject app CSS &amp; re-measure</button>
+  <button id="go" style="background:#cfe9ff">2. continue to prototype</button>
+</div></div>
 <script>
-var BUILD = 'diag-1';
+var BUILD = 'diag-2';
 function px(el){ var r = el.getBoundingClientRect(); return Math.round(r.width)+'x'+Math.round(r.height)+' top '+Math.round(r.top)+' bottom '+Math.round(r.bottom); }
 function unit(u){
   var d = document.createElement('div');
@@ -126,6 +129,22 @@ function setViewport(content){
   setTimeout(measure, 400);
 }
 document.getElementById('again').onclick = measure;
+// Reproduce a real screen's conditions in place: the app stylesheet (which sets
+// html,body{height:100%}) plus the [data-nav] enter animation on #root > *.
+document.getElementById('injectcss').onclick = function(){
+  var l = document.createElement('link');
+  l.rel = 'stylesheet'; l.href = 'shared/styles.css?cb=' + Math.random();
+  l.onload = function(){
+    document.documentElement.setAttribute('data-nav','push');
+    setTimeout(measure, 600);
+  };
+  document.head.appendChild(l);
+  this.textContent = 'app CSS injected';
+};
+document.getElementById('go').onclick = function(){
+  sessionStorage.setItem('pb_skip_diag','1');
+  location.replace('screens/splash.html');
+};
 document.getElementById('nocover').onclick = function(){
   setViewport('width=device-width,initial-scale=1,user-scalable=no'); };
 document.getElementById('cover').onclick = function(){
