@@ -2,155 +2,122 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>PB Viewport Diag</title>
-<!-- Identical viewport/meta configuration to the app screens. -->
+<title>PB Viewport Diag 3</title>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="PB Diag">
 <link rel="manifest" href="diag.webmanifest">
 <link rel="apple-touch-icon" href="app_icon.png">
-<style>
-  /* html/body background is BRIGHT RED on purpose: any strip of red visible at an
-     edge is page background OUTSIDE the position:fixed box — i.e. a letterboxed
-     region, which is exactly the "gap" being investigated. */
-  html, body { margin:0; padding:0; background:#FF0033; height:100%; }
+<style id="base">
+  html, body { margin:0; padding:0; background:#FF0033; }
   * { box-sizing:border-box; }
   #root { width:100%; }
-  #box {
-    position:fixed; inset:0;
-    background:#FFFFFF;
-    border:4px solid #FF00FF;      /* magenta = bounds of position:fixed; inset:0 */
-    overflow:auto;
-    font:11px/1.35 ui-monospace,Menlo,monospace; color:#000;
-    padding:calc(env(safe-area-inset-top,0px) + 8px) 10px 10px;
-  }
-  /* yellow = where 100vh ends */
-  #vh { position:fixed; left:0; right:0; top:calc(100vh - 4px); height:4px; background:#FFD400; z-index:5; }
-  /* green = where the bottom safe-area inset begins */
-  #sa { position:fixed; left:0; right:0; bottom:env(safe-area-inset-bottom,0px); height:4px; background:#00C853; z-index:5; }
-  /* blue = where 100dvh ends */
-  #dvh { position:fixed; left:0; right:0; top:calc(100dvh - 4px); height:4px; background:#0066FF; z-index:5; }
-  b { display:inline-block; min-width:132px; color:#555; font-weight:600; }
-  .k { color:#0a7; font-weight:700; }
-  .bad { color:#c00; font-weight:700; }
-  #probe { position:absolute; visibility:hidden;
-           padding: env(safe-area-inset-top,0px) env(safe-area-inset-right,0px)
-                    env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px); }
-  button { font:600 13px/1 -apple-system,system-ui; padding:9px 12px; margin:4px 4px 0 0;
-           border-radius:8px; border:1px solid #999; background:#eee; }
-  h1 { font:700 14px/1.2 -apple-system,system-ui; margin:0 0 6px; }
-  .legend { margin:8px 0 6px; font-size:10px; color:#444; }
+  /* DRAWABILITY PROBE: 100vh tall (the full screen per CSS). If the yellow bar at
+     its bottom is visible on device, the region below the layout viewport can be
+     painted by page content. If it is not, that region is unreachable. */
+  #probe100vh { position:fixed; top:0; left:0; right:0; height:100vh; z-index:0;
+                background:linear-gradient(to bottom, transparent 0, transparent calc(100% - 74px), #00E5FF calc(100% - 74px)); }
+  #probe100vh span { position:absolute; left:0; right:0; bottom:0; height:74px;
+                     display:flex; align-items:center; justify-content:center; text-align:center;
+                     background:#FFE000; color:#000; font:700 15px/1.15 -apple-system,system-ui;
+                     border-top:3px solid #000; padding:4px 8px; }
+  #panel { position:fixed; top:0; left:0; right:0; z-index:2;
+           background:rgba(255,255,255,0.97); border:3px solid #FF00FF; border-top:none;
+           font:11px/1.3 ui-monospace,Menlo,monospace; color:#000;
+           padding:calc(env(safe-area-inset-top,0px) + 6px) 8px 8px; }
+  h1 { font:700 13px/1.2 -apple-system,system-ui; margin:0 0 4px; }
+  table { border-collapse:collapse; width:100%; font:10px/1.25 ui-monospace,Menlo,monospace; }
+  th,td { border:1px solid #bbb; padding:2px 3px; text-align:right; }
+  th:first-child, td:first-child { text-align:left; }
+  th { background:#eee; }
+  .hit { background:#c8f7c5; font-weight:700; }
+  #probeEnv { position:absolute; visibility:hidden;
+              padding: env(safe-area-inset-top,0px) env(safe-area-inset-right,0px)
+                       env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px); }
+  #note { margin-top:5px; font:10px/1.3 -apple-system,system-ui; color:#333; }
 </style>
 </head>
 <body>
-<div id="probe"></div>
-<div id="vh"></div><div id="dvh"></div><div id="sa"></div>
-<div id="root"><div id="box">
-  <h1>Photobox viewport diagnostic</h1>
-  <div class="legend">
-    RED strip = page background outside the fixed box (the gap).
-    MAGENTA = edges of <code>position:fixed;inset:0</code>.
-    YELLOW = 100vh end. BLUE = 100dvh end. GREEN = bottom safe-area inset.
+<div id="probeEnv"></div>
+<div id="root">
+  <div id="probe100vh"><span id="probeLabel">▼ YELLOW BAR — if you can see this whole bar, page content CAN paint the bottom strip</span></div>
+  <div id="panel">
+    <h1>Diag 3 — which recipe changes the viewport?</h1>
+    <div id="status">running configurations…</div>
+    <div id="tbl"></div>
+    <div id="note"></div>
   </div>
-  <pre id="out">measuring…</pre>
-  <button id="nocover">remove viewport-fit=cover</button>
-  <button id="cover">re-add viewport-fit=cover</button>
-  <button id="again">re-measure</button>
-  <button id="injectcss" style="background:#ffe9b0">1. inject app CSS &amp; re-measure</button>
-  <button id="go" style="background:#cfe9ff">2. continue to prototype</button>
-</div></div>
+</div>
 <script>
-var BUILD = 'diag-2';
-function px(el){ var r = el.getBoundingClientRect(); return Math.round(r.width)+'x'+Math.round(r.height)+' top '+Math.round(r.top)+' bottom '+Math.round(r.bottom); }
-function unit(u){
-  var d = document.createElement('div');
-  d.style.cssText = 'position:absolute;visibility:hidden;width:1px;height:'+u;
-  document.body.appendChild(d);
-  var h = d.getBoundingClientRect().height;
-  d.remove();
-  return Math.round(h*100)/100;
-}
-function row(k,v){ return '<b>'+k+'</b>'+v; }
-function measure(){
-  var cs = getComputedStyle(document.getElementById('probe'));
-  var box = document.getElementById('box');
-  var bodyCS = getComputedStyle(document.body);
-  var htmlCS = getComputedStyle(document.documentElement);
-  var vv = window.visualViewport;
-  var insets = [cs.paddingTop, cs.paddingRight, cs.paddingBottom, cs.paddingLeft].join(' / ');
-  var vh = unit('100vh'), dvh = unit('100dvh'), svh = unit('100svh'), lvh = unit('100lvh'),
-      fa = unit('-webkit-fill-available');
-  var boxRect = box.getBoundingClientRect();
-  var lines = [
-    row('build', BUILD),
-    row('standalone', String(navigator.standalone) + '  (display-mode:standalone = ' +
-        (window.matchMedia('(display-mode: standalone)').matches) + ')'),
-    row('screen', screen.width+'x'+screen.height+'  dpr '+window.devicePixelRatio),
-    row('window.inner', window.innerWidth+'x'+window.innerHeight),
-    row('window.outer', window.outerWidth+'x'+window.outerHeight),
-    row('docEl.client', document.documentElement.clientWidth+'x'+document.documentElement.clientHeight),
-    row('visualViewport', vv ? Math.round(vv.width)+'x'+Math.round(vv.height)+' offTop '+vv.offsetTop+' scale '+vv.scale : 'n/a'),
-    row('env insets T/R/B/L', '<span class="'+(parseFloat(cs.paddingBottom)>0?'k':'bad')+'">'+insets+'</span>'),
-    row('100vh / 100dvh', vh+' / '+dvh),
-    row('100svh / 100lvh', svh+' / '+lvh),
-    row('-webkit-fill-avail', fa),
-    row('fixed inset:0 box', px(box)),
-    row('  → box.bottom vs screen', Math.round(boxRect.bottom)+' vs inner '+window.innerHeight),
-    row('html height', htmlCS.height+'   body height '+bodyCS.height),
-    row('body transform', bodyCS.transform),
-    row('body animation', bodyCS.animationName+' '+bodyCS.animationFillMode),
-    row('viewport meta', document.querySelector('meta[name=viewport]').content)
-  ];
-  document.getElementById('out').innerHTML = lines.join('\n');
+var BUILD='diag-3';
+var COVER='width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no';
+var NOCOVER='width=device-width,initial-scale=1,user-scalable=no';
+var vpMeta=document.querySelector('meta[name=viewport]');
+var cfgStyle=document.createElement('style'); document.head.appendChild(cfgStyle);
+var fixedProbe=document.createElement('div');
+fixedProbe.style.cssText='position:fixed;inset:0;visibility:hidden;pointer-events:none';
+document.body.appendChild(fixedProbe);
 
-  // Does the phone have the new stylesheet + service worker build?
-  fetch('shared/styles.css?cb='+Math.random()).then(function(r){return r.text();}).then(function(t){
-    var n = (t.match(/#root > \* \{ animation/g)||[]).length;
-    add(row('styles.css nav rules', n===4 ? '<span class="k">4/4 on #root &gt; * (NEW build)</span>'
-                                          : '<span class="bad">'+n+'/4 — OLD build on device</span>'));
-  }).catch(function(e){ add(row('styles.css fetch', 'failed: '+e.message)); });
-  fetch('service-worker.js?cb='+Math.random()).then(function(r){return r.text();}).then(function(t){
-    var m = t.match(/photobox-v\d+/);
-    add(row('service-worker cache', m ? m[0] : '?'));
-  }).catch(function(){});
-  if (navigator.serviceWorker) {
-    navigator.serviceWorker.getRegistrations().then(function(rs){
-      add(row('SW registrations', rs.length ? rs.map(function(r){
-        return (r.active&&r.active.scriptURL||'').replace(location.origin,'') + ' [' +
-               (r.active?r.active.state:'none') + ']'; }).join(', ') : 'none'));
+var CONFIGS=[
+  ['A height:100%  +cover',            'html,body{height:100%}',                    COVER],
+  ['B min-h:100vh  +cover  (picker)',  'html,body{min-height:100vh}#root{min-height:100vh}', COVER],
+  ['C fill-avail   +cover',            'html,body{height:-webkit-fill-available}',   COVER],
+  ['D height:100%  NO cover',          'html,body{height:100%}',                    NOCOVER],
+  ['E min-h:100vh  NO cover',          'html,body{min-height:100vh}#root{min-height:100vh}', NOCOVER]
+];
+var results=[];
+function unit(u){
+  var d=document.createElement('div');
+  d.style.cssText='position:absolute;visibility:hidden;width:1px;height:'+u;
+  document.body.appendChild(d); var h=d.getBoundingClientRect().height; d.remove();
+  return Math.round(h);
+}
+function snap(name){
+  var cs=getComputedStyle(document.getElementById('probeEnv'));
+  var r=fixedProbe.getBoundingClientRect();
+  var de=document.documentElement;
+  return { name:name,
+    inner:window.innerHeight, client:de.clientHeight,
+    fixH:Math.round(r.height), fixBot:Math.round(r.bottom),
+    envT:Math.round(parseFloat(cs.paddingTop)), envB:Math.round(parseFloat(cs.paddingBottom)),
+    vh:unit('100vh'), dvh:unit('100dvh'),
+    scroll:Math.max(de.scrollHeight,document.body.scrollHeight)>de.clientHeight?'yes':'no' };
+}
+function run(i){
+  if(i>=CONFIGS.length){ finish(); return; }
+  var c=CONFIGS[i];
+  cfgStyle.textContent=c[1];
+  vpMeta.setAttribute('content',c[2]);
+  document.getElementById('status').textContent='measuring '+c[0]+' …';
+  setTimeout(function(){ results.push(snap(c[0])); run(i+1); }, 900);
+}
+function finish(){
+  // End on the picker recipe with cover, and reveal the drawability probe.
+  cfgStyle.textContent='html,body{min-height:100vh}#root{min-height:100vh}';
+  vpMeta.setAttribute('content',COVER);
+  setTimeout(function(){
+    var screenH=screen.height, base=results[0]?results[0].client:0;
+    var h='<table><tr><th>config</th><th>inner</th><th>client</th><th>fixed h</th>'+
+          '<th>fix bot</th><th>envT</th><th>envB</th><th>100vh</th><th>scroll</th></tr>';
+    results.forEach(function(r){
+      var full=(r.client===screenH);
+      h+='<tr'+(full?' class="hit"':'')+'><td>'+r.name+'</td><td>'+r.inner+'</td><td>'+r.client+
+         '</td><td>'+r.fixH+'</td><td>'+r.fixBot+'</td><td>'+r.envT+'</td><td>'+r.envB+
+         '</td><td>'+r.vh+'</td><td>'+r.scroll+'</td></tr>';
     });
-  }
-  if (window.caches) caches.keys().then(function(k){ add(row('caches', k.join(', ')||'none')); });
+    h+='</table>';
+    document.getElementById('tbl').innerHTML=h;
+    document.getElementById('status').innerHTML='build '+BUILD+' &middot; standalone '+
+      navigator.standalone+' &middot; screen '+screen.width+'x'+screen.height+
+      ' &middot; short by '+(screen.height-base)+'px in config A';
+    document.getElementById('note').innerHTML=
+      'GREEN row = that recipe gives the FULL screen height ('+screenH+'). '+
+      'Now showing the 100vh drawability probe: the CYAN band and YELLOW bar below are '+
+      'drawn by page content inside a 100vh-tall fixed box. Screenshot the whole screen.';
+  }, 900);
 }
-function add(html){ document.getElementById('out').innerHTML += '\n' + html; }
-function setViewport(content){
-  document.querySelector('meta[name=viewport]').setAttribute('content', content);
-  setTimeout(measure, 400);
-}
-document.getElementById('again').onclick = measure;
-// Reproduce a real screen's conditions in place: the app stylesheet (which sets
-// html,body{height:100%}) plus the [data-nav] enter animation on #root > *.
-document.getElementById('injectcss').onclick = function(){
-  var l = document.createElement('link');
-  l.rel = 'stylesheet'; l.href = 'shared/styles.css?cb=' + Math.random();
-  l.onload = function(){
-    document.documentElement.setAttribute('data-nav','push');
-    setTimeout(measure, 600);
-  };
-  document.head.appendChild(l);
-  this.textContent = 'app CSS injected';
-};
-document.getElementById('go').onclick = function(){
-  sessionStorage.setItem('pb_skip_diag','1');
-  location.replace('screens/splash.html');
-};
-document.getElementById('nocover').onclick = function(){
-  setViewport('width=device-width,initial-scale=1,user-scalable=no'); };
-document.getElementById('cover').onclick = function(){
-  setViewport('width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no'); };
-window.addEventListener('resize', function(){ setTimeout(measure, 200); });
-setTimeout(measure, 250);
+setTimeout(function(){ run(0); }, 300);
 </script>
 </body>
 </html>

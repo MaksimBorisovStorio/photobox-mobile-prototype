@@ -158,19 +158,22 @@
 *, *::before, *::after { box-sizing: border-box; }
 html, body {
   margin: 0; padding: 0;
-  /* Kept as a definite height so any in-flow content has a viewport-sized box to
-     resolve against. It is NO LONGER load-bearing for the screen wrappers: the
-     [data-nav] animations are applied to `#root > *` (the wrapper itself), not to
-     <body>, so nothing in the ancestor chain becomes a containing block for their
-     `position:fixed; inset:0`. See the navigation block at the bottom of this file
-     — do not move those animations back onto <body>. */
-  height: 100%;
+  /* `min-height: 100vh`, NOT `height: 100%` — this mirrors image-picker/index.html,
+     the one screen that has never shown the bottom letterbox on device. In the iOS
+     standalone PWA `100%` resolves to the short layout viewport (873 on a 932pt
+     screen) while `100vh` is the full screen, so this leaves the document taller
+     than the viewport instead of pinning it to the short one. Do not "restore" a
+     definite height: it is what the picker deliberately avoids.
+     This is also no longer load-bearing for the screen wrappers — the [data-nav]
+     animations live on `#root > *`, not <body>, so nothing above the wrapper becomes
+     a containing block for its `position:fixed; inset:0`. */
+  min-height: 100vh;
   font-family: var(--font);
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
 }
-#root { width: 100%; }
+#root { width: 100%; min-height: 100vh; }   /* picker recipe — see above */
 
 /* Desktop preview: center the IOSDevice frame */
 @media (min-width: 520px) {
