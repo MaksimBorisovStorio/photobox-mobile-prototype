@@ -18,7 +18,16 @@ function GalleryIndicator({ active = 1 }) {
   );
 }
 
-function OnboardingShell({ slide, title, body, ctaLabel = 'Continue', onNext, children }) {
+// Illustration coordinates are lifted verbatim from the 390-wide Figma frames, so
+// both art slots live in a 390-wide box centred on the viewport — on a wider phone
+// the whole illustration centres instead of hugging the left edge. Decorative, so
+// pointer events pass straight through to the CTA underneath.
+const ART_FRAME = {
+  position: 'absolute', left: '50%', top: 0, width: 390, height: '100%',
+  transform: 'translateX(-50%)', pointerEvents: 'none',
+};
+
+function OnboardingShell({ slide, title, body, ctaLabel = 'Continue', onNext, children, foreground }) {
   const press = s => ({
     onPointerDown: e => { e.currentTarget.style.transform = `scale(${s})`; },
     onPointerUp:   e => { e.currentTarget.style.transform = 'scale(1)'; },
@@ -37,8 +46,9 @@ function OnboardingShell({ slide, title, body, ctaLabel = 'Continue', onNext, ch
         background: 'radial-gradient(815.74% 113.98% at 50% 88.68%, var(--pb-wash-stops))',
       }} />
 
-      {/* Illustration slot — Figma node 451:13809. Empty until artwork lands. */}
-      {children}
+      {/* Illustration, behind the bottom panel — so the panel's backdrop blur softens
+          whatever reaches down into it, exactly as the Figma frames do. */}
+      <div aria-hidden style={ART_FRAME}>{children}</div>
 
       {/* Bottom panel — node 451:13813: 484 tall, blurs the artwork behind it */}
       <div style={{
@@ -51,16 +61,21 @@ function OnboardingShell({ slide, title, body, ctaLabel = 'Continue', onNext, ch
         // the home indicator.
         paddingBottom: 'max(24px, env(safe-area-inset-bottom, 0px))',
       }}>
-        {/* Blur sits on its own layer, ramped in over the first 96px. A plain
-            backdrop-filter on the panel leaves a hard seam at its top edge; the
-            mask makes the blur fade in instead. Text stays unmasked above it. */}
+        {/* ⚠️ The node declares `backdrop-blur: 28.65px` on this panel and it is
+            deliberately NOT implemented. Figma's own render of all three frames shows
+            no blur at all — the panel's fill is rgba(222,241,242,0.01) and Figma
+            modulates a background blur by the layer's own fill alpha, so 1% of the
+            blur is 1% visible. Measured on node 451:13841: the album tile that runs
+            behind this panel keeps 4.78 units of horizontal detail in Figma's render
+            where a live 28.65px backdrop-filter leaves 1.75 — the artwork came out
+            visibly washed out against the design. The panel is therefore a plain
+            translucent layer; the wash gradient behind it is what carries the
+            transition, and it needs no seam-hiding mask because there is no seam.
+            Put the blur back and the illustrations go soft again. */}
         <div aria-hidden style={{
           position: 'absolute', inset: 0, pointerEvents: 'none',
           zIndex: 0,
           background: 'rgba(222,241,242,0.01)',
-          backdropFilter: 'blur(28.65px)', WebkitBackdropFilter: 'blur(28.65px)',
-          maskImage: 'linear-gradient(to bottom, transparent 0px, #000 96px)',
-          WebkitMaskImage: 'linear-gradient(to bottom, transparent 0px, #000 96px)',
         }} />
         {/* Copy — node 451:13814 */}
         {/* Figma gaps are 16 here and 24 below, on a 40px subhead line box. Since
@@ -121,6 +136,11 @@ function OnboardingShell({ slide, title, body, ctaLabel = 'Continue', onNext, ch
           </button>
         </div>
       </div>
+
+      {/* Illustration parts Figma paints AFTER the panel, so they stay sharp where
+          they overlap it: slide 2's front album tile and its two labels, slide 3's
+          notification stack. */}
+      {foreground ? <div aria-hidden style={ART_FRAME}>{foreground}</div> : null}
     </div>
   );
 }

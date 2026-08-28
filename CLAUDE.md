@@ -23,10 +23,10 @@ All 13 implementation tasks are done. Branch `feature/prototype-build` is demo-r
 | Screen | File | Build Status |
 |--------|------|-------------|
 | Splash | `screens/splash.html` + `splash.jsx` | ✅ Done — **Figma-verified** (node `451:13758`) |
-| Onboarding 1 | `screens/onboarding-1.html` + `.jsx` | ✅ Done — **Figma-verified** (node `451:13808`) |
-| Onboarding 2 | `screens/onboarding-2.html` + `.jsx` | ✅ Done — **Figma-verified** (node `451:13841`) |
-| Onboarding 3 | `screens/onboarding-3.html` + `.jsx` | ✅ Done — **Figma-verified** (node `451:13823`) |
-| Home | `screens/home.html` + `home.jsx` | 🟡 Header + Create grid **Figma-verified** (`451:13862` / `367:6068`); Memories, Ideas, tab bar still the old build |
+| Onboarding 1 | `screens/onboarding-1.html` + `.jsx` | ✅ Done, illustration landed — **Figma-verified** (node `451:13808`) |
+| Onboarding 2 | `screens/onboarding-2.html` + `.jsx` | ✅ Done, illustration landed — **Figma-verified** (node `451:13841`) |
+| Onboarding 3 | `screens/onboarding-3.html` + `.jsx` | ✅ Done, illustration landed — **Figma-verified** (node `451:13823`) |
+| Home | `screens/home.html` + `home.jsx` | ✅ Rebuilt end to end — **Figma-verified** against `509:19053`; every section lands on the node's y to <0.1px |
 | Product — Photo Book | `screens/product-photobook.html` + `.jsx` | ✅ Rebuilt — **Figma-verified** (node `406:7183`) |
 | Editor | `screens/editor.html` + `editor.jsx` | ✅ Built — **Figma-verified** (node `451:15574`) |
 | Photo sources | `screens/photo-sources.html` + `.jsx` | ✅ Built — node `451:14202`; 2 of 8 covers verifiable, see below |
@@ -62,10 +62,18 @@ All 13 implementation tasks are done. Branch `feature/prototype-build` is demo-r
 | Screen | Figma Node | Status |
 |--------|-----------|--------|
 | Splash screen | `451:13758` | ✅ Built — matches Figma (pixel-diffed, mean Δ 1.6/255) |
-| Onboarding slide 1 (emotional) | `451:13808` | ✅ Built — matches Figma |
-| Onboarding slide 3 (notifications) | `451:13823` | ✅ Built — matches Figma |
-| Onboarding slide 2 (collections) | `451:13841` | ✅ Built — matches Figma (node not queried; shares slide 1/3 layout) |
-| Home screen | `451:13862` | 🟡 Header + Create match Figma; Memories/Ideas/tab bar not yet reworked |
+| Onboarding slide 1 (emotional) | `451:13808` | ✅ Built — matches Figma; art `451:13809` |
+| Onboarding slide 3 (notifications) | `451:13823` | ✅ Built — matches Figma; art `451:13824` + `451:13838` |
+| Onboarding slide 2 (collections) | `451:13841` | ✅ Built — matches Figma; art `451:13842`/`13843`/`13855` + labels |
+| Home screen | `509:19053` | ✅ Rebuilt — supersedes `451:13862`; all sections verified |
+| Home — promo banners | `509:19066` | ✅ Built (was `451:13875`) — matches on every value |
+| Home — status banners | `509:20175` | ✅ Built — order tracking + continue editing |
+| Home — Create grid | `367:6068` | ✅ Built |
+| Home — Memories | `509:19080` | ✅ Built — reuses the shared collection covers |
+| Home — Collections | `509:19224` | ✅ Built — Trip books / Year books |
+| Home — Ideas | `509:20176` | ✅ Built — ⚠️ the node's four cards have no artwork yet |
+| Home — Ask AI | `509:20290` | ✅ Built |
+| Home — tab bar | `509:19230` | ✅ Built — iOS-26 floating liquid-glass pill |
 | Photo book page | `406:7183` | ✅ Built — matches Figma (hero `406:7432`, options `406:7220`) |
 | Photo book — format chooser | `451:13426` | ✅ Built (Figma not queried) |
 | Photo book — configure (scrollable) | `451:13491` | ✅ Built (Figma not queried) |
@@ -129,7 +137,10 @@ MEGAPROTOTYPE/
 │   │   ├── splash-star-*.svg    ← 5-layer glowing sparkle (base + 4 glow bleeds)
 │   │   ├── icon-notification.svg
 │   │   └── create-*.png         ← 5 product shots for the Create grid (transparent)
-│   ├── brand.jsx                ← PhotoboxLogo (scale-driven), GlassIconButton
+│   ├── brand.jsx                ← PhotoboxLogo (scale-driven), PhotoboxStar,
+│   │                               GlassIconButton
+│   ├── collections.jsx          ← the eight "Smart Stories" covers + CollectionCard,
+│   │                               shared by photo-sources and home → Memories
 │   ├── onboarding-shell.jsx     ← shared onboarding layout: OnboardingShell,
 │   │                               GalleryIndicator, PB_DISPLAY font stack
 │   ├── ios-frame.jsx            ← iOS component library
@@ -370,6 +381,463 @@ both consequences of the Google Sans Flex substitution or of leading:
   slide 3's second line measured exactly 350px against 350px available and wrapped
   to a third line. Remove this once the real font is in place.
 
+### Onboarding illustrations (Figma `451:13809` / `451:13841` / `451:13824`)
+The three slides had an empty art slot until now. Each one is a different kind of
+problem, and the shell grew one prop to serve all three.
+
+#### `OnboardingShell` gained a `foreground` slot, and paint order is load-bearing
+Figma does **not** paint each slide's illustration as one layer behind the copy panel.
+On slide 2 the two back album tiles sit before the panel and the front tile plus both
+labels sit *after* it; on slide 3 the notification stack sits after it. So the shell
+takes two art slots — `children` (behind) and `foreground` (in front) — and wraps each
+in `ART_FRAME`.
+
+`ART_FRAME` is a 390-wide box centred with `left: 50%; translateX(-50%)`, so every
+illustration coordinate can be lifted verbatim from the 390-wide Figma frame and the
+whole composition still centres on a 430 phone instead of hugging the left edge. It
+carries `pointerEvents: 'none'` — without that the foreground layer, which paints
+*above* the panel, would swallow taps meant for the CTA. Verified by hit-test:
+`elementFromPoint` at the CTA's centre returns the button on all three slides at both
+390×844 and 430×932.
+
+Everything is top-anchored at the design's y, matching the frames. The panel stays a
+fixed 484 tall, so on a taller phone the art keeps its distance from the status bar and
+the extra height opens up between the art and the copy.
+
+#### Slide 1 — one masked product collage (`451:13809`)
+A single Gemini-generated cut-out (`451:13811`) at `left 27, top 78, 336×450`, with its
+sibling rectangle `451:13810` acting as an **alpha mask**: a vertical gradient, opaque
+until group y=375 and clear by y=502.738. The image starts at y=78, so in image-local
+pixels the ramp is 297 → 424.74, and it ships as a CSS `mask-image` rather than baked
+into the file — the artwork stays a plain cut-out and the fade always dissolves into
+whatever the live wash is doing behind it.
+
+That ramp was not taken on trust. Recovering the alpha out of Figma's own render —
+`(render − wash) / (artwork − wash)` at every fully-opaque pixel of each row — matches
+the linear model to within **0.008** from y=380 to y=480.
+
+#### Slide 2 — three album tiles and two labels (`451:13841`)
+⚠️ **All three tiles are the same photo.** One 1024×1536 shot of the couple in
+Florence, cover-cropped into three different boxes. It reads as three different
+pictures on the canvas only because the front tile hides the middle of the other two —
+don't go looking for two more source images.
+
+- Tiles are `border-box` with a 2px `#F4F4F4` ring (Figma's inside stroke) and r24, so
+  `overflow: hidden` clips the photo to the inner r22 for free.
+- The two back tiles carry Figma's 2px layer blur as a plain CSS `filter: blur(2px)`.
+- Labels are auto-width pills, 42 tall (1px rim + 8px padding + 24px icon), SF Pro Text
+  Semibold 13/18 at −0.08. Their shadow must be `filter: drop-shadow()`, not a
+  `box-shadow` — same reason as the home banner strip: Figma's shadow follows the
+  pill's own 90% alpha rather than shading the border box.
+- Geometry is expressed as `bbox` + `box` + `rot` per the rotated-node convention above.
+
+Front-tile edges land within 1px of the node's render (left border at x=88 against
+Figma's 87.x — sub-pixel rounding on the 87.68 dev-mode origin).
+
+#### Slide 3 — the iPhone mockup (`451:13824`) and the notification stack (`451:13838`)
+The phone is a ~30-layer vector mockup ("iPhone 17 Pro Silver") under a 2px layer blur
+and a gradient alpha mask, so it ships as one 3× WebP instead of being rebuilt in code.
+Getting a *transparent* 3× render of it is the whole story of the export-route table
+above — read that before re-exporting it.
+
+⚠️ **The SVG frame is 289×507, not the mask group's 288.123×504.** Figma pads the
+export for the blur bleed, putting the content 2.28px down from the frame's top, so the
+render's origin is frame `(51.4385, 105.72)` — *not* the mask group's `(51.4385, 108)`.
+Place it at 105.72 or the phone sits 2px low.
+
+The notification pair is two cards centred on x=195.5: `451:13839` (289 wide, top 288,
+behind) and `451:13840` (341 wide, top 269, in front). The front card is both wider and
+19px higher, so the one behind peeks out along the bottom — the iOS notification stack.
+Measured against the node: front card top edge 268=268, left edge 24=24, back card
+bottom edge 342=342.
+
+Two deviations, both flagged in code:
+- **The white fill is not `mix-blend-mode: luminosity`.** Figma layers white at 0.7/0.8
+  on luminosity; WebKit cannot blend that across a composited layer boundary (see the
+  editor's Continue button for the same trap). A translucent white over a real
+  `backdrop-filter: blur(18px) saturate(120%)` lands on the same frosted card and is
+  what an iOS notification actually is.
+- **Type is the system stack, not Open Sans.** Open Sans is not among the faces this
+  project self-hosts, and a real iOS notification is SF Pro anyway.
+
+#### Assets
+| file | what | size |
+|---|---|---|
+| `ob-products.webp` | slide 1 collage, 1008×1350, alpha | 220KB |
+| `ob-album-photo.jpg` | slide 2 photo, 617×750 (3× of the front tile) | 93KB |
+| `ob-icon-trips.svg` / `ob-icon-photos.svg` | the two label icons, 24px | 2KB each |
+| `ob-phone.webp` | slide 3 phone, 867×1521, alpha, mask + blur baked | 59KB |
+| `ob-notif-icon.png` | notification app icon, 114×114 | 12KB |
+
+Both alpha images are **WebP**, for the reason the collection cut-outs already are: a
+large opaque subject on transparency is PNG's worst case — the collage is 1.6MB as a
+PNG against 220KB here, the phone 511KB against 59KB. Encoded with `-alpha_q 100`, so
+the alpha is lossless: the phone's fade ramp round-trips bit-exact at every sampled row
+(255/250/133/75/36/0) and RGB RMSE is 0.85%.
+
+⚠️ `ob-album-photo.jpg` is pre-cropped to the tiles' 0.8227 aspect. All three tiles
+share that aspect, so one crop serves them; change a tile's proportions and the photo
+needs re-cropping, not just re-framing.
+
+#### Verified
+All three slides render at 390×844 within a 1.7–6.7% band of the Figma frames, and the
+residual is accounted for: slide 1 is clean (no diff pixels above a 12% fuzz), slide 2
+is edge-texture from recompressing the photo, slide 3 is the notification type
+substitution. Every image loads, no horizontal or vertical page overflow at 390×844 or
+430×932, the CTA hit-tests through the foreground art layer, and the desktop
+`IOSDevice` frame is unaffected.
+
+#### ⚠️ A collection cover is a photo *sandwich*, not a photo with text on it
+The single biggest thing to know about `CollectionCard`. Each cover in the node layers
+**three** images, and the display word is painted *between* two of them:
+
+```
+full photo (photoRect, deliberate overscan)
+top blur band            ← blur 11.681
+display lines            ← "CANADA" / "Italy"
+alpha CUT-OUT of the subject   ← this is the layer that was missing
+lines marked `above`     ← Italy's "Hiking in"
+bottom blur band         ← blur 1.498, marked `above`
+month caption
+```
+
+That cut-out is what puts the straw hat in front of the "A D" of CANADA and the stone
+tower in front of "Ital". Without it the word sits flat on the photo **and** the whole
+lower half of the card is left sitting under the bottom blur band with nothing sharp
+on top of it — which is exactly why the cards read as blurred and broken once they
+landed on home's light page.
+
+Fields on a collection entry, all optional:
+
+| field | what it does |
+|---|---|
+| `w` | per-card width override (Canada/Italy are 229.58, the rest `CARD_W` 205.58) |
+| `photoRect` | the node's own `left/top/w/h` for the base photo — an overscan, not a cover fit |
+| `photoBox` | centred + rotated variant (Cappadocia only) |
+| `cutout` | `{src, left, top, w, h, imgHeight, imgTop}` — the occluding alpha layer |
+| `above` on a band or a line | render it *after* the cut-out instead of before |
+
+⚠️ **Only Canada and Italy carry `cutout`/`photoRect`/`w`.** Figma clips exports to the
+containing frame and the other six covers fall outside it — their layer stacks cannot
+be read, so they keep the single-cover-photo fallback. They will look flatter than the
+two verified cards until the designer brings them on-frame. `above` defaults to false
+precisely so those six render exactly as they did before.
+
+#### ⚠️ The rim is an inset shadow, not a border
+As a `border` it sits *outside* the photo (which is `inset: 0`, i.e. the padding box),
+so the node's `rgba(255,255,255,0.12)` ring rendered as the card's own `#111`
+background lifted 12% toward white — a near-black frame. Invisible on the
+photo-sources screen, whose page is dark; a hard black border once the same card
+landed on home's light page. `inset 0 0 0 2px` paints it *over* the photo and it
+becomes the subtle white highlight the node actually specifies.
+
+#### Cover photos are sized for 3× now
+They were 495×660 / 660×371 against a 617×966 slot — a 1.5–2.6× upscale, which is what
+made the cards look soft next to Figma's render. All six were re-exported from the raw
+Figma fills, centre-cropped to their card's aspect and resampled to exactly 3× of the
+box they fill (617×966, or 702×987 for Cappadocia's rotated `photoBox`, or the layer
+box for Canada/Italy). Measured against the node, normalised sharpness went from
+0.307 to 0.350 against its 0.397 in the unbanded strip.
+
+⚠️ Because they are pre-cropped to the card's aspect, **changing `CARD_W`/`CARD_H` now
+re-crops the photos** rather than just re-framing them. Re-run the export if the card
+geometry changes.
+
+**The two cut-outs are WebP.** `pb-cut-canada.webp` is 98KB where the same cut-out as a
+PNG is 867KB — a large opaque subject on transparency is the worst case for PNG. WebP
+with alpha has been in Safari since iOS 14, so it is safe for this PWA; it is the only
+place the project uses the format.
+
+### Home page, rebuilt against Figma `509:19053`
+
+The home screen now follows one node end to end. **`509:19053` supersedes
+`451:13862`** — same screen, 3430 tall instead of 844. Section order and every
+vertical offset were verified by measuring the rendered boxes in a real 390px
+viewport:
+
+| section | component | node | node y | measured y |
+|---|---|---|---|---|
+| header | inline in `HomeScreen` | `509:19056` | 56 | 56 |
+| promo banners | `BannerRow` | `509:19066` | 120 | 120 |
+| status banners | `StatusBanners` | `509:20175` | 296 | 296 |
+| Create | `CreateSection` | `509:19077` | 504 | 504 |
+| Memories | `MemoriesSection` | `509:19080` | 1321.21 | 1321.2 |
+| Collections | `CollectionsSection` | `509:19224` | 1723.07 | 1723.0 |
+| Ideas | `IdeasSection` | `509:20176` | 2073.07 | 2073.0 |
+| Ask AI | `AskAISection` | `509:20290` | 2773.07 | 2773.0 |
+
+**Every section is separated by 24px**, expressed as `marginBottom: 24` on the
+section itself (including `CreateSection`, which needed it added). If a new section
+goes in, give it the same 24 or everything below it shifts.
+
+⚠️ **`FeaturedSection` ("Your projects") is gone.** The new design replaces that
+hand-written list with the two status banners, which occupy the same slot.
+
+#### Status banners — `509:20175`
+An order-tracking card (92 tall) and a continue-editing card (84), stacked with an
+8px gap. White, r20, `padding: 12px 16px`, `flex` row with `gap: 20`. Tracking →
+`account.html` (its order list is the nearest destination this prototype has),
+editing → `editor.html`; neither link is in the node.
+
+- **Every text line is a 16px-tall box holding an 18 or 20px line, centred.** That
+  is what makes the copy blocks 34 and 36 tall rather than the 40 and 42 natural
+  leading gives, and it is what lands the cards on the node's 92 and 84.
+  `StatusLine` reproduces it; collapsing it to a bare `<p>` grows both cards.
+- **The 1px white rim is an inset shadow, not a border.** With `padding: 12px 16px`
+  and an auto height, a real border adds 2px and the cards come out 94/86. Same
+  trick the editor's sheets use.
+- The progress rail is four 16px step icons joined by three 2px rails; the icons
+  carry their state colour from Figma (teal for the three reached steps, `#CCC` for
+  Home) and the last rail is the node's own half-done gradient.
+
+#### Section headers — `509:20182` / `509:20185`
+`SectionHeader({ icon, title, seeAll })`: 40 tall, `gap: 16` to "See all", title
+group `gap: 4` so a 24px icon sits tight against the text. Title metrics are the
+page's existing heading (24/40 −0.24 `#333`); "See all" is 16/40 −0.16 in the brand
+teal. `CreateSection` still has its own inline heading — it predates this and is
+pixel-verified, so it was left alone.
+
+#### Memories reuses the photo-sources covers — `shared/collections.jsx`
+Home's Memories row and the photo-sources Collections row are **the same eight
+"Smart Stories" covers**, so `A`, `TEXT`, `COMPACT`, `F`, `CARD_W`, `CARD_H`,
+`Band`, `CardLine`, `COLLECTIONS` and `CollectionCard` moved out of
+`screens/photo-sources.jsx` into `shared/collections.jsx` verbatim. Both screens
+load it after `ios-frame.jsx` (which defines the `press()` it uses) and after
+`brand.jsx`.
+
+⚠️ These are top-level `const`/`function` declarations in a classic script, so they
+land in the **global lexical scope**. Any screen loading `collections.jsx` must not
+redeclare those ten names — the same collision trap as `PB_DISPLAY`.
+
+The home node widens its first two covers to 229.58 while the rest stay 205.58, and
+that is now honoured via the per-card `w` field — the node's layer offsets for those
+two are authored against 229.58, so porting them verbatim needs the real width.
+
+#### Collections — `509:19224`
+Two 267×270 white r24 cards, `gap: 8` → 542 wide, so the row scrolls.
+
+- **"Trip books" reuses the promo banner's 1080² cover-template source**, cropped by
+  Figma to a two-row band. Here the node export *was* usable as-is, unlike the
+  banner's: the card is solid `#FFFFFF`, so the background Figma bakes into the
+  export matches exactly, and the r24 corner it also bakes lines up with the card's
+  own clip. Only the 1px the artwork overhangs the card's bottom edge was trimmed.
+  Being opaque, it ships as a 132KB JPEG rather than a 445KB PNG — verified that
+  every sampled background pixel is still exactly 255.
+- **Card shadow is an addition.** `509:19227` / `509:20378` are flat; without the
+  page's standard `0 4px 16px -1px rgba(0,77,74,0.1)` the two read as holes.
+
+#### Ideas — `509:20176`
+Header, then a `gap: 24` column: an audience chip row (scrolls, 523 > 390), a 2×2
+grid of 223-tall cards, and a full-width 72-tall "Show all" button in **Teachers
+Bold** — the brand wordmark face, already self-hosted.
+
+⚠️ **The four idea cards have no artwork in the design.** `509:20179` and its three
+siblings are white cards with empty image wells and only the caption filled in. They
+are built that way rather than inventing product shots — drop an `<img>` into the
+well above the caption once the design has them.
+
+The "For dad" chip carries a 1px `#CCC` rim and no fill, which makes it 42 tall
+against its siblings' 40. Kept; the row centres them.
+
+#### Ask AI — `509:20290`
+A 393-tall r24 card: the teal wash, the brand sparkle, a display headline, three
+suggestion chips and an inert text field. Everything inside sits on the node's own
+absolute coordinates.
+
+- **The sparkle is the splash lockup's star**, via the new `PhotoboxStar` in
+  `brand.jsx` — no ninth star asset was added. `PhotoboxStar` expresses the splash
+  geometry as ratios of the base glyph's 31.6722 width (each glow layer is
+  `base + 2 × spread` wide, offset `-spread`), so it renders at any size.
+  The Ask-AI call site adds `filter: drop-shadow(0 0 4px rgba(255,255,255,0.55))`
+  because the splash glow spreads its bloom over ~82px, which reads too diffuse on a
+  mid-teal ground: sampled against the node, the ring at r≈20 was (98,186,188)
+  against its (118,226,230) while r≥30 already matched. With the drop-shadow the mean
+  deviation over r=20..60 is ~19/255.
+  ⚠️ The residual is the **glyph**, not the glow — the node's app-icon star is a
+  slightly different drawing (solid half-extents up/down/left/right: node
+  15/14/17/15, this 18/15/16/14).
+- The node's suggestion row is wider than the card and clips its last chip; made
+  scrollable so all three stay reachable.
+
+#### ⚠️ A rotated Figma gradient: use Figma's own SVG, not a CSS approximation
+The Ideas active chip and the Ask-AI card share one 8-stop radial gradient whose
+ellipse is heavily elongated **and rotated** — the Ask-AI matrix decodes to
+192% × 673% at about 65°. `radial-gradient` in CSS cannot rotate, and sampling the
+node's render showed the un-rotated approximation puts the dark ridge on the wrong
+diagonal entirely (measured darkest point at the right edge 75% down, where the
+approximation put a mid tone).
+
+Both therefore use **the inline SVG Figma itself emits** as a `background-image`,
+which carries `gradientTransform` verbatim. `tealWash(w, h, matrix)` in `home.jsx`
+builds it from one shared stop list. Decoding the matrix, for reference: for
+`matrix(a b c d e f)` with `r='10'`, the ellipse is centred at `(e, f)` with
+semi-axis vectors `(10a, 10b)` and `(10c, 10d)`.
+
+The last stop is transparent, so whatever is behind shows through at the edges —
+deliberate, and it is why the Ask-AI card has no solid background of its own.
+
+#### Tab bar — `509:19230`: the iOS-26 floating glass pill
+Not the old edge-to-edge bar. 16px above, 25px below, 25px gutters, and a 340×50
+r25 pill carrying four tabs — **Home / Projects / Memories / Account**, replacing
+Home / Create / My Photos / Account. Projects → `editor.html` (no projects screen
+exists; the editor holds the in-progress book, which is where the "Continue editing"
+banner goes too), Memories → `photo-sources.html`, Account → `account.html`.
+
+**Content scrolls underneath it.** The scroller is now `inset: 0` rather than
+stopping above the bar, and the content ends with a `calc(8px + TAB_BAR_HEIGHT)`
+spacer. That is both the iOS-26 behaviour and the only way the glass has anything to
+refract — with the old `bottom: calc(49px + …)` the pill would sit over flat page
+colour and the effect would be invisible.
+
+`TAB_BAR_PAD_BOTTOM` is `max(25px, env(safe-area-inset-bottom) + 8px)`: the node's 25
+is the home-indicator gap on a frame with no safe area, so it becomes the floor.
+`TAB_BAR_HEIGHT` is `calc(66px + …)` — 16 top + 50 pill.
+
+The node's BG is Apple's `LiquidGlassRegularSmall` (Light), which does not exist in
+this codebase, so the pill is layered by hand the same way `GlassIconButton`'s
+`gloss` variant is — and for the same reason: every refraction-based glass library
+gets its lensing from `backdrop-filter: url(#svgFilter)`, which WebKit silently
+no-ops. Two differences from the `gloss` recipe, both because this glass sits on a
+**light** page rather than the near-black editor header:
+
+- the interior needs a real white tint (`rgba(255,255,255,0.55)`) — the header's
+  near-clear `0.03` is invisible here;
+- the rim composites **normally**, not with `plus-lighter`, which on a near-white
+  backdrop clips straight to white.
+
+`saturate` is held at 130%: the page behind is a pale teal wash and white cards, and
+a bigger boost tints the glass green — the same finding CLAUDE.md already records for
+the home header's bell.
+
+The selection pill is the node's `inset: 0 -2px` / r100, but with a translucent
+`rgba(120,120,128,0.12)` instead of the flat `#EDEDED` the node resolves Apple's
+vibrant-tertiary fill to. It lands on the same colour over this page while letting
+the glass still read through.
+
+⚠️ **Only the Home icon has a selected state.** Figma ships one variant per icon —
+`hb-tab-home.svg` is the filled teal glyph, the other three are dark outlines. The
+selection pill and the teal label follow `activeTab`, but a non-Home tab navigates
+away immediately, so the missing filled variants never show. Pull the other three
+selected variants from Figma if that changes.
+
+⚠️ The node's tabs carry `mr: -8` so they overlap by their 8px side padding. Four
+equal quarters put the centres within 3px (69/153/237/321 against the node's
+72/154/236/318) and keep the selection pill symmetric, so that is what is used.
+
+#### Verified
+No horizontal page overflow (`documentElement.scrollWidth === clientWidth`), all 42
+images load, all five horizontal scrollers actually scroll, the glass pill measures
+340×50/r25 with its backdrop filter live, and `photo-sources.html` still renders its
+eight collection cards after the extraction.
+
+### Home promo banners (Figma `509:19066`, was `451:13875`)
+The two cards that used to be empty placeholders at the top of home. Row is
+`display:flex; gap:8` in the page's 20px gutters: two 283×152 cards = 574 against a
+350 content width, so it scrolls horizontally **by design** — the node's own frame is
+350 wide with both children overflowing it. Card chrome (r24, 1px white rim,
+`0 4px 16px -1px rgba(0,77,74,0.1)`, the white radial fill at 90% folded into the
+stops) is unchanged from the placeholders; only the size grew from 267×136 and the
+content arrived.
+
+- **"Collect them all"** (`508:18140`) — 185-wide centred copy at y=15, and a
+  full-width 283×88 travel-covers strip flush with the card's bottom and side edges.
+- **"Golden days, bound to last"** (`509:18239`) — 150-wide copy at 19/31 (gap 8,
+  headline wraps to two lines, the subhead's break is the node's own), and a 143×134
+  window at 139/17 flush with the card's right and bottom edges holding the product
+  shot at 112.54% height, which crops the hands' wrists at the card edge.
+
+Verified by measuring the rendered boxes against the node: card 283×152/r24/1px, strip
+0/64/283×88, copy blocks 49/16/185×40 and 20/32/150×88, image window 140/18/143×134,
+row top at page y=120, and `documentElement.scrollWidth === clientWidth` (no
+horizontal page overflow).
+
+#### ⚠️ Offsets from `get_design_context` are padding-box, `get_metadata` is frame-box
+The two tools disagree by exactly the 1px rim and **both are right**. Dev-mode CSS
+measures from the padding box — inside the border — which is precisely what CSS
+absolute positioning uses on a bordered `position:relative` box. So the node's
+`left:139` renders at 140 in frame coords, matching `get_metadata`'s `x=140`, and the
+strip's `left:-1; bottom:-1` lands flush with the card's outer edge. Use the
+dev-mode numbers verbatim in CSS; do not "correct" them to the metadata values.
+
+#### ⚠️ For a ROTATED node the two disagree by much more, and again both are right
+`get_design_context` reports the **rotation bounding box origin**; `get_metadata`
+reports the **rotated node's own top-left corner**. On the onboarding album tiles that
+is a 14px gap in x (`451:13843`: dev-mode `left: 238`, metadata `x = 252.634`) and up
+to 7px in y — big enough to look like a bug rather than a convention.
+
+Reconcile them before trusting either: bbox centre + `R(θ)·(−w/2, −h/2)` must land on
+the metadata corner. Verified for all three tiles to <0.01px. The dev-mode number is
+the one to use, with Figma's own markup shape — a bbox-sized wrapper that flex-centres
+the child, and `transform: rotate()` on the child. That also makes the placement
+robust: a child whose intrinsic size drifts (a label re-measuring its text) stays
+centred instead of walking off the design position.
+
+#### ⚠️ Figma flattens node exports against the canvas — crop the raw fill instead
+`download_assets` on the covers strip (`508:18141`) returned a correctly-cropped
+283×88 PNG that was **fully opaque**: the card's background was baked into the strip's
+transparent upper half (234,234,234) and the Figma canvas grey into the corners
+outside the card radius (46,46,46). Dropped into the app that reads as a grey
+rectangle seam where the strip starts. Alpha was 255 at every sample — worth checking
+before trusting any node export that is supposed to have transparency.
+
+The fix is to crop the artwork out of the **raw fill** instead, which does carry alpha.
+The fill is a 1080×1080 Canva stock sheet ("30 photo book cover templates"); the
+designer's crop is `x 0→1080, y 279→615`, scaled to 283×88. That offset was solved
+rather than guessed — the top-most opaque row of each column was matched against the
+same column in Figma's own render, over 115 columns, giving a median crop-top of 279
+and a median residual of **0px** after the crop. `banner-photobook.png` is likewise
+the raw cut-out (a node export there had the card's rounded corner and white rim
+baked in), resampled to 429 wide.
+
+#### ✅ …but `get_screenshot` with `contentsOnly: true` DOES come back transparent
+The escape hatch, found while pulling the onboarding phone mockup. Same node, three
+routes, three different answers:
+
+| route | transparency | resolution |
+|---|---|---|
+| `download_assets` (png, any scale) | ❌ canvas + frame baked in, alpha 255 everywhere | any scale |
+| `download_assets` (svg) | ⚠️ canvas rect and frame background emitted as real elements | vector |
+| `get_screenshot` `contentsOnly: true` | ✅ true alpha | **1× only** |
+
+`maxDimension` only ever *caps* the longer edge — it never upscales, so `get_screenshot`
+tops out at the node's natural size and cannot give the 3× this project needs.
+
+For a 3× transparent render of a vector node, the working recipe is the SVG export
+plus a headless-Chrome rasterise:
+1. `download_assets` with `defaultFormat: 'svg'`.
+2. Strip the background elements Figma prepends — the `<rect>` filling the whole
+   viewBox with the canvas grey, the section's own `<path>`s, and the frame's
+   `translate(...)` background rects. Everything from `<g id="Mask group">` (or
+   whatever the real content group is) onward is what you want, plus `<defs>`.
+3. Render it in Chrome at the target size with `--default-background-color=00000000`
+   and `--screenshot`. Verify with a `contentsOnly` 1× render as the control.
+
+⚠️ Check the alpha, not the thumbnail. A baked export looks *correct* against the
+teal wash it was flattened over and only betrays itself once the page it lands on
+scales that wash differently.
+
+#### The strip's shadow must be a `filter`, not a `box-shadow`
+`508:18141` carries `0 4px 4px rgba(0,0,0,0.25)`. In Figma that is a drop shadow, so
+it follows the artwork's alpha and shades under each individual book. A CSS
+`box-shadow` shades the *border box*, which on a transparent PNG paints a dark band
+straight across the strip's empty upper half. It has to be
+`filter: drop-shadow(...)` on the `<img>`.
+
+#### Not in the design
+- **Destination.** Neither node carries a link. Both banners promote photo books, so
+  both push `product-photobook.html`; per-card redirect is a one-line change.
+- **Press feedback.** `press(0.97)`, per the project's card convention.
+
+#### A third "Memories" banner exists in Figma and was deliberately not built
+The designer was live-editing this row while it was being implemented: a scratch frame
+(`509:18245`) briefly held a third card that went from a duplicate of "Golden days" →
+a purple-tinted photo-flower "Collages, recaps and much more" → a purple `#886BB3`
+"Memories" card with a clipped tile row, and was then deleted when the two finished
+banners were moved into `451:13875`. Only those two are in the home node, so only
+those two are built. If the Memories card returns, note that its tile row
+(`left:15, gap:8, 128-wide tiles`) puts tiles 3 and 4 past the card's 283 width — only
+the first two are ever visible.
+
 ### A full-bleed wash must live INSIDE the scroller
 Home's gradient was a child of the screen root, sibling to the scroll container —
 so it never moved and read as sticky while everything else scrolled past it. It has
@@ -387,12 +855,31 @@ the page background. No per-section z-index needed.
 Verified by hit-testing: `elementFromPoint` over the "Create" heading returns the
 heading, not the wash, and the wash's viewport offset tracks `-scrollTop` exactly.
 
-### `backdrop-filter` needs an explicit z-order
-The onboarding panel's blur lives on its own `position:absolute; z-index:0` layer
-with a `linear-gradient` mask that ramps it in over 96px — a plain
-`backdrop-filter` on the panel leaves a visible hard seam at its top edge. The
-content blocks each carry `position:relative; z-index:1`; without that the
-absolutely-positioned blur layer paints *over* the text and blurs it away.
+### ⚠️ Figma modulates a background blur by the layer's own fill alpha
+The onboarding copy panel (`451:13813` and siblings) declares
+`backdrop-blur: 28.65px`, and that blur is **deliberately not implemented**. Figma's
+own render of all three frames shows no blur whatsoever: the panel's fill is
+`rgba(222,241,242,0.01)`, and Figma scales a background blur by the layer's fill
+alpha, so 1% of the fill buys 1% of the blur. CSS `backdrop-filter` has no such
+coupling — it blurs the whole backdrop regardless of the element's background.
+
+That difference was invisible for as long as the illustration slot was empty. The
+moment artwork landed behind the panel it showed up as washed-out art. Measured on
+`451:13841`, mean |dI/dx| over the album tile that runs behind the panel:
+
+| band | Figma render | with `blur(28.65px)` | without |
+|---|---|---|---|
+| y 365..400 | 7.95 | 5.96 | 6.88 |
+| y 400..440 | 4.78 | 1.75 | 4.14 |
+
+So the panel is now a plain translucent layer. It needs no seam-hiding mask either,
+because with no blur there is no seam — the wash gradient behind it carries the whole
+transition. The content blocks keep `position:relative; z-index:1` and the fill layer
+keeps `z-index:0`: if the blur is ever restored, an absolutely-positioned
+`backdrop-filter` layer without that ordering paints *over* the copy and blurs it away.
+
+The same 96px ramp trick is still the right answer wherever a `backdrop-filter` really
+is wanted — a plain one leaves a hard seam at its top edge.
 
 ### Photo book page — option flow (Figma `406:7183`)
 One tall scrolling page on a 402 frame with **24px gutters**: hero (`406:7432`) →
@@ -1006,8 +1493,14 @@ splash.html
                                                 │                                                                          └─(push)─> checkout-payment.html
                                                 │                                                                                     └─(replace)─> order-success.html
                                                 │                                                                                                  └─(push)─> home.html
-                                                └─(push)─> account.html
-                                                           └─(replace)─> onboarding-1.html (log out)
+                                                ├─(tab bar)─> account.html
+                                                │             └─(replace)─> onboarding-1.html (log out)
+                                                ├─(tab bar: Projects)─> editor.html
+                                                ├─(tab bar: Memories)─> photo-sources.html
+                                                ├─(status banner: tracking)─> account.html
+                                                ├─(status banner: editing)─> editor.html
+                                                └─(Memories / Collections / Ideas)─> photo-sources.html
+                                                                                  / product-photobook.html
 ```
 
 ---
@@ -1026,6 +1519,10 @@ Exports via `Object.assign(window, {...})`:
 | `IOSListRow` | `title, detail, icon, chevron, isLast, dark` | Single list row (52px tall) — no `style` prop; use plain div for custom row styles |
 | `IOSKeyboard` | `dark` | Full iOS keyboard with liquid glass |
 | `IOSProgressiveBlur` | `scrim` | Three-stage progressive blur scrim, top-down — the image picker's header effect |
+
+`shared/brand.jsx` also exports `PhotoboxLogo`, **`PhotoboxStar`** (the lockup's
+sparkle on its own at any width, with the splash glow layers) and `GlassIconButton`.
+`shared/collections.jsx` exports `COLLECTIONS` + `CollectionCard` — see below.
 
 **Usage:** On mobile, render screen content directly in `position:fixed; inset:0`. On desktop (≥520px), wrap in `<IOSDevice>` for iPhone preview frame.
 
@@ -1059,7 +1556,7 @@ Exports via `Object.assign(window, {...})`:
 
 ### service-worker.js
 Precaches every screen HTML + JSX, the shared assets (incl. fonts and splash SVGs),
-manifest.json and the image-picker files. Cache name `photobox-v19`.
+manifest.json and the image-picker files. Cache name `photobox-v23`.
 
 **Strategy: network-first, cache fallback** — and same-origin requests are fetched
 with `cache: 'no-store'`. Both parts are deliberate:

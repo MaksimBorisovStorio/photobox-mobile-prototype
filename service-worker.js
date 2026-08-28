@@ -1,5 +1,5 @@
 // service-worker.js
-const CACHE = 'photobox-v19';  // bump to evict a stale cache
+const CACHE = 'photobox-v23';  // bump to evict a stale cache
 // Paths are relative to this file's URL, not root-absolute: GitHub Pages serves a
 // project site from /<repo>/, where a leading slash would resolve above the app and
 // 404 every entry. c.add() and the fetch handler both work off the request URL, so
@@ -19,6 +19,36 @@ const PRECACHE = [
   'shared/assets/dmsans-variable-latin.woff2',
   'shared/assets/splash-star-base.svg',
   'shared/assets/icon-notification.svg',
+  // Onboarding illustrations (Figma nodes 451:13809 / 451:13841 / 451:13824)
+  'shared/assets/ob-products.webp',
+  'shared/assets/ob-album-photo.jpg',
+  'shared/assets/ob-icon-trips.svg',
+  'shared/assets/ob-icon-photos.svg',
+  'shared/assets/ob-phone.webp',
+  'shared/assets/ob-notif-icon.png',
+  'shared/collections.jsx',
+  'shared/assets/pb-cut-canada.webp',
+  'shared/assets/pb-cut-italy.webp',
+  'shared/assets/hb-track-book.jpg',
+  'shared/assets/hb-edit-book.jpg',
+  'shared/assets/hb-step-select.svg',
+  'shared/assets/hb-step-book.svg',
+  'shared/assets/hb-step-delivery.svg',
+  'shared/assets/hb-step-home.svg',
+  'shared/assets/hb-icon-edit.svg',
+  'shared/assets/hb-icon-memories.svg',
+  'shared/assets/hb-trip-books.jpg',
+  'shared/assets/hb-year-books.png',
+  'shared/assets/hb-chip-group.svg',
+  'shared/assets/hb-chip-face.svg',
+  'shared/assets/hb-chip-gift.svg',
+  'shared/assets/hb-askai-add.svg',
+  'shared/assets/hb-tab-home.svg',
+  'shared/assets/hb-tab-projects.svg',
+  'shared/assets/hb-tab-memories.svg',
+  'shared/assets/hb-tab-account.svg',
+  'shared/assets/banner-collections.png',
+  'shared/assets/banner-photobook.png',
   'shared/assets/create-photo-books.png',
   'shared/assets/create-wall-decor.png',
   'shared/assets/create-calendars.png',
