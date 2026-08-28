@@ -29,6 +29,7 @@ All 13 implementation tasks are done. Branch `feature/prototype-build` is demo-r
 | Home | `screens/home.html` + `home.jsx` | ✅ Rebuilt end to end — **Figma-verified** against `509:19053`; every section lands on the node's y to <0.1px |
 | Product — Photo Book | `screens/product-photobook.html` + `.jsx` | ✅ Rebuilt — **Figma-verified** (node `406:7183`) |
 | Editor | `screens/editor.html` + `editor.jsx` | ✅ Built — **Figma-verified** (node `451:15574`) |
+| Editor — page view | mode of `editor.jsx` | ✅ Built — **Figma-verified** (node `451:14499`) |
 | Photo sources | `screens/photo-sources.html` + `.jsx` | ✅ Built — node `451:14202`; 2 of 8 covers verifiable, see below |
 | Image Picker | `image-picker/index.html` (pre-built, frozen) | ✅ Wired in |
 | Basket | `screens/basket.html` + `basket.jsx` | ✅ Done |
@@ -41,7 +42,7 @@ All 13 implementation tasks are done. Branch `feature/prototype-build` is demo-r
 
 - **Figma fidelity pass** — query Figma node IDs (see table below) to tighten colors, spacing, typography to exact Figma spec. Screens built from verbal descriptions rather than direct Figma calls due to MCP availability.
 - **Transition polish** — add push/pop slide animations between screens (navigation.js stubs are in place; CSS transitions not yet wired to the iframe-swap mechanism).
-- **Editor tools** — Photos, Arrange, Themes, Style, AI help and Options are inert by request. The card's settings icon and the header's Continue arrow are inert for the same reason.
+- **Editor tools** — Photos, Arrange, Themes, Style, AI help and Options are inert by request, as are page view's eight. The card's settings icon and the header's Continue arrow are inert for the same reason.
 - **My Photos tab** — superseded: the tab bar is now Home / Projects / Memories / Account
   (`509:19230`). The account screen's "My photos" row points at `photo-sources.html`. If a
   standalone grid distinct from the picker is needed, create `screens/my-photos.html`.
@@ -85,6 +86,7 @@ All 13 implementation tasks are done. Branch `feature/prototype-build` is demo-r
 | Photo book — configure variant | `451:13606` | ✅ Built (Figma not queried) |
 | Photo book — CTA screen | `451:13721` | ✅ Built (Figma not queried) |
 | Editor | `451:15574` | ✅ Built — matches Figma (pixel-diffed; see below) |
+| Editor — page view | `451:14499` | ✅ Built — page, navigator and toolbar all land on the node's numbers |
 | Account / Profile | `451:14038` | ✅ Rebuilt — matches Figma; every band lands on the node's y exactly |
 | Photo sources (Album / My trips) | `451:14202` | ✅ Built — Albums grid exact; 6 of 8 covers unverifiable |
 | My Photos (image grid) | `451:14403` | ⬜ Not built (image-picker used instead) |
@@ -1262,6 +1264,177 @@ checkout-payment → order-success` are all built but no longer reachable: the p
 to be the only way in, and the editor's Continue arrow is still inert by request.
 Pointing that arrow at `basket.html` is a one-line change when wanted.
 
+#### Page view mode (Figma `451:14499`)
+Tapping any page in the book view zooms into it: one page nearly fills the width
+with the rest of the book running off-screen, the strip scrolls and snaps page to
+page, and a navigator between the preview and the toolbar says where you are.
+
+It is a **mode of `EditorScreen`, not a screen** — `pageView` holds the slot index
+or `null`. That is what keeps the placed photos, the page count, the pending action
+sheet and the book view's own scroll offset alive across going in and coming back
+out. The book view unmounts while page view is up, so its `scrollTop` is stashed on
+the way in and restored through a **callback ref** on the way back; without it,
+leaving a page halfway down a 24-page book lands you back at the cover.
+
+⚠️ The node is a WIP frame literally named "test" and carries a good deal of
+off-canvas scratch — a second pair of 177px photo squares at x=432/610 and a
+`#272727` add-strip at x=379, all of them behind the book or past the 402 frame
+edge. None of it is visible in the design and none of it is built.
+
+#### Slots are the single source of truth for the strip and the navigator
+A **slot** is one page you can zoom into: the front cover, then every leaf of every
+spread in reading order. `slotsFor(pages)` derives them from the same `spreadsFor()`
+the book view uses, and each slot names the book graphic (`unit`) it lives in — 0
+for the cover, 1..n for the spreads. Because one list drives the strip, the snap
+targets and the navigator, the three cannot drift apart. Slot indices are `0` for
+the cover then `1 + 2i` / `2 + 2i` per spread, and added spreads are appended, so
+existing indices never move.
+
+- **The back cover is drawn but is not a slot.** It is not a page you edit, and the
+  node's navigator carries a single "Cover" entry (`451:14514`) rather than a pair.
+  Since it has no `scroll-snap-align`, the strip can never come to rest on it —
+  which is exactly the wanted behaviour, and it comes for free.
+- ⚠️ **The node numbers the inside front cover "0"** and runs 1..5 from there. The
+  book view's `Caption` leaves both inside-cover leaves blank, and the two views
+  agreeing matters more than reproducing that one number, so they are blank here too.
+
+#### The open book is three exported paper layers plus two live leaves
+Group `451:14563` is a 637.691 × 323.387 frame holding the open spread
+(`451:14570`) at (9.08, 5.45) sized 619.523 × 312.487 — so the paper stack shows as
+~9px of margin at the sides and ~5.5px top and bottom. `BOOK` keeps every one of
+those as a **fraction of the frame**, which is what lets the same three SVGs compose
+correctly at whatever aspect the chosen format gives the spread (the node's own
+leaves are near-square; a Large Portrait book is 0.75).
+
+| layer | asset | what |
+|---|---|---|
+| `Frame 547` | `pb-editor-book-block.svg` | the book block — `#E3E3E3` halves either side of a 16.35 `#EFEFEF` spine strip carrying an inner shadow |
+| `451:14568` | `pb-editor-book-sheet-a.svg` | `#E4E4E4` page-stack sheet, drooping 1.8px at the spine |
+| `451:14569` | `pb-editor-book-sheet-b.svg` | `#F0F0F0` sheet, ditto, with the dy 7.27 drop shadow |
+
+The node declares each sheet as a 623.157 × 310.612 box holding an image inset by
+the negative percentages of its own filter bleed; those are folded into `BOOK.sheetA`
+/ `sheetB`, so each entry is the position and size of the exported SVG itself. All
+three carry `preserveAspectRatio="none"`, so they stretch with the book and the spine
+strip stays a constant 2.57% of its width.
+
+The group's drop shadow is carried over verbatim rather than scaled, minus its two
+no-op layers — the 75.926px one is fully transparent and the last has no offset, blur
+or spread. The offsets are design px on a 637-wide book, which is what the book
+measures at a 402 viewport.
+
+#### Geometry is measured, not expressed in percentages
+A page occupies 309.7615 of the node's 402 frame (`PV_PAGE_FRACTION`), and that
+fraction is what makes the strip read as zoomed into a single page rather than
+showing a whole spread. Everything else derives from it.
+
+⚠️ **The strip's width is measured with a `ResizeObserver` rather than driving the
+books off percentages.** A percentage width on a flex item resolves against the
+flex container's *content* box, and the side padding a snap pager needs would shrink
+that basis — so the two would fight. For the same reason the room that lets the
+first and last page reach the centre is a pair of **flex spacers, not padding**.
+
+#### Scroll snapping, and what syncs the navigator
+`scroll-snap-type: x mandatory` on the strip, with `scroll-snap-align: center` and
+`scroll-snap-stop: always` on every page — so a fast flick advances one page instead
+of flying past six. The active page is whichever snap target's centre is nearest the
+strip's centre, recomputed in an rAF-throttled `scroll` handler (a handful of rects
+per frame).
+
+⚠️ **The navigator follows with `inline: 'nearest'`, never `'center'`, and a tap on a
+thumbnail jumps the preview rather than smooth-scrolling to it.** Both were 'center'
+and 'smooth' first, and together they made the row behave oddly:
+
+- centring re-scrolls the navigator on *every* change of `active`, so it slides under
+  your finger the whole time you drag the strip — and a tap shoves the very thumbnail
+  you just tapped somewhere else;
+- a smooth scroll from page 3 to page 24 drags the preview through twenty spreads, and
+  because the handler tracks the centred page the whole way, the selection ring races
+  through every thumbnail in between — which is what made the navigator look like it
+  was jumping.
+
+With `nearest` the navigator does nothing while the active thumbnail is already
+visible, and the navigator's `scroll-padding-inline: 56px` is what "visible" means, so
+it is nudged clear of the edge rather than left flush against it. Verified: scrolled
+to the end of the navigator on page 3 and tapped page 24 — the navigator moved **0px**
+and the thumbnail stayed exactly where it was tapped, while the preview moved 6769px;
+dragging the preview six pages back then walked the navigator 176px and left the
+active thumbnail 56px from the edge. On mount it scrolls only as far as it must to
+reveal the page that was opened.
+
+`block: 'nearest'` matters too, or this can scroll an ancestor vertically as well.
+
+Measured against the node at its own 402 frame: page width 309.75 against 309.7615,
+book width 637.69 against 637.691, navigator top 639 and height 65 both exact, and
+the photo well's insets 4.934% / 5.456% against the node's 4.937% / 5.456%. The one
+deliberate difference is that the snapped page is **centred** (offset −0.34px)
+where the node has it 4.6px left of centre — a pager that rests off-centre reads as
+a bug.
+
+#### The navigator — `451:14511`
+A 45-tall row of 41px thumbnails with the 11px page number on a 20px line under it,
+65 tall overall. Leaves of one spread sit 1px apart and consecutive spreads 8px
+apart, which is what makes the pairing read; unselected thumbnails and their labels
+drop to opacity 0.5 / `#777`.
+
+- ⚠️ **The selection ring is an inset shadow, not a border.** The node rings the
+  selected page with a 2px `#008E93` border *outside* the 41px thumb, which reflows
+  the whole row by 4px every time the selection moves — and the selection moves on
+  every scroll frame. `inset 0 0 0 2px` paints the same ring over the thumb's own
+  outer 2px and keeps every item a fixed 41. Same finding CLAUDE.md already records
+  for the home status banners and the collection covers.
+- The `+` buttons are the node's `494:17136` — 38×38, `#272727`, 1px `#363636`, r12 —
+  and appear after every spread but the last, the same rule `SpreadBlock` uses for
+  `showPlus`, so adding a spread from either view behaves identically.
+- The cover's 4px white spine bar (`451:14515`) is what marks it as the cover rather
+  than a page. It is invisible while the cover thumbnail has no photo on it.
+
+#### Toolbar — `520:26508`, a later toolset than the book view's
+Eight tools laid out from the left with `gap: 8` and `padding: 0 16px`: Photos (with
+the orange count badge), Add photo, Add text, Layout, Stickers, Smart Design, Ask AI,
+Delete page. `Toolbar` therefore takes `tools`, `gap` and `padX`, all defaulting to
+the book view's six-tool row, and `PhotosStackIcon` and the five-layer
+`BLUR_BANDS` scrim are shared unchanged. All eight are inert, on the same footing as
+the book view's.
+
+- **The node's "Ask AI" glyph (`icon / Magic tool`) exports byte-identical to the
+  book view's "AI help" icon**, so `pb-editor-tool-ai.svg` is reused rather than
+  duplicated. Likewise the header's `back_pbx` is byte-identical to
+  `pb-src-back.svg`, and the navigator's 16px plus to `pb-editor-plus.svg` — three
+  assets that did not need adding. Checked with `diff`, not by eye.
+- "delete page" is the node's own casing; sentence case here, like its siblings.
+- Verified by hit-testing all eight with `elementFromPoint` across the row's scroll
+  range, and that the Photos badge still breaks 7px above the row without being
+  clipped (badge top 789 against the row's clip edge at 781).
+
+#### Header — `451:14591`
+Back chevron, the undo/redo pill centred, and a third slot the node ships at
+`opacity: 0` (its Continue button) — reproduced as an inert 40px spacer so the pill
+stays centred rather than drifting right. The node's back button is 36×36 where the
+book view's close is 40; **kept at 40** so the control does not resize as you move
+between the two modes of one screen.
+
+#### Not in the design
+- **The gap between books** in the strip (8% of a page). The node shows one book.
+- **The cover unit's contents.** The node's page view opens on page "0", so the
+  cover is never shown; it follows `CoverBlock` in the book view — placeholder block
+  bottom-left on the back, "Add text" over a well on the front — with both sized as
+  fractions of the page so the cover reads the same zoomed in as out.
+- **`PhotoWell` gained `iconSize`.** 24px is right on a 164px leaf in the book view
+  and lost on a 310px one here.
+- **The press feedback on a book-view leaf** uses `transformOrigin` toward the spine,
+  so the tap reads as the page being pushed in rather than the whole sheet shrinking.
+- **The fade in.** `pbFadeIn`, 220ms — the mode change is otherwise instant.
+
+#### Verified
+Driven end to end at 390×844, 402×874, 430×932 and in the desktop `IOSDevice`
+frame: 27 snap targets for a 24-page book (cover plus 26 leaves, the back cover
+excluded), the tapped page lands centred with no animation, one page forward moves
+the navigator 3 → 4, tapping "Cover" centres slot 0, a navigator `+` grows the book
+24 → 26 pages and the pills 12 → 13, Back restores the book view's exact scrollTop
+(539 / 561), a tap on the page hits the page and not the paper layers above it, and
+there is no page overflow on either axis and no broken image at any width.
+
 #### Header progressive blur — reused from the image picker
 `IOSProgressiveBlur` in `shared/ios-frame.jsx` is the image picker's header effect
 (`image-picker/image-picker.jsx` ~1850) extracted so the editor can share it rather
@@ -1614,6 +1787,7 @@ splash.html
                                      └─(replace)─> home.html
                                                 ├─(push)─> product-photobook.html
                                                 │          └─(push)─> editor.html  ← Continue arrow inert
+                                                │                     └─ tap any page ─> page view mode (in-screen)
                                                 │                     └─ upload sheet "Select photos"
                                                 │                        └─(push)─> photo-sources.html
                                                 │                                   └─(push)─> ../image-picker/index.html

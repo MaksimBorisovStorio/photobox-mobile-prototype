@@ -129,16 +129,30 @@ function GutterArt({ file, offsets, width, opacity }) {
 // #F5F5F5 and right leaves white throughout the node: gutter shading, not content.
 // Padding is 8 on the outer edge and 12 on the gutter edge, mirrored, which lands
 // the placeholder 12 from the sheet edge and 8 from the spine on both sides.
-function Leaf({ side, photo }) {
+function Leaf({ side, photo, onOpen, label }) {
   const left = side === 'left';
   return (
-    <div style={{
+    <div
+      role={onOpen ? 'button' : undefined}
+      tabIndex={onOpen ? 0 : undefined}
+      aria-label={onOpen ? `Open ${label}` : undefined}
+      onClick={onOpen}
+      onKeyDown={onOpen ? e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); }
+      } : undefined}
+      {...(onOpen ? press(0.97) : {})}
+      style={{
       width: '50%', height: '100%', boxSizing: 'border-box',
       background: left ? '#F5F5F5' : '#FFFFFF',
       boxShadow: '0px 1px 1.5px rgba(0,0,0,0.3), 0px 1px 1.5px rgba(0,0,0,0.1)',
       paddingTop: 8, paddingBottom: 8,
       paddingLeft: left ? 8 : 12, paddingRight: left ? 12 : 8,
       display: 'flex',
+      cursor: onOpen ? 'pointer' : 'default',
+      // The press scale reads as the page being pushed in toward the spine rather
+      // than the whole sheet shrinking, which is what a centred origin would give.
+      transformOrigin: left ? 'right center' : 'left center',
+      transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
     }}>
       <PhotoWell photo={photo} />
     </div>
@@ -147,7 +161,7 @@ function Leaf({ side, photo }) {
 
 // Photo well — node 451:15614. Empty it is #D9D9D9 with the 24px add-image icon;
 // once auto-fill has placed a photo it fills the well. Still inert either way.
-function PhotoWell({ photo, style }) {
+function PhotoWell({ photo, style, iconSize = 24 }) {
   return (
     <div aria-hidden style={Object.assign({
       position: 'relative', flex: 1, minWidth: 0, overflow: 'hidden',
@@ -160,7 +174,7 @@ function PhotoWell({ photo, style }) {
           objectFit: 'cover', display: 'block',
         }} />
       ) : (
-        <img src={`${A}/pb-editor-add-image.svg`} alt="" width={24} height={24}
+        <img src={`${A}/pb-editor-add-image.svg`} alt="" width={iconSize} height={iconSize}
              style={{ display: 'block' }} />
       )}
     </div>
@@ -210,7 +224,7 @@ function AddSpreadButton({ onClick }) {
 // ── Cover — node 451:15622. Back cover carries a 50×18 placeholder bottom-left;
 // the front carries "Add text" over a photo well. The double 14px hinge strips at
 // 50% ±(11,3) reproduce the node's overlapping pair.
-function CoverBlock({ aspect }) {
+function CoverBlock({ aspect, onOpen }) {
   return (
     <div style={{ position: 'relative', width: '100%' }}>
       <Sheet aspect={aspect} interior={
@@ -219,9 +233,21 @@ function CoverBlock({ aspect }) {
             position: 'absolute', left: 6, bottom: 5, width: 50, height: 18,
             background: '#D9D9D9',
           }} />
-          <div style={{
+          <div
+            role={onOpen ? 'button' : undefined}
+            tabIndex={onOpen ? 0 : undefined}
+            aria-label={onOpen ? 'Open the cover' : undefined}
+            onClick={onOpen}
+            onKeyDown={onOpen ? e => {
+              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); }
+            } : undefined}
+            {...(onOpen ? press(0.97) : {})}
+            style={{
             position: 'absolute', left: 'calc(50% + 10px)', right: 3, top: 2, bottom: 2,
             display: 'flex', flexDirection: 'column',
+            cursor: onOpen ? 'pointer' : 'default',
+            transformOrigin: 'left center',
+            transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
           }}>
             {/* node 451:15628/15629 — SF Pro Text Bold 16/20, bottom-aligned in a 31px block */}
             <div style={{ height: 31, padding: 4, boxSizing: 'border-box',
@@ -243,14 +269,17 @@ function CoverBlock({ aspect }) {
 // ── Inner spread — node 451:15591.
 // `photos` is the placed list, indexed by page number — page n holds photos[n-1].
 // The inside-front and inside-back leaves carry no page number, so they stay empty.
-function SpreadBlock({ aspect, left, right, showPlus, onAdd, photos }) {
+function SpreadBlock({ aspect, left, right, showPlus, onAdd, photos, onOpen }) {
   const at = n => (n ? photos[n - 1] : null);
+  const name = n => (n ? `page ${n}` : 'the inside cover');
   return (
     <div style={{ position: 'relative', width: '100%' }}>
       <Sheet aspect={aspect} interior={
         <React.Fragment>
-          <Leaf side="left" photo={at(left)} />
-          <Leaf side="right" photo={at(right)} />
+          <Leaf side="left" photo={at(left)} label={name(left)}
+                onOpen={onOpen && (() => onOpen('left'))} />
+          <Leaf side="right" photo={at(right)} label={name(right)}
+                onOpen={onOpen && (() => onOpen('right'))} />
         </React.Fragment>
       }>
         <GutterArt file="pb-editor-spine.png" offsets={[-4]} width={8} />
@@ -407,6 +436,23 @@ const PHOTO_TILES = [
   { left: 2.033,  top: 9.963,   rot: -4.3 },
 ];
 
+// Page view's toolbar — node 520:26509. A different, later toolset than the book
+// view's 451:15574 row: eight tools laid out from the left with gap 8 rather than six.
+// "delete page" is the node's own casing; sentence case here, like its siblings.
+// All eight are inert, on the same footing as the book view's tools.
+const PV_TOOLS = [
+  { id: 'photos',   label: 'Photos',       icon: 'pb-editor-tool-photos.svg' },
+  { id: 'addphoto', label: 'Add photo',    icon: 'pb-editor-tool-addphoto.svg' },
+  { id: 'addtext',  label: 'Add text',     icon: 'pb-editor-tool-addtext.svg' },
+  { id: 'layout',   label: 'Layout',       icon: 'pb-editor-tool-layout.svg' },
+  { id: 'stickers', label: 'Stickers',     icon: 'pb-editor-tool-stickers.svg' },
+  { id: 'smart',    label: 'Smart Design', icon: 'pb-editor-tool-smartdesign.svg' },
+  // The node's "Ask AI" glyph (icon / Magic tool) exports byte-identical to the book
+  // view's "AI help" icon, so the existing asset is reused rather than duplicated.
+  { id: 'askai',    label: 'Ask AI',       icon: 'pb-editor-tool-ai.svg' },
+  { id: 'delete',   label: 'Delete page',  icon: 'pb-editor-tool-delete.svg' },
+];
+
 function PhotosStackIcon({ photos, count }) {
   return (
     // 26×24 per the node. The badge deliberately breaks out of it — 13px to the right
@@ -475,7 +521,7 @@ function Tool({ label, icon, children }) {
 // drag the strong layers up over the spreads whenever the safe-area inset changes.
 const BLUR_BANDS = [[16, 24, 56], [8, 40, 78], [4, 56, 100], [2, 74, 122], [1, 92, 145]];
 
-function Toolbar({ photos }) {
+function Toolbar({ photos, tools = TOOLS, gap = 10, padX = 8 }) {
   return (
     <div style={{
       position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 6,
@@ -502,17 +548,17 @@ function Toolbar({ photos }) {
       <div style={{
         position: 'absolute', left: 0, right: 0,
         bottom: 'max(37px, calc(env(safe-area-inset-bottom, 0px) + 8px))',
-        display: 'flex', gap: 10, boxSizing: 'border-box',
+        display: 'flex', gap, boxSizing: 'border-box',
         // The Photos badge breaks 7px above its icon, and overflow-x:auto forces
         // overflow-y to auto/hidden — it can never be visible — so the row needs
         // matching headroom or the badge is sliced off. Padding-top only: the row is
         // anchored by `bottom`, so the tools do not move.
-        padding: '8px 8px 0',
+        padding: `8px ${padX}px 0`,
         overflowX: 'auto', overflowY: 'hidden',
         scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch',
         pointerEvents: 'auto',
       }}>
-        {TOOLS.map(t => (
+        {tools.map(t => (
           <Tool key={t.id} {...t}>
             {t.id === 'photos' && photos.length
               ? <PhotosStackIcon photos={photos} count={photos.length} />
@@ -671,12 +717,491 @@ function AutofillSheet({ closing, count, onYes, onNo }) {
 }
 
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// Page view mode — Figma node 451:14499
+// ═══════════════════════════════════════════════════════════════════════════════
+// Tapping any page in the book view zooms into it: one page nearly fills the width
+// with the rest of the book running off-screen, the strip scrolls horizontally from
+// page to page, and a navigator between the preview and the toolbar says where you
+// are. It is a *mode* of EditorScreen rather than its own screen, so the placed
+// photos, the page count, the pending sheet and the book view's scroll position all
+// survive going in and coming back out.
+//
+// ⚠️ The node is a WIP frame literally named "test" and carries a good deal of
+// off-canvas scratch — a second pair of 177px photo squares at x=432/610 and a
+// #272727 add-strip at x=379, all of them behind the book or past the 402 frame
+// edge. None of it is visible in the design and none of it is built.
+
+// The open book — group 451:14563. A 637.691 × 323.387 frame holding the open
+// spread (451:14570) at (9.08, 5.45) sized 619.523 × 312.487, so the paper stack
+// behind shows as ~9px of margin at the sides and ~5.5px top and bottom. Kept as
+// fractions of the frame so the three exported paper layers compose correctly at
+// whatever aspect the chosen format gives the spread.
+const BOOK = {
+  interior: { left: 9.08 / 637.691, top: 5.45 / 323.387,
+              width: 619.523 / 637.691, height: 312.487 / 323.387 },
+  // 451:14568 (#E4E4E4) and 451:14569 (#F0F0F0) — the two drooping sheets. The node
+  // declares each as a 623.157 × 310.612 box holding an image inset by the negative
+  // percentages of its own filter bleed; those are folded in, so each entry is the
+  // position and size of the exported SVG itself.
+  sheetA: { left: 4.71 / 637.691, top: 7.27 / 323.387,
+            width: 626.438 / 637.691, height: 313.893 / 323.387 },
+  sheetB: { left: 0, top: 7.27 / 323.387,
+            width: 1, height: 325.146 / 323.387 },
+};
+
+// A page occupies 309.7615 of the node's 402 frame. That fraction is what makes the
+// strip read as zoomed into a single page rather than showing a whole spread.
+const PV_PAGE_FRACTION = 309.7615 / 402;
+
+// Photo well inside a page — node 451:14572, a 279.332 square at (15.29, 17.05) on
+// a 309.76 × 312.487 leaf. The node's insets are symmetric, so one set serves both
+// leaves and no gutter allowance is needed on the spine side.
+const PV_WELL = { left: '4.937%', right: '4.887%', top: '5.456%', bottom: '5.154%' };
+
+// 451:14563's drop shadow, minus its two no-op layers — the 75.926px one is fully
+// transparent and the last has no offset, blur or spread. The offsets are design px
+// on a 637-wide book, which is what the book measures at a 402 viewport, so they are
+// carried over verbatim rather than scaled.
+const PV_BOOK_SHADOW =
+  'drop-shadow(0px 48.742px 9.842px rgba(0,0,0,0.02))' +
+  ' drop-shadow(0px 27.183px 7.968px rgba(0,0,0,0.08))' +
+  ' drop-shadow(0px 12.186px 6.093px rgba(0,0,0,0.13))' +
+  ' drop-shadow(0px 2.812px 3.281px rgba(0,0,0,0.15))';
+
+// The navigator's own metrics — node 451:14511: a 45-tall row of 41px thumbnails
+// with the 11px page number on a 20px line under it, i.e. 65 tall overall.
+const NAV_THUMB = 41;
+const NAV_ROW = 45;
+const NAV_ADD = 38;
+
+// ── Slots. A slot is one page you can zoom into: the front cover, then every leaf
+// of every spread in reading order. `unit` indexes the book graphic it lives in —
+// 0 is the cover, 1..n are the spreads — so the strip and the navigator are driven
+// by one list and cannot drift apart.
+//
+// The back cover is drawn but is not a slot: it is not a page you edit, and the
+// node's navigator carries a single "Cover" entry (451:14514, the 4px spine bar
+// plus one thumbnail) rather than a pair.
+function slotsFor(pages) {
+  const out = [{ unit: 0, side: 'right', n: null, label: 'Cover' }];
+  spreadsFor(pages).forEach((pair, i) => {
+    pair.forEach((n, k) => {
+      // ⚠️ The node numbers the inside front cover "0" and runs on 1..5 from there.
+      // The book view's captions leave both inside-cover leaves blank, and the two
+      // views agreeing matters more than reproducing that one number.
+      out.push({ unit: i + 1, side: k ? 'right' : 'left', n, label: n ? String(n) : '' });
+    });
+  });
+  return out;
+}
+
+// ── One open book in the strip. The three paper layers are the node's own exports;
+// `children` is the live spread that sits slightly above them.
+function BookUnit({ w, h, children }) {
+  const iv = BOOK.interior;
+  const layer = (file, box) => (
+    <img key={file} src={`${A}/${file}`} alt="" aria-hidden style={{
+      position: 'absolute', display: 'block',
+      left: `${box.left * 100}%`, top: `${box.top * 100}%`,
+      width: `${box.width * 100}%`, height: `${box.height * 100}%`,
+    }} />
+  );
+  return (
+    <div style={{
+      position: 'relative', flex: '0 0 auto', width: w, height: h,
+      filter: PV_BOOK_SHADOW,
+    }}>
+      {layer('pb-editor-book-block.svg', { left: 0, top: 0, width: 1, height: 1 })}
+      {layer('pb-editor-book-sheet-a.svg', BOOK.sheetA)}
+      {layer('pb-editor-book-sheet-b.svg', BOOK.sheetB)}
+      <div style={{
+        position: 'absolute',
+        left: `${iv.left * 100}%`, top: `${iv.top * 100}%`,
+        width: `${iv.width * 100}%`, height: `${iv.height * 100}%`,
+        display: 'flex',
+        filter: 'drop-shadow(0px 1.817px 1.817px rgba(0,0,0,0.25))',
+      }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ── A page in the strip — node 451:14571 (left) / 451:14573 (right). The gradient
+// is the node's own: white until 96.188%, darkening to #EEE / #DFDFDF at the spine.
+// A leaf with `slotRef` set is a scroll-snap target; the back cover has none, so the
+// strip can never come to rest on it.
+function BigLeaf({ side, slotRef, children }) {
+  const left = side === 'left';
+  return (
+    <div ref={slotRef} style={{
+      position: 'relative', width: '50%', height: '100%',
+      background: left
+        ? 'linear-gradient(to right, #FFFFFF 96.188%, #EEEEEE 100.29%)'
+        : 'linear-gradient(to left, #FFFFFF 96.188%, #DFDFDF 100.05%)',
+      scrollSnapAlign: slotRef ? 'center' : 'none',
+      scrollSnapStop: slotRef ? 'always' : 'normal',
+    }}>
+      {children}
+    </div>
+  );
+}
+
+// The well, positioned on the node's own insets. `iconSize` scales the empty-state
+// glyph with the page: 24px is right on a 164px leaf in the book view and lost on a
+// 310px one here.
+function BigWell({ photo, pageW }) {
+  return (
+    <PhotoWell photo={photo} iconSize={Math.round(pageW * 0.13)} style={{
+      position: 'absolute', flex: 'none',
+      left: PV_WELL.left, right: PV_WELL.right,
+      top: PV_WELL.top, bottom: PV_WELL.bottom,
+    }} />
+  );
+}
+
+// ── Cover unit. Not shown in the node's page view — it opens on page "0" — so this
+// follows CoverBlock in the book view: the back cover carries the placeholder block
+// bottom-left, the front carries "Add text" over a well. Both are expressed as
+// fractions of the page so the cover reads the same zoomed in as it does zoomed out.
+function CoverUnit({ w, h, pageW, frontRef }) {
+  return (
+    <BookUnit w={w} h={h}>
+      <BigLeaf side="left">
+        <span aria-hidden style={{
+          position: 'absolute', left: PV_WELL.left, bottom: PV_WELL.bottom,
+          width: '30%', height: '11%', background: '#D9D9D9',
+        }} />
+      </BigLeaf>
+      <BigLeaf side="right" slotRef={frontRef}>
+        <div style={{
+          position: 'absolute',
+          left: PV_WELL.left, right: PV_WELL.right,
+          top: PV_WELL.top, bottom: PV_WELL.bottom,
+          display: 'flex', flexDirection: 'column', gap: Math.round(pageW * 0.03),
+        }}>
+          <span style={{
+            fontFamily: TEXT, fontWeight: 700, color: '#000000',
+            fontSize: Math.round(pageW * 0.098), lineHeight: 1.25,
+          }}>Add text</span>
+          <PhotoWell iconSize={Math.round(pageW * 0.13)} />
+        </div>
+      </BigLeaf>
+    </BookUnit>
+  );
+}
+
+// ── Navigator thumbnail — node 451:14516 / 14519. 41px, r2, white.
+//
+// The node rings the selected page with a 2px #008E93 border *outside* the thumb,
+// which reflows the whole row by 4px every time the selection moves. An inset
+// shadow paints the same ring over the thumb's outer 2px and keeps every item a
+// fixed 41 — the reason the status banners and the collection covers already use an
+// inset shadow rather than a border.
+function NavThumb({ photo, active, label, spine, onClick, itemRef }) {
+  return (
+    <button ref={itemRef} type="button" onClick={onClick} {...press(0.9)}
+      aria-label={spine ? 'Cover' : (label ? `Page ${label}` : 'Inside cover')}
+      aria-current={active ? 'true' : undefined}
+      style={{
+        flex: '0 0 auto', border: 'none', padding: 0, background: 'transparent',
+        cursor: 'pointer', display: 'flex', flexDirection: 'column',
+        alignItems: 'center', transition: 'transform 140ms ease',
+        WebkitTapHighlightColor: 'transparent',
+      }}>
+      <span aria-hidden style={{ height: NAV_ROW, display: 'flex', alignItems: 'center' }}>
+        {spine && (
+          <span style={{
+            width: 4, height: NAV_THUMB, borderRadius: 1, background: '#FFFFFF',
+            opacity: active ? 1 : 0.5,
+          }} />
+        )}
+        <span style={{
+          width: NAV_THUMB, height: NAV_THUMB, borderRadius: 2, overflow: 'hidden',
+          background: '#FFFFFF', opacity: active ? 1 : 0.5,
+          boxShadow: active ? 'inset 0 0 0 2px #008E93' : 'none',
+        }}>
+          {photo && (
+            <img src={photo} alt="" loading="lazy" style={{
+              width: '100%', height: '100%', objectFit: 'cover', display: 'block',
+            }} />
+          )}
+        </span>
+      </span>
+      <span aria-hidden style={{
+        fontFamily: TEXT, fontWeight: 500, fontSize: 11, lineHeight: '20px',
+        textAlign: 'center', color: active ? '#FFFFFF' : '#777777',
+      }}>{label || ' '}</span>
+    </button>
+  );
+}
+
+// node 494:17136 — 38×38, #272727, 1px #363636, r12, 16px plus. Adds a spread on
+// the same footing as the book view's pill, so the two views stay in step.
+function NavAdd({ onClick }) {
+  return (
+    <button type="button" onClick={onClick} aria-label="Add spread" {...press(0.9)}
+      style={{
+        flex: '0 0 auto', marginTop: (NAV_ROW - NAV_ADD) / 2,
+        width: NAV_ADD, height: NAV_ADD, borderRadius: 12, padding: 0,
+        background: '#272727', border: '1px solid #363636',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'pointer', transition: 'transform 140ms ease',
+        WebkitTapHighlightColor: 'transparent',
+      }}>
+      <img src={`${A}/pb-editor-plus.svg`} alt="" width={16} height={16}
+           style={{ display: 'block' }} />
+    </button>
+  );
+}
+
+// ── Navigator row — node 451:14513. Leaves of one spread sit 1px apart and
+// consecutive spreads 8px apart, which is what makes the pairing read; the row
+// scrolls, since a 24-page book is far wider than any phone.
+function PageNavigator({ slots, photoFor, active, onPick, onAdd, itemRefs, bottom }) {
+  const groups = [];
+  slots.forEach((s, i) => {
+    const g = groups[groups.length - 1];
+    if (g && g.unit === s.unit) g.items.push(i);
+    else groups.push({ unit: s.unit, items: [i] });
+  });
+  return (
+    <div style={{
+      position: 'absolute', left: 0, right: 0, bottom, zIndex: 5,
+      display: 'flex', alignItems: 'flex-start', gap: 8,
+      padding: '0 16px', boxSizing: 'border-box',
+      overflowX: 'auto', overflowY: 'hidden',
+      // Read by scrollIntoView above: it keeps the active thumbnail this far from
+      // the edge instead of flush against it.
+      scrollPaddingLeft: 56, scrollPaddingRight: 56,
+      scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch',
+    }}>
+      {groups.map((g, gi) => (
+        <React.Fragment key={g.unit}>
+          <div style={{ flex: '0 0 auto', display: 'flex', gap: 1 }}>
+            {g.items.map(i => (
+              <NavThumb key={i} label={slots[i].label} spine={slots[i].unit === 0}
+                        photo={photoFor(slots[i])} active={i === active}
+                        onClick={() => onPick(i)}
+                        itemRef={el => { itemRefs.current[i] = el; }} />
+            ))}
+          </div>
+          {/* A pill after every spread but the last — the same rule SpreadBlock
+              uses for showPlus, so adding from either view behaves identically. */}
+          {g.unit > 0 && gi < groups.length - 1 && <NavAdd onClick={onAdd} />}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
+
+// ── Header — node 451:14591. Back chevron, the undo/redo pill centred, and a third
+// slot the node ships at opacity 0 (its Continue button); reproduced as an inert
+// spacer so the pill stays centred rather than drifting right.
+//
+// The node's back button is 36×36 where the book view's close is 40; kept at 40 so
+// the control does not resize as you move between the two modes of one screen.
+function PageViewHeader({ onBack }) {
+  const icon = file => (
+    <img src={`${A}/${file}`} alt="" width={24} height={24} style={{ display: 'block' }} />
+  );
+  return (
+    <div style={{
+      position: 'absolute', left: 0, right: 0, top: 0, zIndex: 6,
+      height: 'calc(env(safe-area-inset-top, 44px) + 103px)',
+      pointerEvents: 'none',
+    }}>
+      <IOSProgressiveBlur scrim={
+        'linear-gradient(to bottom, rgba(20,20,20,0.55) 0.3%,' +
+        ' rgba(16,16,16,0.22) 60%, rgba(12,12,12,0) 96%)'
+      } />
+      <div style={{
+        position: 'absolute', left: 0, right: 0,
+        top: 'max(68px, calc(env(safe-area-inset-top, 44px) + 24px))',
+        padding: '0 16px', boxSizing: 'border-box',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        pointerEvents: 'auto',
+      }}>
+        <GlassIconButton label="Back to book" tint="rgba(0,0,0,0.25)" gloss onClick={onBack}>
+          {icon('pb-src-back.svg')}
+        </GlassIconButton>
+        <GlassIconButton label="Undo and redo" width={88} tint="rgba(0,0,0,0.25)" gloss>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {icon('pb-editor-undo.svg')}
+            {icon('pb-editor-redo.svg')}
+          </span>
+        </GlassIconButton>
+        <div aria-hidden style={{ width: 40, height: 40 }} />
+      </div>
+    </div>
+  );
+}
+
+// ── Page view — node 451:14499.
+//
+// Vertical layout is the node's, and it lands on the node's own numbers: the header
+// is 147 tall, the navigator's 65px row sits 170 from the bottom (31 above the
+// toolbar's 139), and the strip fills what is left. Centring the book in that band
+// puts its top edge at 231.3 against the node's 231.
+function PageView({ aspect, pages, placed, uploaded, startSlot, onBack, onAdd }) {
+  const { useState, useRef, useEffect, useLayoutEffect, useMemo } = React;
+  const slots = useMemo(() => slotsFor(pages), [pages]);
+  const [active, setActive] = useState(() => Math.min(startSlot, slots.length - 1));
+  const [vw, setVw] = useState(0);
+  const scroller = useRef(null);
+  const leafRefs = useRef([]);
+  const navRefs = useRef([]);
+  const raf = useRef(0);
+  const centred = useRef(false);
+
+  // The strip's geometry is all derived from its own width, so it tracks the
+  // viewport (390 on a phone, 402 in the desktop IOSDevice frame) and re-derives on
+  // rotation. Measured rather than expressed in percentages because the children's
+  // percentage basis would be the *content* box, which the side padding shrinks.
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const measure = () => setVw(el.clientWidth);
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const pageW = vw * PV_PAGE_FRACTION;
+  const bookW = (2 * pageW) / BOOK.interior.width;
+  const bookH = ((2 * pageW) / aspect) / BOOK.interior.height;
+
+  const centreOn = (i, behavior) => {
+    const sc = scroller.current;
+    const el = leafRefs.current[i];
+    if (!sc || !el) return;
+    const delta = el.getBoundingClientRect().left + el.offsetWidth / 2
+                  - (sc.getBoundingClientRect().left + sc.clientWidth / 2);
+    if (behavior === 'smooth' && sc.scrollTo) sc.scrollTo({ left: sc.scrollLeft + delta, behavior });
+    else sc.scrollLeft += delta;
+  };
+
+  // Land on the page that was tapped, without an animation — the mode change is the
+  // transition. Deliberately not in the deps of anything: it runs once the first
+  // measurement has produced a laid-out strip.
+  useLayoutEffect(() => {
+    if (centred.current || !vw) return;
+    centred.current = true;
+    centreOn(active, 'auto');
+  }, [vw]);
+
+  // Which page is under the middle of the strip. rAF-throttled: a handful of rects
+  // per frame during a drag.
+  const onScroll = () => {
+    if (raf.current) return;
+    raf.current = requestAnimationFrame(() => {
+      raf.current = 0;
+      const sc = scroller.current;
+      if (!sc) return;
+      const mid = sc.getBoundingClientRect().left + sc.clientWidth / 2;
+      let best = -1, bestD = Infinity;
+      leafRefs.current.forEach((el, i) => {
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        const d = Math.abs(r.left + r.width / 2 - mid);
+        if (d < bestD) { bestD = d; best = i; }
+      });
+      if (best >= 0) setActive(best);
+    });
+  };
+  useEffect(() => () => { if (raf.current) cancelAnimationFrame(raf.current); }, []);
+
+  // Keep the active thumbnail reachable — `inline: 'nearest'`, deliberately not
+  // 'center'. Centring re-scrolls the navigator on every change of `active`, which
+  // means it slides under your finger the whole time you drag the strip, and a tap
+  // on a thumbnail shoves the thumbnail you just tapped somewhere else. 'nearest'
+  // does nothing while the thumbnail is already visible, and the navigator's
+  // scroll-padding gives it 56px of margin so "visible" is not the very edge.
+  // `block: 'nearest'` matters too, or this can scroll an ancestor vertically.
+  useEffect(() => {
+    const el = navRefs.current[active];
+    if (el && el.scrollIntoView) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+    }
+  }, [active]);
+
+  const photoFor = s => (s.n ? placed[s.n - 1] : null);
+  const spreads = spreadsFor(pages);
+  // Slot indices are 0 for the cover then two per spread, so a spread's leaves are
+  // 1 + 2i and 2 + 2i. Added spreads are appended, so existing indices never move.
+  const leafRef = i => el => { leafRefs.current[i] = el; };
+
+  return (
+    <div style={{
+      position: 'absolute', inset: 0,
+      animation: 'pbFadeIn 220ms ease both',
+    }}>
+      <div
+        ref={scroller}
+        onScroll={onScroll}
+        style={{
+          position: 'absolute', left: 0, right: 0,
+          top: 'calc(env(safe-area-inset-top, 44px) + 103px)',
+          bottom: 'calc(235px + env(safe-area-inset-bottom, 0px))',
+          display: 'flex', alignItems: 'center',
+          // A gap of 8% of a page reads as a break between books without stranding
+          // the strip on empty canvas. Not in the node, which shows one book.
+          gap: pageW * 0.08,
+          overflowX: 'auto', overflowY: 'hidden',
+          scrollSnapType: 'x mandatory',
+          scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch',
+        }}
+      >
+        {/* Spacers, not padding: percentage widths on the books would resolve
+            against the scroller's content box, which padding shrinks. These are
+            what let the first and last page reach the centre of the viewport. */}
+        <div aria-hidden style={{ flex: `0 0 ${(vw - pageW) / 2}px` }} />
+        {vw > 0 && (
+          <React.Fragment>
+            <CoverUnit w={bookW} h={bookH} pageW={pageW} frontRef={leafRef(0)} />
+            {spreads.map(([l, r], i) => (
+              <BookUnit key={i} w={bookW} h={bookH}>
+                <BigLeaf side="left" slotRef={leafRef(1 + 2 * i)}>
+                  <BigWell photo={l ? placed[l - 1] : null} pageW={pageW} />
+                </BigLeaf>
+                <BigLeaf side="right" slotRef={leafRef(2 + 2 * i)}>
+                  <BigWell photo={r ? placed[r - 1] : null} pageW={pageW} />
+                </BigLeaf>
+              </BookUnit>
+            ))}
+          </React.Fragment>
+        )}
+        <div aria-hidden style={{ flex: `0 0 ${(vw - pageW) / 2}px` }} />
+      </div>
+
+      <PageNavigator
+        slots={slots} photoFor={photoFor} active={active}
+        // Jump, don't animate. A smooth scroll from page 3 to page 24 drags the
+        // preview through twenty spreads, and because the scroll handler tracks the
+        // centred page the whole way, the selection ring races through every
+        // thumbnail in between. One cut sets `active` once.
+        onPick={i => { setActive(i); centreOn(i, 'auto'); }}
+        onAdd={onAdd} itemRefs={navRefs}
+        bottom="calc(170px + env(safe-area-inset-bottom, 0px))"
+      />
+
+      <PageViewHeader onBack={onBack} />
+      <Toolbar photos={uploaded} tools={PV_TOOLS} gap={8} padX={16} />
+    </div>
+  );
+}
+
 function EditorScreen() {
-  const { useState, useEffect } = React;
+  const { useState, useEffect, useRef } = React;
   const [book] = useState(readBook);
   const [incoming] = useState(readIncomingPhotos);
   const [uploaded] = useState(() => incoming || readList('pb_uploaded'));
   const [placed, setPlaced] = useState(() => readList('pb_placed'));
+  // null = the book view; otherwise the slot index the page view opened on.
+  const [pageView, setPageView] = useState(null);
   const [added, setAdded] = useState(() => {
     // A book reloaded with more photos than pages keeps the spreads auto-fill added.
     const p = readList('pb_placed');
@@ -700,6 +1225,20 @@ function EditorScreen() {
     const t = setTimeout(() => setSheet('open'), 300);
     return () => clearTimeout(t);
   }, [sheet]);
+
+  // The book view unmounts while page view is up, so its scroll offset is stashed
+  // and put back through the callback ref when it comes back. Without this, coming
+  // out of a page halfway down a 24-page book lands you at the top of the cover.
+  const bookScroller = useRef(null);
+  const bookScrollTop = useRef(0);
+  const attachBookScroller = el => {
+    bookScroller.current = el;
+    if (el) el.scrollTop = bookScrollTop.current;
+  };
+  const openPage = slot => {
+    if (bookScroller.current) bookScrollTop.current = bookScroller.current.scrollTop;
+    setPageView(slot);
+  };
 
   const dismissSheet = () => {
     setSheet('closing');
@@ -743,8 +1282,18 @@ function EditorScreen() {
         @keyframes pbSheetOut { from { transform: translateY(0); } to { transform: translateY(100%); } }
         @keyframes pbScrimIn  { from { opacity: 0; } to { opacity: 1; } }
         @keyframes pbScrimOut { from { opacity: 1; } to { opacity: 0; } }
+        @keyframes pbFadeIn   { from { opacity: 0; } to { opacity: 1; } }
       `}</style>
-      <div style={{
+
+      {pageView !== null ? (
+        <PageView
+          aspect={aspect} pages={pages} placed={placed} uploaded={uploaded}
+          startSlot={pageView} onBack={() => setPageView(null)}
+          onAdd={() => setAdded(n => n + 1)}
+        />
+      ) : (
+      <React.Fragment>
+      <div ref={attachBookScroller} style={{
         position: 'absolute', inset: 0, overflowY: 'auto', overflowX: 'hidden',
         WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none',
       }}>
@@ -771,11 +1320,13 @@ function EditorScreen() {
             display: 'flex', flexDirection: 'column', gap: 47,
             padding: `0 ${GUTTER}px`, boxSizing: 'border-box',
           }}>
-            <CoverBlock aspect={aspect} />
+            <CoverBlock aspect={aspect} onOpen={() => openPage(0)} />
             {spreads.map(([l, r], i) => (
               <SpreadBlock key={i} aspect={aspect} left={l} right={r} photos={placed}
                            showPlus={i < spreads.length - 1}
-                           onAdd={() => setAdded(n => n + 1)} />
+                           onAdd={() => setAdded(n => n + 1)}
+                           /* Slot 0 is the cover, then two per spread. */
+                           onOpen={side => openPage(1 + 2 * i + (side === 'right' ? 1 : 0))} />
             ))}
           </div>
 
@@ -802,6 +1353,8 @@ function EditorScreen() {
             onSkip={dismissSheet}
           />
         )
+      )}
+      </React.Fragment>
       )}
     </div>
   );

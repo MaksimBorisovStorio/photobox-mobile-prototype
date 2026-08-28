@@ -1,5 +1,5 @@
 // service-worker.js
-const CACHE = 'photobox-v24';  // bump to evict a stale cache
+const CACHE = 'photobox-v25';  // bump to evict a stale cache
 // Paths are relative to this file's URL, not root-absolute: GitHub Pages serves a
 // project site from /<repo>/, where a leading slash would resolve above the app and
 // 404 every entry. c.add() and the fetch handler both work off the request URL, so
@@ -115,6 +115,16 @@ const PRECACHE = [
   'shared/assets/pb-editor-tool-themes.svg',
   'shared/assets/pb-editor-tool-style.svg',
   'shared/assets/pb-editor-tool-ai.svg',
+  // page view mode — node 451:14499
+  'shared/assets/pb-editor-tool-addphoto.svg',
+  'shared/assets/pb-editor-tool-addtext.svg',
+  'shared/assets/pb-editor-tool-layout.svg',
+  'shared/assets/pb-editor-tool-stickers.svg',
+  'shared/assets/pb-editor-tool-smartdesign.svg',
+  'shared/assets/pb-editor-tool-delete.svg',
+  'shared/assets/pb-editor-book-block.svg',
+  'shared/assets/pb-editor-book-sheet-a.svg',
+  'shared/assets/pb-editor-book-sheet-b.svg',
   'shared/assets/pb-editor-spine.png',
   'shared/assets/pb-editor-hinge.png',
   'shared/assets/splash-star-glow1.svg',
