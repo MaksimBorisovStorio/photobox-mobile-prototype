@@ -180,40 +180,46 @@ sessionStorage.setItem('pb_nav', 'push');
 window.location.href = '../screens/basket.html';
 ```
 
-### ⚠️ The screen wrapper is sized `height: 100vh` — NOT `inset: 0`
-`black-translucent` shifts the iOS web view **up** under the status bar without
-growing it. So in the standalone PWA the layout viewport is `screen − top inset`
-tall and sits at physical y=0, orphaning a band at the bottom equal to the **top**
-inset. `position: fixed` obeys that short viewport; `100vh` does not. Measured on
-device (iPhone 430×932, `diag.html`):
+### ⚠️ `min-height: 100vh` on html/body is what makes the iOS PWA full-screen
+The bottom band reported on device — every screen ~59px short, with a strip of flat
+page background under the content — is **not** a layout bug in the screens. It is the
+iOS standalone PWA handing the page a layout viewport shorter than the screen, and the
+only thing that changes it is the html/body sizing. Measured in the PWA on an iPhone
+430×932 (`diag.html`, five recipes auto-measured back to back):
 
-| | value |
-|---|---|
-| `screen` | 430×**932** |
-| `window.inner` / `docEl.client` / `visualViewport` | 430×**873** |
-| `position:fixed; inset:0` box | 430×**873**, top 0, bottom 873 |
-| `env()` insets T/R/B/L | **59** / 0 / 34 / 0 |
-| `100vh` / `100lvh` | **932** / 932 |
-| `100dvh` / `100svh` | 872.98 / 872.98 |
+| html/body recipe | `viewport-fit` | `innerHeight` | `fixed;inset:0` | env T/B | `100vh` |
+|---|---|---|---|---|---|
+| `height: 100%` | cover | 873 | 873 | 59 / 34 | 932 |
+| **`min-height: 100vh`** | **cover** | **932** | **932** | **59 / 34** | **932** |
+| `height: -webkit-fill-available` | cover | 873 | 873 | 59 / 34 | 932 |
+| `height: 100%` | — | 873 | 873 | **0 / 0** | 873 |
+| `min-height: 100vh` | — | 873 | 873 | **0 / 0** | 873 |
 
-932 − 873 = 59 = exactly the top inset. Hence every screen's mobile wrapper is
-`position:'fixed', top:0, left:0, right:0, height:'100vh'`. Do not "tidy" that back
-to `inset: 0`, and do not reach for `dvh`/`svh` — both are the *short* viewport here;
-only `vh`/`lvh` are the full screen.
+So: `min-height: 100vh` + `viewport-fit=cover` is the **only** combination that yields
+the full 932. `shared/styles.css` therefore carries
+`html, body { min-height: 100vh }` and `#root { width:100%; min-height:100vh }` — which
+is verbatim what `image-picker/index.html` has always done, and why the picker was the
+one screen that never showed the band. Its inline comment ("no height/overflow
+constraints on html/body") is load-bearing, not incidental.
 
-Consequences worth knowing:
-- **A fixed box taller than the layout viewport adds no page scroll** — fixed
-  elements don't contribute to scrollable overflow. Verified: a 932px fixed box in a
-  786px viewport leaves `documentElement.scrollHeight` at 786.
-- `html, body { height: 100% }` stays at the short 873. That is deliberate: making it
-  `100vh` would give the document 59px of real scroll. Nothing reads body's box.
-- Bottom-anchored CTAs now land where the design intends. They pad by
-  `env(safe-area-inset-bottom)` (34), so they used to sit 93px above the screen
-  bottom; now it is the correct 34.
-- **The image picker was never immune** — it has the identical 59px shortfall, but its
-  page background and wrapper are both `#000`, so the band is invisible. Its wrapper
-  is still `inset: 0`; `image-picker/` is frozen, so this was left alone. The visible
-  symptom there is only that its bottom bar sits 59px high.
+Things that look like fixes and are not:
+- **`height: 100vh` on the wrapper instead of `inset: 0`.** Tried on device: with the
+  short 873 viewport the region below it is not paintable by page content, so a
+  932-tall wrapper simply pushes everything anchored to its bottom 59px past the
+  visible edge — bottom CTAs came out sliced in half. The strip becomes paintable only
+  once the *viewport itself* is 932, i.e. once the recipe above is in place. Wrappers
+  stay `position:fixed; inset:0`.
+- **Dropping `viewport-fit=cover`.** It does make the band disappear, which is a
+  tempting dead end: it also zeroes every `env(safe-area-inset-*)` and shrinks `100vh`
+  to 873, so every safe-area inset in the app silently collapses to 0.
+- **`dvh` / `svh` units.** Both are the short viewport (872.98). Only `vh`/`lvh` report
+  the full screen.
+
+⚠️ The recipe leaves the document taller than `documentElement.clientHeight`, so the
+page itself is scrollable by the 59px difference (`scroll: yes` in the measurement).
+The picker has always been in that state without trouble — every screen's wrapper is
+`overflow: hidden` and touches land on inner scrollers — but if a page-level drag ever
+shows up on a screen with no inner scroller, that is where it comes from.
 
 ### ⚠️ Never animate `<body>` — the nav transitions run on `#root > *`
 Separate from the gap above, and still a real hazard.
@@ -1021,9 +1027,7 @@ Exports via `Object.assign(window, {...})`:
 | `IOSKeyboard` | `dark` | Full iOS keyboard with liquid glass |
 | `IOSProgressiveBlur` | `scrim` | Three-stage progressive blur scrim, top-down — the image picker's header effect |
 
-**Usage:** On mobile, render screen content directly in
-`position:fixed; top:0; left:0; right:0; height:100vh` (see the viewport gotcha —
-`inset: 0` is 59px short in the iOS PWA). On desktop (≥520px), wrap in `<IOSDevice>` for iPhone preview frame.
+**Usage:** On mobile, render screen content directly in `position:fixed; inset:0`. On desktop (≥520px), wrap in `<IOSDevice>` for iPhone preview frame.
 
 ---
 
@@ -1055,7 +1059,7 @@ Exports via `Object.assign(window, {...})`:
 
 ### service-worker.js
 Precaches every screen HTML + JSX, the shared assets (incl. fonts and splash SVGs),
-manifest.json and the image-picker files. Cache name `photobox-v17`.
+manifest.json and the image-picker files. Cache name `photobox-v19`.
 
 **Strategy: network-first, cache fallback** — and same-origin requests are fetched
 with `cache: 'no-store'`. Both parts are deliberate:
@@ -1120,7 +1124,7 @@ delete and re-add the icon.
     function App() {
       const mobile = useIsMobile();
       if (mobile) return (
-        <div style={{position:'fixed', top:0, left:0, right:0, height:'100vh', background:'#F2F2F7', overflow:'hidden'}}>
+        <div style={{position:'fixed', inset:0, background:'#F2F2F7', overflow:'hidden'}}>
           <ScreenComponent />
         </div>
       );
@@ -1220,7 +1224,6 @@ python3 -m http.server 8080
 4. Add `'/screens/screen-name.html'` and `'/screens/screen-name.jsx'` to `service-worker.js` PRECACHE
 
 ### Quality checklist for any screen change
-- [ ] Mobile wrapper is `position:'fixed', top:0, left:0, right:0, height:'100vh'` — not `inset: 0`
 - [ ] Root div has `position:'relative'`
 - [ ] Status bar `<IOSStatusBar dark={false/true} />` present
 - [ ] Safe area insets applied top and bottom
