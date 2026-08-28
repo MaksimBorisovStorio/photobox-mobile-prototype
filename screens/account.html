@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="Photobox">
   <link rel="manifest" href="../manifest.json">
   <link rel="stylesheet" href="../shared/styles.css">
-  <style> html, body { margin:0; padding:0; background:#F2F2F7; } ::-webkit-scrollbar{display:none;} </style>
+  <style> html, body { margin:0; padding:0; background:#F1F6F6; } ::-webkit-scrollbar{display:none;} </style>
   <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
@@ -19,6 +19,8 @@
   <script src="../shared/navigation.js"></script>
   <script src="../shared/mock-data.js"></script>
   <script type="text/babel" src="../shared/ios-frame.jsx"></script>
+  <script type="text/babel" src="../shared/brand.jsx"></script>
+  <script type="text/babel" src="../shared/tab-bar.jsx"></script>
   <script type="text/babel" src="account.jsx"></script>
   <script type="text/babel">
     function useIsMobile() {
@@ -34,7 +36,7 @@
     function App() {
       const mobile = useIsMobile();
       if (mobile) return (
-        <div style={{position:'fixed', inset:0, background:'#F2F2F7', overflow:'hidden'}}>
+        <div style={{position:'fixed', inset:0, background:'#F1F6F6', overflow:'hidden'}}>
           <AccountScreen />
         </div>
       );

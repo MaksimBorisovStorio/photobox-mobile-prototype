@@ -4,6 +4,8 @@
   --Extended-brand-colours-Secondary-500: #007377;
   --colour-foreground-fg-secondary: #007377;
   --colour-foreground-fg-black: #333333;
+  --functional-colours-grey-200: #DDDDDD;   /* account row dividers */
+  --functional-colours-grey-700: #666666;   /* account row value text */
   --functional-colours-grey-50: #F4F4F4;
   --colour-foreground-fg-white: #FFFFFF;
   /* Editor (451:15574): the toolbar/card grey and the Continue button's wash */

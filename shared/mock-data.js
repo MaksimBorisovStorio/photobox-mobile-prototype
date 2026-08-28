@@ -3,11 +3,15 @@
   const p = (seed, w, h) => `https://picsum.photos/seed/${seed}/${w}/${h}`;
 
   window.MOCK = {
+    // Name and email are the Figma account node's own copy (451:14042/14044).
+    // `firstName` is what the welcome headline shows — it is a 38px display line and
+    // the node sets it `nowrap`, so a full name would overflow the 350 column.
     user: {
-      name: 'Sarah Johnson',
-      email: 'sarah.j@example.com',
+      name: 'Iria Otero',
+      firstName: 'Iria',
+      email: 'iria.otero@albelli.com',
       avatar: p('portrait42', 80, 80),
-      memberSince: '2021',
+      memberSince: '2024',
     },
 
     categories: [
@@ -83,6 +87,15 @@
     },
 
     account: {
+      // The stats strip on the account screen — Figma 451:14045. `w` is the node's
+      // own per-column width; the strip is centred, so the three are not equal.
+      stats: [
+        { value: '18',    label: 'Books made',    w: 70 },
+        { value: '1,255', label: 'Photos stored', w: 84 },
+        { value: '2 yrs', label: 'Together',      w: 70 },
+      ],
+      // Kept for a future orders screen: the redesigned account page replaced its
+      // inline order list with a "My orders" row, which has no destination yet.
       orders: [
         { id: 'ord1', title: 'Canada Photo Book', date: '12 Jul 2026', status: 'Delivered', thumb: p('order1', 60, 60) },
         { id: 'ord2', title: 'Italy Prints ×6',   date: '03 Jun 2026', status: 'Delivered', thumb: p('order2', 60, 60) },

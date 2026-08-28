@@ -1,5 +1,5 @@
 // service-worker.js
-const CACHE = 'photobox-v23';  // bump to evict a stale cache
+const CACHE = 'photobox-v24';  // bump to evict a stale cache
 // Paths are relative to this file's URL, not root-absolute: GitHub Pages serves a
 // project site from /<repo>/, where a leading slash would resolve above the app and
 // 404 every entry. c.add() and the fetch handler both work off the request URL, so
@@ -27,6 +27,7 @@ const PRECACHE = [
   'shared/assets/ob-phone.webp',
   'shared/assets/ob-notif-icon.png',
   'shared/collections.jsx',
+  'shared/tab-bar.jsx',
   'shared/assets/pb-cut-canada.webp',
   'shared/assets/pb-cut-italy.webp',
   'shared/assets/hb-track-book.jpg',
@@ -44,6 +45,16 @@ const PRECACHE = [
   'shared/assets/hb-chip-gift.svg',
   'shared/assets/hb-askai-add.svg',
   'shared/assets/hb-tab-home.svg',
+  'shared/assets/ac-icon-orders.svg',
+  'shared/assets/ac-icon-photos.svg',
+  'shared/assets/ac-icon-reminders.svg',
+  'shared/assets/ac-icon-mail.svg',
+  'shared/assets/ac-icon-settings.svg',
+  'shared/assets/ac-icon-notifications.svg',
+  'shared/assets/ac-icon-language.svg',
+  'shared/assets/ac-icon-feedback.svg',
+  'shared/assets/ac-icon-chat.svg',
+  'shared/assets/ac-icon-gift.svg',
   'shared/assets/hb-tab-projects.svg',
   'shared/assets/hb-tab-memories.svg',
   'shared/assets/hb-tab-account.svg',

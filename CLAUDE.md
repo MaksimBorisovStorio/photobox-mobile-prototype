@@ -35,14 +35,19 @@ All 13 implementation tasks are done. Branch `feature/prototype-build` is demo-r
 | Checkout — Delivery | `screens/checkout-delivery.html` + `.jsx` | ✅ Done |
 | Checkout — Payment | `screens/checkout-payment.html` + `.jsx` | ✅ Done |
 | Order Success | `screens/order-success.html` + `.jsx` | ✅ Done |
-| Account | `screens/account.html` + `account.jsx` | ✅ Done |
+| Account | `screens/account.html` + `account.jsx` | ✅ Rebuilt end to end — **Figma-verified** (node `451:14038`) |
 
 ### Possible next tasks
 
 - **Figma fidelity pass** — query Figma node IDs (see table below) to tighten colors, spacing, typography to exact Figma spec. Screens built from verbal descriptions rather than direct Figma calls due to MCP availability.
 - **Transition polish** — add push/pop slide animations between screens (navigation.js stubs are in place; CSS transitions not yet wired to the iframe-swap mechanism).
 - **Editor tools** — Photos, Arrange, Themes, Style, AI help and Options are inert by request. The card's settings icon and the header's Continue arrow are inert for the same reason.
-- **My Photos tab** — home tab bar has a "My Photos" tab that navigates to `../image-picker/index.html`. If a standalone My Photos grid (distinct from the picker) is needed, create `screens/my-photos.html`.
+- **My Photos tab** — superseded: the tab bar is now Home / Projects / Memories / Account
+  (`509:19230`). The account screen's "My photos" row points at `photo-sources.html`. If a
+  standalone grid distinct from the picker is needed, create `screens/my-photos.html`.
+- **Orders screen** — the redesigned account page replaced its inline order list with a
+  "My orders" row that has nowhere to go. `MOCK.account.orders` is still there for it, and
+  home's order-tracking banner currently points at `account.html` for want of anything better.
 - **Real Figma node check** — `editor-cover.html` referenced in the original plan was merged into `product-photobook.html` (it's the same cover-picker step); verify this matches stakeholder expectations.
 
 ---
@@ -80,7 +85,7 @@ All 13 implementation tasks are done. Branch `feature/prototype-build` is demo-r
 | Photo book — configure variant | `451:13606` | ✅ Built (Figma not queried) |
 | Photo book — CTA screen | `451:13721` | ✅ Built (Figma not queried) |
 | Editor | `451:15574` | ✅ Built — matches Figma (pixel-diffed; see below) |
-| Account / Profile | `451:14038` | ✅ Built (Figma not queried) |
+| Account / Profile | `451:14038` | ✅ Rebuilt — matches Figma; every band lands on the node's y exactly |
 | Photo sources (Album / My trips) | `451:14202` | ✅ Built — Albums grid exact; 6 of 8 covers unverifiable |
 | My Photos (image grid) | `451:14403` | ⬜ Not built (image-picker used instead) |
 | Basket | — | ✅ Built (PB3 style, no Figma node) |
@@ -146,6 +151,8 @@ MEGAPROTOTYPE/
 │   ├── ios-frame.jsx            ← iOS component library
 │   │                               Exports: IOSDevice, IOSStatusBar, IOSNavBar,
 │   │                               IOSGlassPill, IOSList, IOSListRow, IOSKeyboard
+│   ├── tab-bar.jsx              ← the floating iOS-26 glass tab bar, shared by
+│   │                               home and account (TabBar, TAB_BAR_HEIGHT, TABS)
 │   ├── navigation.js            ← screen transition engine (push/pop/modal/replace)
 │   ├── styles.css               ← CSS custom properties: brand colors, type scale, spacing
 │   └── mock-data.js             ← all mock: products, user, orders, basket
@@ -259,7 +266,10 @@ CTAs are `position:'absolute'; bottom:0` — they anchor to the nearest `positio
 - Both need: `onPointerUp/Leave` → `scale(1)`, `transition:'transform 140ms ease'`
 
 ### IOSListRow does not accept a `style` prop
-When you need custom styling on a list row (e.g. red "Log out" text), render it as a plain `<div>` with manual press state handlers instead of using `IOSListRow`.
+When you need custom styling on a list row, render it as a plain `<div>` with manual press
+state handlers instead of using `IOSListRow`. ⚠️ The account screen no longer uses
+`IOSList`/`IOSListRow` at all — Figma `451:14038` replaced the iOS inset-grouped list with
+its own `PB3/AccountRow` card, built in `account.jsx`.
 
 ### Checkout payment — intentional hardcoded values
 `checkout-payment.jsx` hardcodes `€24.99`, `€4.99`, `€29.98` rather than reading `window.MOCK.basket`. This is by design — `mock-data.js` is not loaded on that screen. Values match the mock exactly. Do not add the mock-data dependency unless you want dynamic cart support.
@@ -1355,6 +1365,132 @@ Inert by request: all six tools, the card's settings icon, the header's Continue
 and the undo/redo pill (the node ships its redo glyph already in the `#333` disabled
 state). Only the close button navigates — `navigation.pop()`.
 
+### Account page, rebuilt against Figma `451:14038`
+
+Supersedes the hand-written iOS inset-grouped list the screen used to carry (avatar
+block → My Orders → Preferences → Support → Log out), which predated any Figma call.
+The node is a 390×1410 frame; every band was verified by measuring the rendered boxes
+in a real 390px viewport:
+
+| band | component | node | node y | measured y | h (node / built) |
+|---|---|---|---|---|---|
+| welcome | `Welcome` | `451:14041` | 56 | 56 | 87 / 87 |
+| stats strip | `StatsStrip` | `451:14045` | 167 | 167 | 66 / 66 |
+| refer CTA | `ReferCard` | `451:14057` | 257 | 257 | 70 / 70 |
+| sections | `AccountSection` ×4 | `451:14064` | 351 | 351 | 970 / 975 |
+
+The container (`451:14040`) is `pt 56 / px 20 / pb 32` with `gap: 24`, and those four
+offsets are exactly what it adds up to. Inside `451:14064` the four sections have **no
+gap of their own** — each is `py: 16`, so consecutive cards sit 32 apart. Add a
+section without that `py: 16` and everything below it shifts.
+
+**There is no back button and no nav bar.** The node has neither: account is a tab
+destination, so the tab bar is the way out. That is also why `TabBar` grew an `href`
+on the Home tab (see below).
+
+#### The tab bar moved to `shared/tab-bar.jsx`
+`home.jsx` owned `TABS`, `TAB_BAR_PAD_BOTTOM`, `TAB_BAR_HEIGHT` and `TabBar`
+outright. This node carries the same bar, so all four moved out **verbatim** — the
+same extraction `shared/collections.jsx` got when home and photo-sources turned out
+to share the collection covers. Both screens load it after `ios-frame.jsx` (which
+defines the `press()` it uses).
+
+⚠️ Top-level declarations in a classic script land in the **global lexical scope**, so
+any screen loading `tab-bar.jsx` must not redeclare those four names — the same
+collision trap as `PB_DISPLAY`. For that reason the label face inside the file is
+`TAB_LABEL_FONT`, not home's `BANNER_FONT`: two top-level `const BANNER_FONT`
+declarations in two classic scripts would collide.
+
+Two behavioural changes, both needed the moment the bar served more than one screen:
+- **The Home tab now has `href: 'home.html'`.** It never needed one while the bar was
+  home-only.
+- **A tab never navigates to the screen it is already on** (`tab.id !== activeTab`).
+  That is what lets one `TABS` list serve every destination.
+
+⚠️ The node marks **Tab 1 (Home) selected even though this is the account screen** —
+a designer slip. The build selects `account`, which is the correct behaviour. And per
+the note on `509:19230`, Figma ships only one variant per tab icon, so the Account tab
+gets the selection pill and the teal label but keeps its dark outline glyph; pull the
+filled variant from Figma if that matters.
+
+#### The wash is NOT `--pb-wash-stops`
+`451:14039` is 390×429 at the top, the same slot as home's `451:13863`, but it is a
+different paint: its second stop sits at **15%** where the shared list has 12.04%, it
+carries the 3 extra mid stops the shared list drops, and its ellipse is ~1.5× home's
+(4128 × 634.5 against 2739 × 421). So it ships as the inline SVG Figma itself emits,
+carrying the `gradientTransform` verbatim — the same reason home's `tealWash` does.
+Decoding the matrix: centred at (6, 0), essentially axis-aligned, deep teal in the
+top-left corner fading out across and down the header.
+
+It lives **inside the scroller** at `z-index: -1` with `isolation: isolate` on the
+scroller — the trap CLAUDE.md already records for home's gradient. Verified: the
+wash's offset tracks `-scrollTop` exactly (300px for a 300px scroll).
+
+#### ⚠️ The card rim is an inset shadow, not a border — again
+Third place this bites. Figma strokes are *inside* strokes, so the node's heights
+already include the 1px white rim: the My-account card is 278 and its rows sum to
+exactly 278, leaving no room for a real border. A CSS `border` on an auto-height box
+adds 2px and every card comes out oversized. `inset 0 0 0 1px #FFF` paints it over
+the content edge, which is what Figma is doing. Same for the stats strip (66 = 8 + 50
++ 8, no room either).
+
+#### The stats strip's height comes from the hairlines, not the columns
+`451:14045` is `py: 8` with three 36-tall columns — but it measures 66, because the
+two 1px rules are 50 tall and are the tallest child. `align-items: center` then
+centres the columns against them, landing each on the node's own `y=15` (8 + 7).
+Column widths are the node's own 70 / 84 / 70 — deliberately unequal, and the row is
+centred. The rules are `rgba(51,51,51,0.05)`: as faint as that sounds on a near-white
+fill, and that is the node's value.
+
+#### Deviations from the node, all deliberate
+- **The "My photos" row is 56 tall, not 50.** Four of the five My-account rows carry an
+  explicit `h: 56` and that one does not, so it falls to its content (13 + 24 + 13).
+  Took the majority, per the convention the editor's sheet/pill variants already set —
+  a 6px-short row inside a list of 56s is a visible defect. Card 284 against the
+  node's 278.
+- **Preferences drops a leading divider.** `451:14136` is a 1px divider at the *top* of
+  the card, left behind when the bell row above it was hidden. Card 113 against the
+  node's 114, which matches Support's card exactly.
+- **Cards are full width.** The Preferences and Support cards are 343 wide inside a 350
+  column while My account and Account actions are 350. Normalised to 350.
+- **Inter → the system stack.** The node types the welcome block and the row labels in
+  SF Pro but the stat/refer/action labels in Inter. Inter is Figma's own default
+  fallback, is not among the faces this project self-hosts, and sits directly beside
+  SF Pro Semibold at the same size. One stack throughout.
+- **Section titles use `PB_DISPLAY`.** The node's Google Sans Flex Bold 24/40 at −0.24
+  is the same heading metric home's `SectionHeader` uses, so it takes the same stack
+  (DM Sans standing in).
+- **`backdrop-blur: 28.65px` on the container is not implemented.** The layer has no
+  fill at all, and Figma scales a background blur by the layer's own fill alpha — so
+  Figma renders none. Same finding as the onboarding copy panel.
+
+#### Not in the design
+- **Destinations.** No row and neither card carries a link. Only the two the prototype
+  can satisfy are wired: **My photos → `photo-sources.html`** and **Log out →
+  `onboarding-1.html`** (replace). The other seven rows and the refer card are inert,
+  including "Delete account" — destructive, with no confirmation flow designed.
+- **Press feedback on inert rows.** Every row keeps `press(0.97)` and the pointer
+  cursor even with nowhere to go, matching the Create grid's five destination-less
+  cards: the chevron is the design's affordance and a row that refuses the touch would
+  read as disabled.
+- **The chevron is the node's own text `›`** at 18px in `#333`, not the iOS
+  tertiary-grey vector the rest of the app uses. Kept as the glyph.
+
+#### Mock data
+`MOCK.user` took the node's own copy (`Iria` / `iria.otero@albelli.com`) and gained
+**`firstName`** — the welcome headline is a 38px `nowrap` display line, so a full name
+would overflow the 350 column. `MOCK.account.stats` is new. `MOCK.account.orders` is
+kept for a future orders screen. Nothing else in the app reads `MOCK.user`.
+
+#### Verified
+All four bands land on the node's y exactly and the welcome block's three lines land
+on 6/25/70 with heights 18/44/17 (frame 87). No horizontal page overflow at 390×844 or
+430×932, all 14 images load, all 11 rows hit-test as tappable at both rest and maximum
+scroll (the last row clears the floating tab bar by 72px), the wash scrolls with the
+content, and `animation`/`transform` on `<body>` are both `none`. Home still renders
+after the extraction: 44/44 images, no JS errors, its own tab bar unchanged at
+340×50/r25 with Home selected.
+
 ### Testing a mobile layout in headless Chrome
 `--window-size=375,1366` does **not** give a 375px layout: headless Chrome clamps the
 viewport to a 500px minimum, so the page lays out at 500 and the screenshot merely
@@ -1494,7 +1630,11 @@ splash.html
                                                 │                                                                                     └─(replace)─> order-success.html
                                                 │                                                                                                  └─(push)─> home.html
                                                 ├─(tab bar)─> account.html
-                                                │             └─(replace)─> onboarding-1.html (log out)
+                                                │             ├─(replace)─> onboarding-1.html (log out)
+                                                │             ├─(My photos)─> photo-sources.html
+                                                │             └─(tab bar: Home)─> home.html
+                                                │                ⚠️ no back button — the node has none;
+                                                │                account is a tab destination.
                                                 ├─(tab bar: Projects)─> editor.html
                                                 ├─(tab bar: Memories)─> photo-sources.html
                                                 ├─(status banner: tracking)─> account.html
@@ -1523,6 +1663,9 @@ Exports via `Object.assign(window, {...})`:
 `shared/brand.jsx` also exports `PhotoboxLogo`, **`PhotoboxStar`** (the lockup's
 sparkle on its own at any width, with the splash glow layers) and `GlassIconButton`.
 `shared/collections.jsx` exports `COLLECTIONS` + `CollectionCard` — see below.
+`shared/tab-bar.jsx` exports `TabBar`, `TABS`, `TAB_BAR_HEIGHT` and
+`TAB_BAR_PAD_BOTTOM` — loaded by `home.html` and `account.html`, after
+`ios-frame.jsx` for its `press()`.
 
 **Usage:** On mobile, render screen content directly in `position:fixed; inset:0`. On desktop (≥520px), wrap in `<IOSDevice>` for iPhone preview frame.
 
@@ -1556,7 +1699,7 @@ sparkle on its own at any width, with the splash glow layers) and `GlassIconButt
 
 ### service-worker.js
 Precaches every screen HTML + JSX, the shared assets (incl. fonts and splash SVGs),
-manifest.json and the image-picker files. Cache name `photobox-v23`.
+manifest.json and the image-picker files. Cache name `photobox-v24`.
 
 **Strategy: network-first, cache fallback** — and same-origin requests are fetched
 with `cache: 'no-store'`. Both parts are deliberate:
@@ -1664,14 +1807,15 @@ onPointerLeave={e => e.currentTarget.style.transform = 'scale(1)'}
 
 ### Mock Data (`window.MOCK`)
 ```
-window.MOCK.user            → { name, email, avatar, memberSince }
+window.MOCK.user            → { name, firstName, email, avatar, memberSince }
 window.MOCK.categories      → [ { id, label, icon, from } ]
 window.MOCK.featuredProjects → [ { id, title, subtitle, thumb, type } ]
 window.MOCK.memories        → [ { id, title, thumb, count } ]
 window.MOCK.photobook       → { coverTypes, formats, pageOptions, paperOptions }
 window.MOCK.basket          → { items: [{ id, type, spec, thumb, qty, price }], subtotal, delivery, total }
 window.MOCK.order           → { number, estimatedDelivery, items, total }
-window.MOCK.account         → { orders: [{ id, title, date, status, thumb }] }
+window.MOCK.account         → { stats: [{ value, label, w }],
+                                orders: [{ id, title, date, status, thumb }] }
 ```
 
 ---
