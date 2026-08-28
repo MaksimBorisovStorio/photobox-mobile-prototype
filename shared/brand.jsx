@@ -157,4 +157,40 @@ function GlassIconButton({ children, size = 40, radius = 20, onClick, label,
   );
 }
 
-Object.assign(window, { PhotoboxLogo, GlassIconButton, PB_DISPLAY });
+
+// ─────────────────────────────────────────────────────────────
+// The lockup's star on its own, at any size
+// ─────────────────────────────────────────────────────────────
+// The Ask-AI card (Figma 509:20294) uses the splash sparkle at 52px rather than a new
+// asset, so the five SVG layers PhotoboxLogo composites are available standalone
+// here. Geometry is the splash's, expressed as ratios of the base glyph's 31.6722
+// width: each glow layer is `base + 2 × spread` wide and offset by `-spread`.
+function PhotoboxStar({ width = 31.6722, glow = false, assetBase = '../shared/assets' }) {
+  const s = width / 31.6722;
+  const layer = (file, spread, w, h, blend) => (
+    <img
+      key={file + spread}
+      src={`${assetBase}/${file}`}
+      alt=""
+      style={{
+        position: 'absolute',
+        left: -spread * s, top: -spread * s,
+        width: w * s, height: h * s, display: 'block',
+        ...(blend ? { mixBlendMode: 'plus-lighter' } : null),
+      }}
+    />
+  );
+  return (
+    <div style={{ position: 'relative', width: 31.6722 * s, height: 31.4948 * s }}>
+      {layer('splash-star-base.svg', 0, 31.6722, 31.4948, false)}
+      {glow && [
+        layer('splash-star-glow1.svg', 50, 131.672, 130.2325, false),
+        layer('splash-star-glow2.svg', 50, 131.672, 130.2325, true),
+        layer('splash-star-glow3.svg', 25, 81.6721, 80.2325, false),
+        layer('splash-star-glow4.svg', 15, 61.6721, 60.2325, true),
+      ]}
+    </div>
+  );
+}
+
+Object.assign(window, { PhotoboxLogo, PhotoboxStar, GlassIconButton, PB_DISPLAY });
