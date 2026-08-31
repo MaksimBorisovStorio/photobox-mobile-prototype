@@ -31,6 +31,7 @@ All 13 implementation tasks are done. Branch `feature/prototype-build` is demo-r
 | Editor | `screens/editor.html` + `editor.jsx` | ✅ Built — **Figma-verified** (node `451:15574`) |
 | Editor — page view | mode of `editor.jsx` | ✅ Built — **Figma-verified** (node `451:14499`) |
 | Editor — choose layout | mode of `editor.jsx` | ✅ Built — **Figma-verified** (node `451:14921`) |
+| Editor — photo selected | mode of `editor.jsx` | ✅ Built — **Figma-verified** (node `451:14611`) |
 | Photo sources | `screens/photo-sources.html` + `.jsx` | ✅ Built — node `451:14202`; 2 of 8 covers verifiable, see below |
 | Image Picker | `image-picker/index.html` (pre-built, frozen) | ✅ Wired in |
 | Basket | `screens/basket.html` + `basket.jsx` | ✅ Done |
@@ -43,7 +44,7 @@ All 13 implementation tasks are done. Branch `feature/prototype-build` is demo-r
 
 - **Figma fidelity pass** — query Figma node IDs (see table below) to tighten colors, spacing, typography to exact Figma spec. Screens built from verbal descriptions rather than direct Figma calls due to MCP availability.
 - **Transition polish** — add push/pop slide animations between screens (navigation.js stubs are in place; CSS transitions not yet wired to the iframe-swap mechanism).
-- **Editor tools** — Photos, Arrange, Themes, Style, AI help and Options are inert by request, as are page view's eight *except* **Layout**, which opens the choose-layout drawer (`451:14921`). The card's settings icon and the header's Continue arrow are inert for the same reason.
+- **Editor tools** — Photos, Arrange, Themes, Style, AI help and Options are inert by request, as are page view's eight *except* **Layout**, which opens the choose-layout drawer (`451:14921`). The selected-photo row (`451:14611`) is inert except **Back**, which deselects. The card's settings icon and the header's Continue arrow are inert for the same reason.
 - **My Photos tab** — superseded: the tab bar is now Home / Projects / Memories / Account
   (`509:19230`). The account screen's "My photos" row points at `photo-sources.html`. If a
   standalone grid distinct from the picker is needed, create `screens/my-photos.html`.
@@ -89,6 +90,7 @@ All 13 implementation tasks are done. Branch `feature/prototype-build` is demo-r
 | Editor | `451:15574` | ✅ Built — matches Figma (pixel-diffed; see below) |
 | Editor — page view | `451:14499` | ✅ Built — page, navigator and toolbar all land on the node's numbers |
 | Editor — choose layout drawer | `451:14921` | ✅ Built — drawer, chips and cards land on the node's numbers; only its "2 photos" tab is designed |
+| Editor — photo selected | `451:14611` | ✅ Built — ring and selection toolbar exact; its navigator omission not carried over |
 | Account / Profile | `451:14038` | ✅ Rebuilt — matches Figma; every band lands on the node's y exactly |
 | Photo sources (Album / My trips) | `451:14202` | ✅ Built — Albums grid exact; 6 of 8 covers unverifiable |
 | My Photos (image grid) | `451:14403` | ⬜ Not built (image-picker used instead) |
@@ -1571,6 +1573,101 @@ slots and 4 page slots starting with the page's own photo, and there is no page
 overflow on either axis, no broken local asset and no JS error at any width.
 `animation` and `transform` on `<body>` are both still `none`.
 
+#### Selected photo (Figma `451:14611`)
+
+Tapping a photo on a page in page view selects it: the photo takes a 1px ring and the
+toolbar swaps for the node's six selection tools. Like page view and the layout
+drawer, it is a state of `PageView` — `selected` is `{slot, i}`, naming the page in
+the strip and the slot of that page's layout, and it lives on `PageView` rather than
+in the leaf because the toolbar is a sibling that has to swap with it.
+
+⚠️ The node is a third WIP frame named "test", carrying the same off-canvas scratch
+`451:14499` and `451:14921` do — the 177px photo squares at x=432/610 and the
+`#272727` add-strip at x=379. None of it is built.
+
+#### ⚠️ The ring is an overlay, not an inset shadow — the opposite of the usual rule
+`451:14635` puts a 1px `#1500FF` stroke on the photo rect, whose box is exactly
+`PV_WELL`. Everywhere else in this project such a ring is an inset shadow (the status
+banners, the collection covers, the navigator thumb, the account cards), because a
+real border would resize the box. Here an inset shadow is **invisible**: it paints
+above the element's background but *below* its content, and the well's content is an
+`<img>` at `inset: 0` that covers it completely. So the ring is a separate
+`position: absolute; inset: 0` span with `pointerEvents: 'none'`, painted after the
+image. That keeps the slot's geometry untouched, which is what a Figma inside-stroke
+does anyway — measured, the ringed slot sits at 4.934% / 5.456% against the node's
+4.937% / 5.456%.
+
+`pointerEvents: 'none'` on the overlay is load-bearing: without it the ring swallows
+the tap on the very photo it marks, so a second tap could not reach the slot.
+
+#### Only a filled slot is selectable
+`LayoutWell` grew `onSelect` / `selected`. A slot with a photo renders as a
+`role="button"` wrapper around its `PhotoWell`; an empty well renders exactly as
+before, because there is nothing to select and the node only ever shows a filled
+photo ringed. That also means the layout work and this compose: a 4-photo page has
+four independently selectable slots, and `selected.i` is which one.
+
+`aria-hidden` on the `LayoutWell` root is now conditional — it is still hidden while
+the slots are decorative (the book view, the drawer cards), but a hidden subtree would
+take the real controls off assistive tech too.
+
+#### Selection toolbar — `451:14675`
+Six tools laid out **from x=0** with `gap: 4` (against page view's `gap: 8` and 16px
+gutters), so `Toolbar` now takes its `tools`, `gap` and `padX` from whether anything is
+selected. A `{ divider: true }` entry renders the node's `451:14679` — a 1px
+`rgba(217,217,217,0.1)` rule, `alignSelf: stretch`, between Back and Replace. It is
+very faint by design; measured 1×48 at the node's own colour.
+
+- **Two glyphs needed no new asset.** The node's `icon / Magic tool` and `icon /
+  Delete` exports are **byte-identical** to `pb-editor-tool-ai.svg` and
+  `pb-editor-tool-delete.svg` — checked with `cmp`, not by eye. Back, Replace, Edit
+  and Move are new (`pb-editor-sel-*.svg`); note the node's Back here is an **arrow**,
+  not the header's chevron, so `pb-src-back.svg` does not serve.
+- The row measures 433 and scrolls, as the node's own 557-wide container does. All six
+  hit-test with `elementFromPoint` across its scroll range.
+
+#### Only "Back" is live
+It deselects, which is what the node's leading position and back arrow mean. Replace,
+Edit, Move, Delete and Ask AI are inert, on the same footing as every other tool in
+this editor — **Delete deliberately so**: the undo pill is inert, so a working delete
+would drop a photo out of `pb_placed` with no way back. Wire it to a `setPlaced()`
+splice when that is wanted.
+
+⚠️ Because the selection row has no Layout tool (the node's doesn't either), **the
+layout drawer cannot be opened while a photo is selected** — you deselect first.
+`openDrawer` still clears the selection defensively, since changing a template can
+change how many slots a page has.
+
+#### Three ways out of the selection, and why
+- **"Back"** — the node's own control.
+- **A tap on the page anywhere but a photo.** The strip's click handler clears it;
+  slot taps `stopPropagation`, so they never reach it. The iOS-standard escape, and it
+  is the same reasoning as the upload sheet's scrim.
+- **Scrolling to another page.** A ring on a page that has scrolled out of view, with
+  the selection toolbar still up, reads as a bug, so the selection is cleared when
+  `active` moves off `selected.slot`.
+
+#### Deviations from the node
+- **The navigator stays.** `451:14611` drops the page navigator and lifts the book from
+  231 to 197.81 — but nothing covers that band (its toolbar is the same 139 tall as
+  page view's), the frame is scratch, and page navigation is orthogonal to whether a
+  photo is selected. Removing it would also slide the book 33px the moment you tap a
+  photo, which reads worse than either end state. The book therefore stays exactly
+  where it is and the navigator stays reachable.
+- **The header is page view's.** The node's is identical apart from the 36px back
+  button, which is already a documented deviation (kept at 40 so the control does not
+  resize between the modes of one screen).
+
+#### Verified
+Driven at 390×844, 430×932 and 320×568 with a filled book: tapping a photo rings it at
+`#1500FF` 1px on the node's own well box, the toolbar becomes exactly Back │ Replace /
+Edit / Move / Delete / Ask AI with `gap: 4`, `padding-left: 0`, the first tool flush at
+x=0 and one 1×48 `rgba(217,217,217,0.1)` divider; the ring paints over the photograph
+and does not block a tap on it; "Back", a tap on the page background and a scroll to
+another page each clear the selection and restore the eight-tool row; all six tools
+hit-test across the row's scroll range; and there is no page overflow on either axis,
+no failing request, and `animation`/`transform` on `<body>` are both still `none`.
+
 #### Header progressive blur — reused from the image picker
 `IOSProgressiveBlur` in `shared/ios-frame.jsx` is the image picker's header effect
 (`image-picker/image-picker.jsx` ~1850) extracted so the editor can share it rather
@@ -1925,6 +2022,7 @@ splash.html
                                                 │          └─(push)─> editor.html  ← Continue arrow inert
                                                 │                     └─ tap any page ─> page view mode (in-screen)
                                                 │                        └─ Layout tool ─> choose-layout drawer (in-screen)
+                                                │                        └─ tap a photo ─> selected state + selection toolbar (in-screen)
                                                 │                     └─ upload sheet "Select photos"
                                                 │                        └─(push)─> photo-sources.html
                                                 │                                   └─(push)─> ../image-picker/index.html

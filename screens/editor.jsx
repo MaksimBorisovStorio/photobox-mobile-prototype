@@ -290,20 +290,60 @@ function slotPhotos(photo, pool) {
 // A well subdivided by a layout. It positions itself absolutely inside its parent,
 // so the parent only has to be `position: relative` — which is what lets the same
 // component serve a leaf in the book view, a page in the strip and a drawer card.
-function LayoutWell({ layout, photos, iconSize = 24, style }) {
+function LayoutWell({ layout, photos, iconSize = 24, style, onSelect, selected }) {
   const slots = layout && layout.length ? layout : FULL_PAGE;
+  const pickable = !!onSelect;
   return (
-    <div aria-hidden style={Object.assign({ position: 'absolute', inset: 0 }, style)}>
-      {slots.map((s, i) => (
-        <PhotoWell key={i} photo={photos && photos[i]}
-          // Scale the empty-state glyph with the slot: 24px swamps a 22%-tall track,
-          // and PhotoWell's overflow:hidden would simply clip it.
-          iconSize={Math.max(10, Math.round(iconSize * Math.min(s.w, s.h) / 100))}
-          style={{
-            position: 'absolute', flex: 'none',
-            left: `${s.x}%`, top: `${s.y}%`, width: `${s.w}%`, height: `${s.h}%`,
-          }} />
-      ))}
+    // aria-hidden only while the slots are decorative; with onSelect they are real
+    // controls and hiding them would take them off assistive tech too.
+    <div aria-hidden={pickable ? undefined : true}
+         style={Object.assign({ position: 'absolute', inset: 0 }, style)}>
+      {slots.map((s, i) => {
+        const photo = photos && photos[i];
+        // Scale the empty-state glyph with the slot: 24px swamps a 22%-tall track,
+        // and PhotoWell's overflow:hidden would simply clip it.
+        const icon = Math.max(10, Math.round(iconSize * Math.min(s.w, s.h) / 100));
+        const box = {
+          position: 'absolute',
+          left: `${s.x}%`, top: `${s.y}%`, width: `${s.w}%`, height: `${s.h}%`,
+        };
+        // Only a slot with a photo in it can be selected — an empty well has nothing
+        // to select, and the node only ever shows a filled photo ringed.
+        if (!pickable || !photo) {
+          return <PhotoWell key={i} photo={photo} iconSize={icon}
+                            style={Object.assign({ flex: 'none' }, box)} />;
+        }
+        return (
+          <div key={i} role="button" tabIndex={0}
+               aria-label={`Select photo ${i + 1}`}
+               aria-pressed={selected === i}
+               // Stop the tap here: the strip's own click handler deselects, which is
+               // how a tap on the page around a photo clears the selection.
+               onClick={e => { e.stopPropagation(); onSelect(i); }}
+               onKeyDown={e => {
+                 if (e.key === 'Enter' || e.key === ' ') {
+                   e.preventDefault(); e.stopPropagation(); onSelect(i);
+                 }
+               }}
+               style={Object.assign({
+                 cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
+               }, box)}>
+            <PhotoWell photo={photo} iconSize={icon}
+                       style={{ position: 'absolute', inset: 0, flex: 'none' }} />
+            {selected === i && (
+              // node 451:14635 — a 1px #1500FF ring on the photo. It has to paint
+              // *over* the picture, so it is an overlay rather than an inset shadow
+              // on the slot itself: an inset shadow renders below the <img> that
+              // fills the well. Painting it inside the box also keeps the slot's
+              // geometry untouched, the way a real Figma inside-stroke does.
+              <span aria-hidden style={{
+                position: 'absolute', inset: 0, pointerEvents: 'none',
+                boxShadow: 'inset 0 0 0 1px #1500FF',
+              }} />
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -585,6 +625,29 @@ const PV_TOOLS = [
   { id: 'delete',   label: 'Delete page',  icon: 'pb-editor-tool-delete.svg' },
 ];
 
+// ── Selected-photo toolbar — node 451:14611, row 451:14675. Replaces the page
+// view's eight tools for as long as a photo is selected: six tools laid out from
+// x=0 with gap 4, and a 1px rule after "Back" (451:14679).
+//
+// Two of the node's glyphs needed no new asset — its "icon / Magic tool" and
+// "icon / Delete" exports are byte-identical to pb-editor-tool-ai.svg and
+// pb-editor-tool-delete.svg. Checked with cmp, not by eye.
+//
+// Only "Back" is live (it deselects, which is what the node's leading position and
+// back arrow mean). Replace, Edit, Move, Delete and Ask AI are inert, on the same
+// footing as every other tool in this editor — Delete deliberately so: the undo pill
+// is inert too, so a working delete would drop a photo out of pb_placed with no way
+// back. Wire it to a setPlaced() splice when that is wanted.
+const SELECTED_TOOLS = [
+  { id: 'back',    label: 'Back',    icon: 'pb-editor-sel-back.svg' },
+  { divider: true },
+  { id: 'replace', label: 'Replace', icon: 'pb-editor-sel-replace.svg' },
+  { id: 'edit',    label: 'Edit',    icon: 'pb-editor-sel-edit.svg' },
+  { id: 'move',    label: 'Move',    icon: 'pb-editor-sel-move.svg' },
+  { id: 'delete',  label: 'Delete',  icon: 'pb-editor-tool-delete.svg' },
+  { id: 'askai',   label: 'Ask AI',  icon: 'pb-editor-tool-ai.svg' },
+];
+
 function PhotosStackIcon({ photos, count }) {
   return (
     // 26×24 per the node. The badge deliberately breaks out of it — 13px to the right
@@ -690,12 +753,20 @@ function Toolbar({ photos, tools = TOOLS, gap = 10, padX = 8, onTool }) {
         scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch',
         pointerEvents: 'auto',
       }}>
-        {tools.map(t => (
-          <Tool key={t.id} {...t} onClick={onTool && (() => onTool(t.id))}>
-            {t.id === 'photos' && photos.length
-              ? <PhotosStackIcon photos={photos} count={photos.length} />
-              : null}
-          </Tool>
+        {tools.map((t, i) => (
+          // node 451:14679 — a 1px rule spanning the row, between Back and Replace.
+          t.divider ? (
+            <span key={`divider-${i}`} aria-hidden style={{
+              flex: '0 0 auto', alignSelf: 'stretch', width: 1,
+              background: 'rgba(217,217,217,0.1)',
+            }} />
+          ) : (
+            <Tool key={t.id} {...t} onClick={onTool && (() => onTool(t.id))}>
+              {t.id === 'photos' && photos.length
+                ? <PhotosStackIcon photos={photos} count={photos.length} />
+                : null}
+            </Tool>
+          )
         ))}
       </div>
     </div>
@@ -983,7 +1054,7 @@ function BigLeaf({ side, slotRef, children }) {
 // The well, positioned on the node's own insets. `iconSize` scales the empty-state
 // glyph with the page: 24px is right on a 164px leaf in the book view and lost on a
 // 310px one here.
-function BigWell({ photo, pool, layout, pageW }) {
+function BigWell({ photo, pool, layout, pageW, onSelect, selected }) {
   return (
     <div style={{
       position: 'absolute',
@@ -991,7 +1062,8 @@ function BigWell({ photo, pool, layout, pageW }) {
       top: PV_WELL.top, bottom: PV_WELL.bottom,
     }}>
       <LayoutWell layout={layout} photos={slotPhotos(photo, pool)}
-                  iconSize={Math.round(pageW * 0.13)} />
+                  iconSize={Math.round(pageW * 0.13)}
+                  onSelect={onSelect} selected={selected} />
     </div>
   );
 }
@@ -1392,6 +1464,11 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
   const navRefs = useRef([]);
   const raf = useRef(0);
 
+  // ── Selected photo — node 451:14611. `{slot, i}`: which page in the strip, and
+  // which slot of that page's layout. It lives here rather than in the leaf because
+  // the toolbar is a sibling and has to swap with it.
+  const [selected, setSelected] = useState(null);
+
   // ── The layout drawer. 'open' → 'closing' → null, matching the action sheets.
   // The draft is previewed live on the page the drawer was opened over, and only
   // written back to the book on confirm; the close button puts the stored layout
@@ -1402,6 +1479,10 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
   const [draft, setDraft] = useState(null);
 
   const openDrawer = () => {
+    // The drawer covers the toolbar the selection would be driven from, and changing
+    // the template can change how many slots a page has — so a selection cannot
+    // survive it.
+    setSelected(null);
     const cur = layouts[active] || null;
     // The node opens on the "2 photos" tab with its first card selected.
     const c = cur ? Number(String(cur).split('-')[0]) : 2;
@@ -1490,6 +1571,12 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
   };
   useEffect(() => () => { if (raf.current) cancelAnimationFrame(raf.current); }, []);
 
+  // A ring on a page that has scrolled out of view, with the selection toolbar still
+  // up, reads as a bug. Scrolling to another page clears it.
+  useEffect(() => {
+    if (selected && selected.slot !== active) setSelected(null);
+  }, [active]);
+
   // Keep the active thumbnail reachable — `inline: 'nearest'`, deliberately not
   // 'center'. Centring re-scrolls the navigator on every change of `active`, which
   // means it slides under your finger the whole time you drag the strip, and a tap
@@ -1509,6 +1596,10 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
   // Slot indices are 0 for the cover then two per spread, so a spread's leaves are
   // 1 + 2i and 2 + 2i. Added spreads are appended, so existing indices never move.
   const leafRef = i => el => { leafRefs.current[i] = el; };
+  // Tapping a photo selects it; the strip is only pickable while the drawer is down.
+  const pick = slot => (drawer ? null : (i => setSelected({ slot, i })));
+  const selectedIn = slot =>
+    (selected && selected.slot === slot ? selected.i : null);
 
   return (
     <div style={{
@@ -1518,6 +1609,9 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
       <div
         ref={scroller}
         onScroll={onScroll}
+        // The iOS-standard escape: a tap on the page anywhere but a photo clears the
+        // selection. Slot taps stopPropagation, so they never reach this.
+        onClick={() => { if (selected) setSelected(null); }}
         style={{
           position: 'absolute', left: 0, right: 0,
           // With the drawer up the node keeps only its 93-tall blur band at the top
@@ -1547,11 +1641,13 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
               <BookUnit key={i} w={bookW} h={bookH}>
                 <BigLeaf side="left" slotRef={leafRef(1 + 2 * i)}>
                   <BigWell photo={l ? placed[l - 1] : null} pool={uploaded}
-                           layout={layoutFor(1 + 2 * i)} pageW={pageW} />
+                           layout={layoutFor(1 + 2 * i)} pageW={pageW}
+                           onSelect={pick(1 + 2 * i)} selected={selectedIn(1 + 2 * i)} />
                 </BigLeaf>
                 <BigLeaf side="right" slotRef={leafRef(2 + 2 * i)}>
                   <BigWell photo={r ? placed[r - 1] : null} pool={uploaded}
-                           layout={layoutFor(2 + 2 * i)} pageW={pageW} />
+                           layout={layoutFor(2 + 2 * i)} pageW={pageW}
+                           onSelect={pick(2 + 2 * i)} selected={selectedIn(2 + 2 * i)} />
                 </BigLeaf>
               </BookUnit>
             ))}
@@ -1580,10 +1676,17 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
                         ? 'calc(env(safe-area-inset-top, 44px) + 49px)'
                         : 'calc(env(safe-area-inset-top, 44px) + 103px)'} />
 
-      {/* Layout is the one live tool; the other seven are inert, as in the book view. */}
+      {/* With a photo selected the row becomes the node's six selection tools, laid
+          out from x=0 with gap 4 (451:14675); otherwise it is the page view's eight,
+          of which Layout is the one live tool. */}
       {!drawer && (
-        <Toolbar photos={uploaded} tools={PV_TOOLS} gap={8} padX={16}
-                 onTool={id => { if (id === 'layout') openDrawer(); }} />
+        <Toolbar photos={uploaded}
+                 tools={selected ? SELECTED_TOOLS : PV_TOOLS}
+                 gap={selected ? 4 : 8} padX={selected ? 0 : 16}
+                 onTool={id => {
+                   if (selected) { if (id === 'back') setSelected(null); return; }
+                   if (id === 'layout') openDrawer();
+                 }} />
       )}
 
       {drawer && (
