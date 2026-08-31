@@ -1,10 +1,35 @@
-// Photo data — uses picsum.photos (reliable, always works).
+// Photo data — self-hosted mock photographs.
 // Generated programmatically so we have a wide date range to test the
-// super-scroll scrubber against. ~370+ photos across ~40 dates from
+// super-scroll scrubber against. ~480 photos across ~50 dates from
 // late October 2024 through early July 2025.
+//
+// ⚠️ These used to be picsum.photos URLs. picsum went down and took every photo in
+// the prototype with it — which also meant the "offline-capable PWA" was never true
+// for photos. The set is now local, so it cannot break again and works offline.
+//
+// The pool is the design's own photographs, pulled from the Figma file's image fills
+// (mock-01..25, in shared/assets/photos/) plus six of the collection-cover photos the
+// repo already carries. Paths are relative and resolve identically from /image-picker/
+// and from /screens/ — which matters, because the picker hands these strings to the
+// editor through sessionStorage.pb_photos.
+const MOCK_PHOTOS = [];
+for (let i = 1; i <= 25; i++) {
+  MOCK_PHOTOS.push(`../shared/assets/photos/mock-${String(i).padStart(2, '0')}.webp`);
+}
+[
+  'pb-src-canada.jpg', 'pb-src-cappadocia.jpg', 'pb-src-etna.jpg',
+  'pb-src-guadalupe.jpg', 'pb-src-italy.jpg', 'ob-album-photo.jpg',
+].forEach(f => MOCK_PHOTOS.push(`../shared/assets/${f}`));
 
-function p(seed, w, h) { return `https://picsum.photos/seed/${seed}/${w}/${h}`; }
+// Walk the pool by a stride coprime to its length: every photo is used once before
+// any repeats, and consecutive slots are far apart in the list, so a screenful of the
+// grid never shows the same picture twice.
+const PHOTO_STRIDE = 7;
+function photoFor(n) { return MOCK_PHOTOS[(n * PHOTO_STRIDE) % MOCK_PHOTOS.length]; }
 
+// ⚠️ Only the third element (the aspect) is still read: it used to size the picsum
+// request as well. The picker's tiles are always 1:1 and its aspect toggle switches
+// between cover and contain, so `ar` is metadata only — nothing lays out from it.
 const ASPECTS = [
   [ 600,  800, 3/4],  // portrait
   [ 800,  800, 1],    // square
@@ -60,7 +85,7 @@ DATE_PLAN.forEach(([y, m, d, count]) => {
     const k = KINDS[Math.floor(r() * KINDS.length)];
     PHOTOS.push({
       id: `p${counter}`,
-      src: p(`bcn-${y}-${m}-${d}-${i}`, a[0], a[1]),
+      src: photoFor(counter),
       ar: a[2],
       date: dateStr,
       kind: k,

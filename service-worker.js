@@ -1,5 +1,5 @@
 // service-worker.js
-const CACHE = 'photobox-v28';  // bump to evict a stale cache
+const CACHE = 'photobox-v29';  // bump to evict a stale cache
 // Paths are relative to this file's URL, not root-absolute: GitHub Pages serves a
 // project site from /<repo>/, where a leading slash would resolve above the app and
 // 404 every entry. c.add() and the fetch handler both work off the request URL, so
@@ -76,6 +76,31 @@ const PRECACHE = [
   'shared/assets/pb-icon-pages.svg',
   'shared/assets/pb-icon-delivery.svg',
   'shared/assets/pb-icon-arrow.svg',
+  'shared/assets/photos/mock-01.webp',
+  'shared/assets/photos/mock-02.webp',
+  'shared/assets/photos/mock-03.webp',
+  'shared/assets/photos/mock-04.webp',
+  'shared/assets/photos/mock-05.webp',
+  'shared/assets/photos/mock-06.webp',
+  'shared/assets/photos/mock-07.webp',
+  'shared/assets/photos/mock-08.webp',
+  'shared/assets/photos/mock-09.webp',
+  'shared/assets/photos/mock-10.webp',
+  'shared/assets/photos/mock-11.webp',
+  'shared/assets/photos/mock-12.webp',
+  'shared/assets/photos/mock-13.webp',
+  'shared/assets/photos/mock-14.webp',
+  'shared/assets/photos/mock-15.webp',
+  'shared/assets/photos/mock-16.webp',
+  'shared/assets/photos/mock-17.webp',
+  'shared/assets/photos/mock-18.webp',
+  'shared/assets/photos/mock-19.webp',
+  'shared/assets/photos/mock-20.webp',
+  'shared/assets/photos/mock-21.webp',
+  'shared/assets/photos/mock-22.webp',
+  'shared/assets/photos/mock-23.webp',
+  'shared/assets/photos/mock-24.webp',
+  'shared/assets/photos/mock-25.webp',
   'shared/assets/pb-editor-check.svg',
   'shared/assets/pb-editor-sel-back.svg',
   'shared/assets/pb-editor-sel-edit.svg',

@@ -1,6 +1,31 @@
 // shared/mock-data.js
 (function () {
-  const p = (seed, w, h) => `https://picsum.photos/seed/${seed}/${w}/${h}`;
+  // Self-hosted mock photographs. These were picsum.photos URLs until picsum went
+  // down and took every photo in the prototype with it; the set is local now, so it
+  // cannot break again and works offline. Paths are relative to a screen in /screens/.
+  //
+  // Seeds are mapped onto the pool by a small deterministic hash, so a given seed
+  // always resolves to the same picture — except the handful the repo already has the
+  // right photograph for, which are named outright.
+  const PHOTO_DIR = '../shared/assets/photos';
+  const POOL = [];
+  for (let i = 1; i <= 25; i++) POOL.push(`${PHOTO_DIR}/mock-${String(i).padStart(2, '0')}.webp`);
+  const NAMED = {
+    canada1: '../shared/assets/pb-src-canada.jpg',
+    canada2: '../shared/assets/pb-src-canada.jpg',
+    italy2:  '../shared/assets/pb-src-italy.jpg',
+    italy3:  '../shared/assets/pb-src-italy.jpg',
+    snow1:   '../shared/assets/pb-src-cappadocia.jpg',
+    london1: '../shared/assets/ob-album-photo.jpg',
+  };
+  // `w`/`h` are ignored — kept in the signature so every call site below reads as it
+  // did, and so the intended thumbnail size stays documented at each one.
+  const p = (seed, w, h) => {
+    if (NAMED[seed]) return NAMED[seed];
+    let x = 0;
+    for (let i = 0; i < seed.length; i++) x = (x * 31 + seed.charCodeAt(i)) % 100003;
+    return POOL[x % POOL.length];
+  };
 
   window.MOCK = {
     // Name and email are the Figma account node's own copy (451:14042/14044).

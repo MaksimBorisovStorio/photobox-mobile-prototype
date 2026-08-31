@@ -194,6 +194,9 @@ MEGAPROTOTYPE/
 > 2. The **Back** button is now the shared glass control and navigates up to
 >    `../screens/photo-sources.html`. `index.html` loads `../shared/brand.jsx` for it,
 >    and the `?v=` query on its scripts was bumped to 17.
+> 3. `photos.js` no longer points at `picsum.photos`, which went down and blanked every
+>    photo in the prototype. The pool is self-hosted now — see **Mock photos are
+>    self-hosted** below. `image-picker.jsx` itself is untouched.
 
 ---
 
@@ -2064,6 +2067,85 @@ content, and `animation`/`transform` on `<body>` are both `none`. Home still ren
 after the extraction: 44/44 images, no JS errors, its own tab bar unchanged at
 340×50/r25 with Home selected.
 
+### ⚠️ Mock photos are self-hosted — picsum.photos took the whole prototype down
+
+Every mock photograph in the app used to be a `picsum.photos` URL: 483 in
+`image-picker/photos.js` and 20 in `shared/mock-data.js`. On 2026-08-31 picsum's CDN
+started returning 503 and **every photo in the prototype went blank at once** — the
+picker grid, the editor's placed pages, the basket thumbnail. Nothing in this repo had
+changed.
+
+Two lessons, both now fixed:
+
+- **A third-party image host is a single point of failure for a demo.** There is no
+  fallback that helps: if the host is down, it is down.
+- **The "offline-capable PWA" claim was never true for photos.** `service-worker.js`
+  precached every screen, script and local asset — but the photos were cross-origin
+  URLs that the worker fetched with normal caching and could not serve offline. The
+  prototype only ever looked offline-capable because a warm HTTP cache was doing the
+  work.
+
+#### The pool is the design's own photographs
+31 distinct images, all local:
+
+| where | what | count |
+|---|---|---|
+| `shared/assets/photos/mock-01..25.webp` | pulled from the Figma file's own image fills — the designer's Barcelona trip set: Arc de Triomf, the rooftop crowd, city streets, the plane window over the coast, Montserrat, the beach aerial, Moraine Lake, hikers, snow | 25 |
+| `shared/assets/pb-src-{canada,cappadocia,etna,guadalupe,italy}.jpg`, `ob-album-photo.jpg` | collection-cover photos the repo already carried, referenced by path | 6 |
+
+Total added: **1.09 MB** for 25 WebP files, 1200px longest edge, averaging 45KB.
+
+⚠️ **Several of the Figma fills are small** (the smallest is 322×242) because that is
+what the designer placed. They are fine as grid thumbnails but soft in the picker's
+pinch-zoom fullscreen preview. Replacing the set is a drop-in: overwrite
+`shared/assets/photos/mock-NN.webp`, keeping the names, and nothing else needs to
+change.
+
+#### How the sourcing went, so it is not repeated
+Three routes were tried before the Figma fills:
+
+| route | outcome |
+|---|---|
+| `loremflickr.com` | works and is deterministic per `lock`, but 6 of 60 came back with its **red letterbox matte** and the subjects were random Flickr — a politician at a podium, a noise pattern, animal close-ups. Not a camera roll. |
+| Wikimedia Commons "Quality images" | open API, but **rate-limits hard** (429 after a handful of calls, both on `api.php` and `upload.wikimedia.org`), and its photography is documentary — bullfighting, chewing gum, church interiors. |
+| Unsplash | `api.unsplash.com` and the internal `napi` both return **401** without a key. `source.unsplash.com` is retired (503). |
+| **Figma image fills** | ✅ `download_assets` returns `rawImages` for a node's subtree, **unclipped** (unlike node exports, which Figma clips to the containing frame). `451:14403` and `451:14202` between them yielded 40 fills, 25 distinct photographs after dropping cut-outs, UI screenshots, maps and near-duplicates. |
+
+Cut-outs on transparency, the UI screenshot and the map were dropped by eye from a
+contact sheet; near-duplicates by an 8×8 average hash with a Hamming threshold of 6,
+which caught seven (the Arc de Triomf appears three times at different sizes).
+
+⚠️ **`sips` can read WebP but cannot write it**, and this machine has no `cwebp` or
+ImageMagick. The encode therefore runs through **headless Chrome** — draw to a canvas
+at the target size, `toDataURL('image/webp', 0.74)` — which is also how to redo it.
+
+#### How a photo is chosen
+- **The picker** walks the pool by a **stride of 7**, which is coprime to 31: every
+  photo is used once before any repeats and consecutive slots are far apart in the
+  list, so a screenful never shows the same picture twice. Verified: 483 photos, 31
+  distinct sources, **0 adjacent duplicates**.
+- **`mock-data.js`** hashes each seed onto the pool, so a seed always resolves to the
+  same picture — except the six the repo already has the right photograph for
+  (`canada1`/`canada2` → the Canada cover, `italy2`/`italy3` → Italy, `snow1` →
+  Cappadocia, `london1` → the album photo), which are named outright.
+
+⚠️ **Paths are relative and one level deep** (`../shared/assets/...`), which resolves
+identically from `/image-picker/` and from `/screens/`. That matters: the picker hands
+these strings to the editor through `sessionStorage.pb_photos`, so the same string has
+to work on both screens.
+
+⚠️ `ASPECTS` in `photos.js` still carries `w`/`h`, but **only the aspect is read now** —
+the width and height used to size the picsum request. The picker's tiles are always
+1:1 and its aspect toggle switches between `cover` and `contain`, so `ar` is metadata
+that nothing lays out from. `mock-data.js`'s `p(seed, w, h)` likewise ignores `w`/`h`;
+they are kept in the signature so each call site still documents its intended size.
+
+#### Verified
+483 picker photos and the basket thumbnail all load, **0 broken images**, **0
+cross-origin image requests**, and no failing request or JS error on either screen. The
+25 new files are in the service-worker precache (`photobox-v29`), so the photos are now
+genuinely available offline.
+
 ### Testing a mobile layout in headless Chrome
 `--window-size=375,1366` does **not** give a 375px layout: headless Chrome clamps the
 viewport to a 500px minimum, so the page lays out at 500 and the screenshot merely
@@ -2276,7 +2358,7 @@ sparkle on its own at any width, with the splash glow layers) and `GlassIconButt
 
 ### service-worker.js
 Precaches every screen HTML + JSX, the shared assets (incl. fonts and splash SVGs),
-manifest.json and the image-picker files. Cache name `photobox-v24`.
+manifest.json, the 25 mock photos and the image-picker files. Cache name `photobox-v29`.
 
 **Strategy: network-first, cache fallback** — and same-origin requests are fetched
 with `cache: 'no-store'`. Both parts are deliberate:
@@ -2385,6 +2467,7 @@ onPointerLeave={e => e.currentTarget.style.transform = 'scale(1)'}
 ### Mock Data (`window.MOCK`)
 ```
 window.MOCK.user            → { name, firstName, email, avatar, memberSince }
+(all thumbs/avatars are local paths — see "Mock photos are self-hosted")
 window.MOCK.categories      → [ { id, label, icon, from } ]
 window.MOCK.featuredProjects → [ { id, title, subtitle, thumb, type } ]
 window.MOCK.memories        → [ { id, title, thumb, count } ]
