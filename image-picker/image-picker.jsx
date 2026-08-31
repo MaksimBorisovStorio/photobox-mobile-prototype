@@ -1769,11 +1769,17 @@ function ImagePickerScreen() {
   // chronological order regardless of the order they were tapped in — which is what
   // the editor's auto-fill prompt promises. navigation.js is not loaded here, so the
   // transition flag is set by hand; 'pop' because this returns to the editor.
+  //
+  // ⚠️ `location.replace`, not `location.href`. The editor has to load *fresh* — it
+  // reads pb_photos on mount to raise the auto-fill prompt, which a bfcache restore
+  // would skip — but assigning href would leave the picker sitting in the history in
+  // front of it, so closing the editor landed back in the picker. Replacing swaps the
+  // picker's own entry for the editor instead.
   const handoffToEditor = () => {
     const chosen = sourcePhotos.filter(p => selected.has(p.id)).map(p => p.src);
     sessionStorage.setItem('pb_photos', JSON.stringify(chosen));
     sessionStorage.setItem('pb_nav', 'pop');
-    window.location.href = '../screens/editor.html';
+    window.location.replace('../screens/editor.html');
   };
 
   // Most-recent-first selected photos for the pill stack
@@ -1899,13 +1905,20 @@ function ImagePickerScreen() {
         }}>
           {/* Back — same liquid glass as the editor header (shared/brand.jsx), at 36
               to keep this header's tighter metrics. navigation.js is not loaded in
-              this directory, so the transition flag is set by hand, exactly as
-              onContinue below does it. */}
+              this directory, so the transition flag is set by hand.
+
+              ⚠️ This MUST be history.back(), not `location.href = photo-sources`.
+              Assigning href is a *forward* navigation: it pushed a fourth entry on
+              top of [editor, photo-sources, picker], so photo-sources' own back
+              arrow — which is history.back() like every other back in the app —
+              walked straight back into the picker. Tapping the two alternated
+              forever and the editor was unreachable. Measured: history.length went
+              3 → 4 → 5 and then stuck at 5, ping-ponging between the two screens. */}
           <GlassIconButton
             size={36} radius={18} gloss tint="rgba(0,0,0,0.25)" label="Back"
             onClick={() => {
               sessionStorage.setItem('pb_nav', 'pop');
-              window.location.href = '../screens/photo-sources.html';
+              window.history.back();
             }}
           >
             <IconBack size={26} color="#fff" />

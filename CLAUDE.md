@@ -197,6 +197,10 @@ MEGAPROTOTYPE/
 > 3. `photos.js` no longer points at `picsum.photos`, which went down and blanked every
 >    photo in the prototype. The pool is self-hosted now — see **Mock photos are
 >    self-hosted** below. `image-picker.jsx` itself is untouched.
+> 4. Back is `history.back()` and Continue is `location.replace()`, not `location.href`
+>    — assigning href made Back a *forward* navigation and left an unbreakable loop
+>    between the picker and photo-sources. See **A "back" that assigns location.href**
+>    below. The `?v=` query on its scripts is now 18.
 
 ---
 
@@ -249,6 +253,59 @@ page itself is scrollable by the 59px difference (`scroll: yes` in the measureme
 The picker has always been in that state without trouble — every screen's wrapper is
 `overflow: hidden` and touches land on inner scrollers — but if a page-level drag ever
 shows up on a screen with no inner scroller, that is where it comes from.
+
+### ⚠️ A "back" that assigns location.href is a forward navigation — it made a loop
+
+`navigation.pop()` is `history.back()`, and every back control in the app goes through
+it. The image picker does not load `navigation.js`, so its Back button set the
+transition flag by hand and then did `window.location.href =
+'../screens/photo-sources.html'`. **Assigning href pushes a new history entry**, so
+Back was walking *forward*:
+
+| step | lands on | `history.length` |
+|---|---|---|
+| editor → "Select photos" | photo-sources | 3 |
+| tap an album | picker | 4 |
+| **picker Back** (`location.href`) | photo-sources | **5** ← a new entry |
+| photo-sources back arrow (`history.back()`) | **picker** | 5 |
+| back arrow again | photo-sources | 5 |
+
+The two screens ping-ponged forever and **the editor was unreachable**. The picker's
+Back is now `window.history.back()` with the flag still set by hand. Verified:
+`history.length` holds at 4 and the arrow reaches the editor in two taps.
+
+`onContinue` had the same defect with a different symptom: `location.href` left the
+picker sitting in the history *in front of* the editor, so closing the editor landed
+back in the picker. It is now **`location.replace`**, which swaps the picker's own
+entry for the editor. `replace` rather than `history.go(-2)` because the editor has to
+load **fresh** — it reads `pb_photos` on mount to raise the auto-fill prompt, and a
+bfcache restore would skip that. Verified end to end: Continue still lands on
+"You uploaded 10 photos…", `pb_photos` is consumed, and "Yes, auto-fill" places all 10.
+
+⚠️ Remaining imperfection, deliberately not chased: closing the editor after a
+Continue lands on **photo-sources** rather than the product page, because
+photo-sources is still legitimately in the stack behind it. That is one screen out of
+place, not a loop. Fixing it properly means the picker returning with `history.go(-2)`
+and the editor re-reading `pb_photos` on `pageshow` — worth doing only if the extra
+screen actually bothers anyone.
+
+#### ⚠️ A bfcache restore does not re-run navigation.js — the flag was left stale
+Going back to a page usually restores it from the back/forward cache, which does
+**not** re-execute its scripts. So `navigation.js`'s IIFE never ran on the way back:
+the restored page kept the `data-nav` it was first loaded with (measured: returning to
+the editor left it on `'push'`, so the enter animation was wrong) and the `'pop'` the
+`pop()` call had written **stayed in sessionStorage**, waiting to misdirect whatever
+navigated next.
+
+`navigation.js` now also listens for `pageshow` and, when `event.persisted` is set,
+consumes the flag and applies the direction. `pageshow` with `persisted` is the only
+signal for that restore — `DOMContentLoaded` and `load` do not fire. Verified across
+every back path: `pb_nav` reads `null` after each navigation and `data-nav` is `'pop'`
+on each restored page.
+
+A useful side effect: because photo-sources' arrow is a plain `history.back()`, it
+returns to **wherever you actually came from** — home → Memories → back lands on home,
+editor → Select photos → back lands on the editor. Verified both.
 
 ### ⚠️ Never animate `<body>` — the nav transitions run on `#root > *`
 Separate from the gap above, and still a real hazard.
@@ -2358,7 +2415,7 @@ sparkle on its own at any width, with the splash glow layers) and `GlassIconButt
 
 ### service-worker.js
 Precaches every screen HTML + JSX, the shared assets (incl. fonts and splash SVGs),
-manifest.json, the 25 mock photos and the image-picker files. Cache name `photobox-v29`.
+manifest.json, the 25 mock photos and the image-picker files. Cache name `photobox-v30`.
 
 **Strategy: network-first, cache fallback** — and same-origin requests are fetched
 with `cache: 'no-store'`. Both parts are deliberate:

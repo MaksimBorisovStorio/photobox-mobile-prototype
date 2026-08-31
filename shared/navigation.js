@@ -7,6 +7,18 @@
 
   function setDir(d) { sessionStorage.setItem('pb_nav', d); }
 
+  /* ⚠️ A page restored from the back/forward cache does not re-run this script, so
+     without this the flag set by pop() is never consumed: the restored page keeps the
+     `data-nav` it was first loaded with (measured: going back to the editor left it on
+     'push') and a stale 'pop' sits in sessionStorage waiting to misdirect whatever
+     navigates next. `pageshow` with `persisted` is the only signal for that restore. */
+  window.addEventListener('pageshow', function (e) {
+    if (!e.persisted) return;
+    var d = sessionStorage.getItem('pb_nav') || 'pop';
+    sessionStorage.removeItem('pb_nav');
+    document.documentElement.setAttribute('data-nav', d);
+  });
+
   /* The exit animations run on the screen wrapper, never on <body> — same reason
      as the enter animations in styles.css: a transform on <body> makes it the
      containing block for the wrapper's `position:fixed; inset:0`, and in the iOS
