@@ -30,6 +30,7 @@ All 13 implementation tasks are done. Branch `feature/prototype-build` is demo-r
 | Product — Photo Book | `screens/product-photobook.html` + `.jsx` | ✅ Rebuilt — **Figma-verified** (node `406:7183`) |
 | Editor | `screens/editor.html` + `editor.jsx` | ✅ Built — **Figma-verified** (node `451:15574`) |
 | Editor — page view | mode of `editor.jsx` | ✅ Built — **Figma-verified** (node `451:14499`) |
+| Editor — choose layout | mode of `editor.jsx` | ✅ Built — **Figma-verified** (node `451:14921`) |
 | Photo sources | `screens/photo-sources.html` + `.jsx` | ✅ Built — node `451:14202`; 2 of 8 covers verifiable, see below |
 | Image Picker | `image-picker/index.html` (pre-built, frozen) | ✅ Wired in |
 | Basket | `screens/basket.html` + `basket.jsx` | ✅ Done |
@@ -42,7 +43,7 @@ All 13 implementation tasks are done. Branch `feature/prototype-build` is demo-r
 
 - **Figma fidelity pass** — query Figma node IDs (see table below) to tighten colors, spacing, typography to exact Figma spec. Screens built from verbal descriptions rather than direct Figma calls due to MCP availability.
 - **Transition polish** — add push/pop slide animations between screens (navigation.js stubs are in place; CSS transitions not yet wired to the iframe-swap mechanism).
-- **Editor tools** — Photos, Arrange, Themes, Style, AI help and Options are inert by request, as are page view's eight. The card's settings icon and the header's Continue arrow are inert for the same reason.
+- **Editor tools** — Photos, Arrange, Themes, Style, AI help and Options are inert by request, as are page view's eight *except* **Layout**, which opens the choose-layout drawer (`451:14921`). The card's settings icon and the header's Continue arrow are inert for the same reason.
 - **My Photos tab** — superseded: the tab bar is now Home / Projects / Memories / Account
   (`509:19230`). The account screen's "My photos" row points at `photo-sources.html`. If a
   standalone grid distinct from the picker is needed, create `screens/my-photos.html`.
@@ -87,6 +88,7 @@ All 13 implementation tasks are done. Branch `feature/prototype-build` is demo-r
 | Photo book — CTA screen | `451:13721` | ✅ Built (Figma not queried) |
 | Editor | `451:15574` | ✅ Built — matches Figma (pixel-diffed; see below) |
 | Editor — page view | `451:14499` | ✅ Built — page, navigator and toolbar all land on the node's numbers |
+| Editor — choose layout drawer | `451:14921` | ✅ Built — drawer, chips and cards land on the node's numbers; only its "2 photos" tab is designed |
 | Account / Profile | `451:14038` | ✅ Rebuilt — matches Figma; every band lands on the node's y exactly |
 | Photo sources (Album / My trips) | `451:14202` | ✅ Built — Albums grid exact; 6 of 8 covers unverifiable |
 | My Photos (image grid) | `451:14403` | ⬜ Not built (image-picker used instead) |
@@ -1435,6 +1437,140 @@ the navigator 3 → 4, tapping "Cover" centres slot 0, a navigator `+` grows the
 (539 / 561), a tap on the page hits the page and not the paper layers above it, and
 there is no page overflow on either axis and no broken image at any width.
 
+#### "Choose layout" drawer (Figma `451:14921`)
+
+Tapping **Layout** in the page view's toolbar opens a drawer over the bottom half of
+the screen: the page preview stays live above it, the chip row picks how many photos
+a page holds, and the card row offers templates for that count. It is a state of
+`PageView`, not a screen — `drawer` is `null` / `'open'` / `'closing'`, matching the
+action sheets.
+
+⚠️ The node is another WIP frame named "test" and carries the **same off-canvas
+scratch `451:14499` does** — a second pair of 177px photo squares at x=432/610 and a
+`#272727` add-strip at x=379, all past the frame edge. None of it is visible in the
+design and none of it is built.
+
+#### A layout is fractions of the *well*, so one definition serves every scale
+`LAYOUTS[count][option]` is a list of `{x, y, w, h}` in percentages of the printable
+box `PV_WELL` describes — not of the page, and not in px. That is what lets a single
+template render identically on a 114px drawer card and a 310px page in the strip,
+and it makes a template independent of the book format chosen on the product page.
+
+`LayoutWell` is the shared renderer: it positions itself `absolute; inset: 0` inside
+whatever relative box it is given, so it serves a leaf in the **book view**, a page
+in the **strip**, the **cover's** front well and a **drawer card** unchanged. With no
+layout set it falls back to `FULL_PAGE`, which is the single well the node draws — so
+every screen that predates this renders exactly as it did.
+
+- **Only the "2 photos" tab exists in the design**, and only three of its cards:
+  `451:14976` (a centred pair), `451:14978` (halves), `451:14979` (two stacked on the
+  right two-fifths — deliberately off-centre; the node leaves the left 30% empty).
+  Those are `LAYOUTS[2][0..2]`. The 1 / 3 / 4 / 5+ chips ship with **no cards behind
+  them**, so those templates are additions, built on the same 3% gutter the node's
+  own halves leave (`451:14978` measures 46.8% + 49.7% on a 102.6-wide well) — which
+  is where 48.5 / 31.333 / 22.75 come from.
+- **The empty-state glyph scales with the slot.** 24px swamps a 22%-tall track, and
+  `PhotoWell`'s `overflow: hidden` would simply clip it, so `LayoutWell` scales the
+  icon by the slot's smaller dimension with a 10px floor.
+- **Slot 0 holds the photo auto-fill placed on that page; the rest come from the
+  upload pool** (`slotPhotos`), so a multi-photo template previews with real pictures
+  instead of empty wells. Nothing is written back to `pb_placed` — a layout is a page
+  template, and one photo per page is still the placement. A page with nothing placed
+  stays empty in every slot rather than borrowing from the pool.
+
+#### The draft is previewed on the real page, and only committed on confirm
+`draft` previews live on the slot the drawer was opened over (`target`), so tapping a
+card re-lays the actual page behind the drawer. The **check** button writes it through
+`onSetLayout`; the **close** button puts the stored layout back *before* starting the
+slide-out, so the revert is visible rather than snapping after the animation.
+
+`pb_layouts` is a fourth storage key alongside `pb_photos` / `pb_uploaded` /
+`pb_placed`: an object keyed by **slot index** (0 is the cover, then two per spread —
+the same indices `slotsFor` produces, and added spreads are appended so an existing
+index never moves), with `"<count>-<option>"` ids as values. Durable, like
+`pb_placed`, so a reload keeps the templates. The book view reads it too, so a page
+laid out here shows the same template zoomed out.
+
+#### ⚠️ The strip now fits the book to its band, because the drawer halves it
+Page width was derived from the viewport width alone. With the drawer taking the
+bottom half, a portrait book is **taller than the band that is left** and would run
+underneath the drawer, so `PageView` measures the scroller's height as well and
+scales the book down when `bookH` exceeds it. With the drawer closed the band is
+always tall enough and the clamp is a no-op — verified: 390×844 gives the same
+619×415 book as before, and 373 tall with the drawer up (exactly `band − 16`).
+
+The re-centring effect is therefore keyed on `pageW` rather than run once behind a
+`centred` ref. Opening or closing the drawer re-scales the strip, and without that
+the centred page drifts by however much the books shrank. Measured: the active page
+comes back to dead centre (offset 0) after confirm.
+
+#### Chrome while the drawer is up
+- **The navigator and the toolbar are unmounted**, not hidden — the drawer covers the
+  bottom half, which is where both live.
+- **The header keeps its blur and loses its controls.** `PageViewHeader` gained
+  `controls` and `height`: the node keeps only a blur band across the top, and its
+  close/confirm live on the drawer, so the header's own buttons would double up. The
+  height drops to the node's own 93 (44 status bar + 49) — at the book view's 147 the
+  blur would reach a third of the way down the page preview.
+- **No scrim.** The node has none, and the point of a half-height sheet is that the
+  preview above stays visible and interactive — so the drawer is dismissed by its own
+  close button rather than by a tap outside.
+
+#### Drawer geometry
+- **Height is `min(406px, 50%)` + the safe-area bottom.** 406 is the node's height on
+  its 812 frame; the `min` keeps it to half the screen on a short phone. `Toolbar`'s
+  spacer conventions do not apply — the drawer is absolutely positioned, so the strip
+  above simply takes `PV_DRAWER_H` as its `bottom`.
+- **The fill is a linear wash over a radial one** (`451:14966`). Figma's transform,
+  `matrix(0 24.75 -63.674 0 188 -22.5)` at `r=10`, decodes to an ellipse centred on
+  (188, −22.5) with semi-axes 636.74 × 247.5 → `169.8% 60.96% at 50.13% -5.54%`. The
+  linear layer's top 13.3% is fully transparent and the radial's centre stop is only
+  20% black, so the preview reads faintly through the drawer's top edge. **Deliberate
+  — do not flatten it to a solid fill.**
+- **The card row's ring is a real border**, unlike the navigator's inset shadow. The
+  row is a scroller with a 12px gap, so the 4px reflow an outside border causes is
+  invisible here, and a border is what draws the ring *outside* the card as the node
+  has it. `2px` padding + `2px` border reproduces the node's 4/4.79 offset exactly:
+  ring 122×109 on a 114-wide card.
+- **Cards follow the chosen page's aspect**, so the thumbnail is a true miniature.
+  The node's own 114×99.418 is a square-leaved book, which its sibling `451:14499`
+  contradicts anyway. ⚠️ A portrait card is 152 tall, which fits the node's 406
+  drawer but not the `50%` a 568-tall phone resolves to — so `LayoutDrawer` measures
+  itself with a `ResizeObserver` and caps the card width to the room left below
+  `top: 164`. Verified: the row's bottom edge is 16 inside the drawer at 667 and 568,
+  and the cards stay at the node's 114 at 844.
+- **Both rows scroll.** The five chips measure ~430 against 375 (which is what clips
+  the last one in the node's own render) and four 122-wide rings overflow any phone.
+- **The selected chip is auto-width**, not the node's fixed 80×34, so a chip does not
+  resize as the selection moves along the row. Both states are 34 tall regardless
+  (8 + 18 + 8).
+- The close/confirm buttons are `GlassIconButton` with `gloss` — the same controls the
+  page view's header uses — and the confirm button reuses `CONTINUE_ACCENT` rather
+  than the node's `color-dodge`/`soft-light` pair, for the reason recorded above.
+  Its glyph is the node's own `24x24/check`, and the node's `close` export is
+  **byte-identical** to the existing `pb-editor-close.svg`, so only one asset was
+  added.
+
+#### Not in the design
+- **Every count but 2**, per above, and a fourth 2-photo template (plain halves,
+  stacked).
+- **A layout applies to the cover too.** The node's page view opens on page "0" and
+  never shows the cover, but the cover's front leaf carries the same well, so it takes
+  templates on the same footing.
+
+#### Verified
+Driven at 390×844, 402×874, 430×932, 390×667 and 320×568: the drawer lands at 406
+(48.1% at 844) with r24 top corners, rings at x 24/158/292 measuring 122×162, the
+`#CCA34C` ring on the selected card, header buttons at y 16 and the title at 28 —
+all the node's numbers. Tapping a card re-lays the page live (2 → 4 slots), confirm
+persists `{"4":"4-1"}` and the page keeps four slots in the **book view** as well,
+close reverts to one slot and stores nothing, the navigator and toolbar come back on
+dismiss, all four cards and both header buttons hit-test with `elementFromPoint`
+(the fourth card after scrolling the row), a filled book puts real photos in 12 card
+slots and 4 page slots starting with the page's own photo, and there is no page
+overflow on either axis, no broken local asset and no JS error at any width.
+`animation` and `transform` on `<body>` are both still `none`.
+
 #### Header progressive blur — reused from the image picker
 `IOSProgressiveBlur` in `shared/ios-frame.jsx` is the image picker's header effect
 (`image-picker/image-picker.jsx` ~1850) extracted so the editor can share it rather
@@ -1788,6 +1924,7 @@ splash.html
                                                 ├─(push)─> product-photobook.html
                                                 │          └─(push)─> editor.html  ← Continue arrow inert
                                                 │                     └─ tap any page ─> page view mode (in-screen)
+                                                │                        └─ Layout tool ─> choose-layout drawer (in-screen)
                                                 │                     └─ upload sheet "Select photos"
                                                 │                        └─(push)─> photo-sources.html
                                                 │                                   └─(push)─> ../image-picker/index.html

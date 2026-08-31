@@ -72,6 +72,18 @@ function readList(key) {
   }
 }
 
+// pb_layouts — the page template chosen per slot, keyed by slot index (the cover is
+// 0, then two per spread) because added spreads are appended and never move an
+// existing index. Values are "<count>-<option>" ids; see LAYOUTS.
+function readLayouts() {
+  try {
+    const o = JSON.parse(sessionStorage.getItem('pb_layouts') || '{}');
+    return o && typeof o === 'object' && !Array.isArray(o) ? o : {};
+  } catch (e) {
+    return {};
+  }
+}
+
 // Leaves in reading order: inside front cover, pages 1..n, inside back cover —
 // chunked into pairs, so the first spread is [inside front | 1] exactly as the
 // node shows it. The trailing [n | inside back] pair is an extension: the node
@@ -129,7 +141,7 @@ function GutterArt({ file, offsets, width, opacity }) {
 // #F5F5F5 and right leaves white throughout the node: gutter shading, not content.
 // Padding is 8 on the outer edge and 12 on the gutter edge, mirrored, which lands
 // the placeholder 12 from the sheet edge and 8 from the spine on both sides.
-function Leaf({ side, photo, onOpen, label }) {
+function Leaf({ side, photo, onOpen, label, layout, pool }) {
   const left = side === 'left';
   return (
     <div
@@ -154,7 +166,11 @@ function Leaf({ side, photo, onOpen, label }) {
       transformOrigin: left ? 'right center' : 'left center',
       transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
     }}>
-      <PhotoWell photo={photo} />
+      {/* A relative box for the layout to position its slots inside; with no layout
+          set LayoutWell falls back to the single full-page well the node draws. */}
+      <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+        <LayoutWell layout={layout} photos={slotPhotos(photo, pool)} />
+      </div>
     </div>
   );
 }
@@ -177,6 +193,117 @@ function PhotoWell({ photo, style, iconSize = 24 }) {
         <img src={`${A}/pb-editor-add-image.svg`} alt="" width={iconSize} height={iconSize}
              style={{ display: 'block' }} />
       )}
+    </div>
+  );
+}
+
+// ── Layouts — the page templates the "Choose layout" drawer offers.
+//
+// Figma node 451:14921 fills in only the "2 photos" tab, and only three cards:
+//   451:14976  two photos side by side, inset in a centred band
+//   451:14978  two photos filling the page as halves
+//   451:14979  two photos stacked, on the right two-fifths of the page
+// Those are LAYOUTS[2][0..2], converted out of the node's card coordinates into
+// fractions of the *well* — the printable box PV_WELL describes. Expressing a
+// template that way is what lets one definition render identically on a 114px
+// drawer card and a 310px page in the strip, and keeps it independent of the book
+// format chosen on the product page.
+//
+// Every other count is an addition: the node ships the 1 / 3 / 4 / 5+ chips with no
+// cards behind them. The invented templates use the same 3% gutter the node's own
+// halves leave between them (451:14978 measures 46.8% + 49.7% on a 102.6-wide
+// well), which is where 48.5 / 31.333 / 22.75 come from.
+const LAYOUTS = {
+  1: [
+    [{ x: 0, y: 0, w: 100, h: 100 }],
+    [{ x: 10, y: 10, w: 80, h: 80 }],
+    [{ x: 0, y: 0, w: 100, h: 68.5 }],
+  ],
+  2: [
+    // 451:14976 — the node's selected card. Its rect reduces to 10 / 30.6 / 38 / 44.1;
+    // squared up to symmetric margins, which is inside a pixel at card scale.
+    [{ x: 10, y: 28, w: 38, h: 44 }, { x: 52, y: 28, w: 38, h: 44 }],
+    // 451:14978
+    [{ x: 0, y: 0, w: 48.5, h: 100 }, { x: 51.5, y: 0, w: 48.5, h: 100 }],
+    // 451:14979 — deliberately off-centre; the node leaves the left 30% of the
+    // page empty rather than centring the pair.
+    [{ x: 30, y: 0, w: 40, h: 48.5 }, { x: 30, y: 51.5, w: 40, h: 48.5 }],
+    [{ x: 0, y: 0, w: 100, h: 48.5 }, { x: 0, y: 51.5, w: 100, h: 48.5 }],
+  ],
+  3: [
+    [{ x: 0, y: 0, w: 64.5, h: 100 },
+     { x: 67.5, y: 0, w: 32.5, h: 48.5 }, { x: 67.5, y: 51.5, w: 32.5, h: 48.5 }],
+    [{ x: 0, y: 0, w: 100, h: 64.5 },
+     { x: 0, y: 67.5, w: 48.5, h: 32.5 }, { x: 51.5, y: 67.5, w: 48.5, h: 32.5 }],
+    [{ x: 0, y: 0, w: 100, h: 31.333 }, { x: 0, y: 34.333, w: 100, h: 31.333 },
+     { x: 0, y: 68.667, w: 100, h: 31.333 }],
+  ],
+  4: [
+    [{ x: 0, y: 0, w: 48.5, h: 48.5 }, { x: 51.5, y: 0, w: 48.5, h: 48.5 },
+     { x: 0, y: 51.5, w: 48.5, h: 48.5 }, { x: 51.5, y: 51.5, w: 48.5, h: 48.5 }],
+    [{ x: 0, y: 0, w: 64.5, h: 100 },
+     { x: 67.5, y: 0, w: 32.5, h: 31.333 }, { x: 67.5, y: 34.333, w: 32.5, h: 31.333 },
+     { x: 67.5, y: 68.667, w: 32.5, h: 31.333 }],
+    [{ x: 0, y: 0, w: 100, h: 22.75 }, { x: 0, y: 25.75, w: 100, h: 22.75 },
+     { x: 0, y: 51.5, w: 100, h: 22.75 }, { x: 0, y: 77.25, w: 100, h: 22.75 }],
+  ],
+  // The chip reads "5+", so this set runs 5, 5 and 6 slots.
+  5: [
+    [{ x: 0, y: 0, w: 100, h: 64.5 },
+     { x: 0, y: 67.5, w: 22.75, h: 32.5 }, { x: 25.75, y: 67.5, w: 22.75, h: 32.5 },
+     { x: 51.5, y: 67.5, w: 22.75, h: 32.5 }, { x: 77.25, y: 67.5, w: 22.75, h: 32.5 }],
+    [{ x: 0, y: 0, w: 48.5, h: 48.5 }, { x: 51.5, y: 0, w: 48.5, h: 48.5 },
+     { x: 0, y: 51.5, w: 31.333, h: 48.5 }, { x: 34.333, y: 51.5, w: 31.333, h: 48.5 },
+     { x: 68.667, y: 51.5, w: 31.333, h: 48.5 }],
+    [{ x: 0, y: 0, w: 31.333, h: 48.5 }, { x: 34.333, y: 0, w: 31.333, h: 48.5 },
+     { x: 68.667, y: 0, w: 31.333, h: 48.5 },
+     { x: 0, y: 51.5, w: 31.333, h: 48.5 }, { x: 34.333, y: 51.5, w: 31.333, h: 48.5 },
+     { x: 68.667, y: 51.5, w: 31.333, h: 48.5 }],
+  ],
+};
+
+// Chip order — node 451:14988..14997. "5+ photos" is the node's own label.
+const LAYOUT_COUNTS = [1, 2, 3, 4, 5];
+const countLabel = c =>
+  (c === 1 ? '1 photo' : c === 5 ? '5+ photos' : `${c} photos`);
+
+// A layout is stored as "<count>-<index>" so it survives a reload as a plain string
+// and stays readable in sessionStorage.
+const FULL_PAGE = LAYOUTS[1][0];
+function layoutById(id) {
+  if (!id) return null;
+  const parts = String(id).split('-');
+  const set = LAYOUTS[parts[0]];
+  return (set && set[Number(parts[1])]) || null;
+}
+
+// Slot 0 of a page's layout holds the photo auto-fill placed there; the remaining
+// slots are filled from the rest of the upload, so a multi-photo layout previews with
+// real pictures instead of empty wells. Nothing is written back to pb_placed — the
+// layout is a page template, and one photo per page is still the placement. A page
+// with nothing placed on it stays empty in every slot.
+function slotPhotos(photo, pool) {
+  if (!photo) return [];
+  return [photo].concat((pool || []).filter(p => p !== photo));
+}
+
+// A well subdivided by a layout. It positions itself absolutely inside its parent,
+// so the parent only has to be `position: relative` — which is what lets the same
+// component serve a leaf in the book view, a page in the strip and a drawer card.
+function LayoutWell({ layout, photos, iconSize = 24, style }) {
+  const slots = layout && layout.length ? layout : FULL_PAGE;
+  return (
+    <div aria-hidden style={Object.assign({ position: 'absolute', inset: 0 }, style)}>
+      {slots.map((s, i) => (
+        <PhotoWell key={i} photo={photos && photos[i]}
+          // Scale the empty-state glyph with the slot: 24px swamps a 22%-tall track,
+          // and PhotoWell's overflow:hidden would simply clip it.
+          iconSize={Math.max(10, Math.round(iconSize * Math.min(s.w, s.h) / 100))}
+          style={{
+            position: 'absolute', flex: 'none',
+            left: `${s.x}%`, top: `${s.y}%`, width: `${s.w}%`, height: `${s.h}%`,
+          }} />
+      ))}
     </div>
   );
 }
@@ -224,7 +351,7 @@ function AddSpreadButton({ onClick }) {
 // ── Cover — node 451:15622. Back cover carries a 50×18 placeholder bottom-left;
 // the front carries "Add text" over a photo well. The double 14px hinge strips at
 // 50% ±(11,3) reproduce the node's overlapping pair.
-function CoverBlock({ aspect, onOpen }) {
+function CoverBlock({ aspect, onOpen, layout }) {
   return (
     <div style={{ position: 'relative', width: '100%' }}>
       <Sheet aspect={aspect} interior={
@@ -255,7 +382,9 @@ function CoverBlock({ aspect, onOpen }) {
               <span style={{ fontFamily: TEXT, fontWeight: 700, fontSize: 16,
                              lineHeight: '20px', color: '#000000' }}>Add text</span>
             </div>
-            <PhotoWell />
+            <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+              <LayoutWell layout={layout} photos={[]} />
+            </div>
           </div>
         </div>
       }>
@@ -269,16 +398,19 @@ function CoverBlock({ aspect, onOpen }) {
 // ── Inner spread — node 451:15591.
 // `photos` is the placed list, indexed by page number — page n holds photos[n-1].
 // The inside-front and inside-back leaves carry no page number, so they stay empty.
-function SpreadBlock({ aspect, left, right, showPlus, onAdd, photos, onOpen }) {
+function SpreadBlock({ aspect, left, right, showPlus, onAdd, photos, onOpen,
+                      layoutFor, pool }) {
   const at = n => (n ? photos[n - 1] : null);
   const name = n => (n ? `page ${n}` : 'the inside cover');
   return (
     <div style={{ position: 'relative', width: '100%' }}>
       <Sheet aspect={aspect} interior={
         <React.Fragment>
-          <Leaf side="left" photo={at(left)} label={name(left)}
+          <Leaf side="left" photo={at(left)} label={name(left)} pool={pool}
+                layout={layoutFor && layoutFor('left')}
                 onOpen={onOpen && (() => onOpen('left'))} />
-          <Leaf side="right" photo={at(right)} label={name(right)}
+          <Leaf side="right" photo={at(right)} label={name(right)} pool={pool}
+                layout={layoutFor && layoutFor('right')}
                 onOpen={onOpen && (() => onOpen('right'))} />
         </React.Fragment>
       }>
@@ -491,9 +623,9 @@ function PhotosStackIcon({ photos, count }) {
 
 // The node's drop-shadow sits on the row; applied per tool instead, which composites
 // identically (tools never overlap) and keeps a filter off the scroll container.
-function Tool({ label, icon, children }) {
+function Tool({ label, icon, children, onClick }) {
   return (
-    <button type="button" {...press(0.9)} style={{
+    <button type="button" onClick={onClick} {...press(0.9)} style={{
       flex: '0 0 auto', width: 68, padding: '0 8px', boxSizing: 'border-box',
       border: 'none', background: 'transparent', cursor: 'pointer',
       display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -521,7 +653,7 @@ function Tool({ label, icon, children }) {
 // drag the strong layers up over the spreads whenever the safe-area inset changes.
 const BLUR_BANDS = [[16, 24, 56], [8, 40, 78], [4, 56, 100], [2, 74, 122], [1, 92, 145]];
 
-function Toolbar({ photos, tools = TOOLS, gap = 10, padX = 8 }) {
+function Toolbar({ photos, tools = TOOLS, gap = 10, padX = 8, onTool }) {
   return (
     <div style={{
       position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 6,
@@ -559,7 +691,7 @@ function Toolbar({ photos, tools = TOOLS, gap = 10, padX = 8 }) {
         pointerEvents: 'auto',
       }}>
         {tools.map(t => (
-          <Tool key={t.id} {...t}>
+          <Tool key={t.id} {...t} onClick={onTool && (() => onTool(t.id))}>
             {t.id === 'photos' && photos.length
               ? <PhotosStackIcon photos={photos} count={photos.length} />
               : null}
@@ -851,13 +983,16 @@ function BigLeaf({ side, slotRef, children }) {
 // The well, positioned on the node's own insets. `iconSize` scales the empty-state
 // glyph with the page: 24px is right on a 164px leaf in the book view and lost on a
 // 310px one here.
-function BigWell({ photo, pageW }) {
+function BigWell({ photo, pool, layout, pageW }) {
   return (
-    <PhotoWell photo={photo} iconSize={Math.round(pageW * 0.13)} style={{
-      position: 'absolute', flex: 'none',
+    <div style={{
+      position: 'absolute',
       left: PV_WELL.left, right: PV_WELL.right,
       top: PV_WELL.top, bottom: PV_WELL.bottom,
-    }} />
+    }}>
+      <LayoutWell layout={layout} photos={slotPhotos(photo, pool)}
+                  iconSize={Math.round(pageW * 0.13)} />
+    </div>
   );
 }
 
@@ -865,7 +1000,7 @@ function BigWell({ photo, pageW }) {
 // follows CoverBlock in the book view: the back cover carries the placeholder block
 // bottom-left, the front carries "Add text" over a well. Both are expressed as
 // fractions of the page so the cover reads the same zoomed in as it does zoomed out.
-function CoverUnit({ w, h, pageW, frontRef }) {
+function CoverUnit({ w, h, pageW, frontRef, layout }) {
   return (
     <BookUnit w={w} h={h}>
       <BigLeaf side="left">
@@ -885,7 +1020,10 @@ function CoverUnit({ w, h, pageW, frontRef }) {
             fontFamily: TEXT, fontWeight: 700, color: '#000000',
             fontSize: Math.round(pageW * 0.098), lineHeight: 1.25,
           }}>Add text</span>
-          <PhotoWell iconSize={Math.round(pageW * 0.13)} />
+          <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+            <LayoutWell layout={layout} photos={[]}
+                        iconSize={Math.round(pageW * 0.13)} />
+          </div>
         </div>
       </BigLeaf>
     </BookUnit>
@@ -1002,20 +1140,27 @@ function PageNavigator({ slots, photoFor, active, onPick, onAdd, itemRefs, botto
 //
 // The node's back button is 36×36 where the book view's close is 40; kept at 40 so
 // the control does not resize as you move between the two modes of one screen.
-function PageViewHeader({ onBack }) {
+// While the layout drawer is up, node 451:14921 keeps only a blur band across the
+// top — its close and confirm buttons live on the drawer, so the header's own
+// controls would double up. `controls={false}` renders the scrim alone, and the
+// shorter height is the node's own 93 (its 44 status bar + 49), which is what keeps
+// the blur off the top of the page preview.
+function PageViewHeader({ onBack, controls = true,
+                          height = 'calc(env(safe-area-inset-top, 44px) + 103px)' }) {
   const icon = file => (
     <img src={`${A}/${file}`} alt="" width={24} height={24} style={{ display: 'block' }} />
   );
   return (
     <div style={{
       position: 'absolute', left: 0, right: 0, top: 0, zIndex: 6,
-      height: 'calc(env(safe-area-inset-top, 44px) + 103px)',
+      height,
       pointerEvents: 'none',
     }}>
       <IOSProgressiveBlur scrim={
         'linear-gradient(to bottom, rgba(20,20,20,0.55) 0.3%,' +
         ' rgba(16,16,16,0.22) 60%, rgba(12,12,12,0) 96%)'
       } />
+      {controls && (
       <div style={{
         position: 'absolute', left: 0, right: 0,
         top: 'max(68px, calc(env(safe-area-inset-top, 44px) + 24px))',
@@ -1034,6 +1179,196 @@ function PageViewHeader({ onBack }) {
         </GlassIconButton>
         <div aria-hidden style={{ width: 40, height: 40 }} />
       </div>
+      )}
+    </div>
+  );
+}
+
+// ── "Choose layout" drawer — Figma node 451:14921 (a 375×812 WIP frame named
+// "test"). Opened by the page view's Layout tool: the drawer takes the bottom half
+// of the screen and the page preview stays live above it, so a template can be
+// judged on the actual page.
+//
+// ⚠️ The node carries the same off-canvas scratch 451:14499 does — a second pair of
+// 177px photo squares at x=432/610 and a #272727 add-strip at x=379, all past the
+// frame edge. None of it is visible in the design and none of it is built.
+//
+// The node's drawer is 406 of an 812 frame. Kept as `min(406px, 50%)` so it is the
+// node's height on a phone and never more than half the screen on a short one; the
+// strip above fits the book to whatever band is left (see PageView).
+const PV_DRAWER_H = 'calc(min(406px, 50%) + env(safe-area-inset-bottom, 0px))';
+
+// node 451:14966 — a linear wash over a radial one. Figma's radial transform,
+// matrix(0 24.75 -63.674 0 188 -22.5) at r=10, decodes to an ellipse centred on
+// (188, -22.5) with semi-axes 636.74 × 247.5 → 169.8% × 60.96% at 50.13% / -5.54%
+// of the 375×406 drawer.
+//
+// The top 13% of the linear layer is fully transparent and the radial's centre stop
+// is only 20% black, so the page preview reads faintly through the drawer's top
+// edge. That is deliberate — do not flatten it to a solid fill.
+const DRAWER_FILL =
+  'linear-gradient(180deg, rgba(0,0,0,0) 13.3%, rgba(39,39,39,0.8) 35.961%),' +
+  ' radial-gradient(169.8% 60.96% at 50.13% -5.54%,' +
+  ' rgba(0,0,0,0.2) 0%, rgba(18,18,18,0.6) 50%, #232323 100%)';
+
+// node 451:14988 (unselected) / 451:14990 (selected). The selected chip is a fixed
+// 80×34 in the node; kept auto-width here so a chip does not resize as the
+// selection moves along the row. Both states are 34 tall either way (8 + 18 + 8).
+function CountChip({ label, active, onClick }) {
+  return (
+    <button type="button" onClick={onClick} {...press(0.97)}
+      aria-pressed={active}
+      style={{
+        flex: '0 0 auto', position: 'relative', overflow: 'hidden',
+        padding: '8px 12px', border: 'none', cursor: 'pointer',
+        borderRadius: active ? 42 : 22,
+        background: active ? 'transparent' : 'rgba(0,0,0,0.1)',
+        fontFamily: TEXT, fontWeight: active ? 600 : 500,
+        fontSize: 13, lineHeight: '18px', letterSpacing: '-0.08px',
+        whiteSpace: 'nowrap',
+        color: active ? '#FFFFFF' : 'var(--colour-foreground-fg-grey, #CCCCCC)',
+        transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
+      }}>
+      {active && CONTINUE_ACCENT}
+      <span style={{ position: 'relative' }}>{label}</span>
+    </button>
+  );
+}
+
+// node 451:14976 — a 114-wide white card inside a 122×109 selection ring. The ring
+// is a real border here rather than an inset shadow (unlike the navigator's): the
+// row is a scroller with a 12px gap, so a 4px reflow on selection would be
+// invisible, and a border is what draws the ring *outside* the card as the node has
+// it. The 2/2.79 padding is the node's 4/4.79 offset less the border.
+//
+// The card's proportions follow the chosen page (`pageAspect`), so the thumbnail is
+// a true miniature — the node's own 114×99.418 is a square-leaved book, which its
+// sibling 451:14499 contradicts anyway.
+const LAYOUT_CARD_W = 114;
+// What the ring adds around a card: the node's 4/4.79 offset on both sides, of which
+// 2px is the border itself.
+const LAYOUT_RING_H = 9.58;
+
+function LayoutCard({ layout, photos, pageAspect, width, selected, onClick, index }) {
+  return (
+    <button type="button" onClick={onClick} {...press(0.97)}
+      aria-pressed={selected} aria-label={`Layout option ${index + 1}`}
+      style={{
+        flex: '0 0 auto', padding: '2.79px 2px', boxSizing: 'border-box',
+        border: `2px solid ${selected ? '#CCA34C' : 'transparent'}`,
+        borderRadius: 6, background: 'transparent', cursor: 'pointer',
+        transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
+      }}>
+      <span style={{
+        display: 'block', position: 'relative',
+        width, aspectRatio: String(pageAspect),
+        background: '#FFFFFF', borderRadius: 4,
+      }}>
+        {/* The same PV_WELL insets the page uses, so the card is the page in little. */}
+        <LayoutWell layout={layout} photos={photos} iconSize={14} style={{
+          left: PV_WELL.left, right: PV_WELL.right,
+          top: PV_WELL.top, bottom: PV_WELL.bottom,
+        }} />
+      </span>
+    </button>
+  );
+}
+
+// The drawer. No scrim: the node has none, and the point of the half-height sheet is
+// that the preview above stays visible and interactive. It is therefore dismissed by
+// its own close button rather than by a tap outside.
+function LayoutDrawer({ closing, count, selected, options, photos, pageAspect,
+                        onCount, onPick, onClose, onConfirm }) {
+  const { useState, useRef, useLayoutEffect } = React;
+  const root = useRef(null);
+  const [h, setH] = useState(0);
+
+  // The card row is anchored 164 from the drawer's top, and a portrait card at the
+  // node's 114 wide is 152 tall — which fits the node's 406 drawer with room to
+  // spare but not the `50%` a short phone resolves to. So the card is measured down
+  // to whatever height is left rather than allowed to overhang the drawer.
+  useLayoutEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    const measure = () => setH(el.clientHeight);
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const room = h ? h - 164 - 16 - LAYOUT_RING_H : 0;
+  const cardW = room > 0
+    ? Math.max(48, Math.min(LAYOUT_CARD_W, room * pageAspect))
+    : LAYOUT_CARD_W;
+
+  const icon = file => (
+    <img src={`${A}/${file}`} alt="" width={24} height={24} style={{ display: 'block' }} />
+  );
+  return (
+    <div ref={root} role="dialog" aria-labelledby="pb-layout-title" style={{
+      position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 20,
+      height: PV_DRAWER_H, boxSizing: 'border-box', overflow: 'hidden',
+      borderRadius: '24px 24px 0 0', backgroundImage: DRAWER_FILL,
+      animation: closing
+        ? 'pbSheetOut 320ms cubic-bezier(0.4,0,0.2,1) both'
+        : 'pbSheetIn 380ms cubic-bezier(0.34,1.05,0.64,1) both',
+    }}>
+      {/* node 451:14967/14968 — a 40-tall row 16 from the drawer's top edge */}
+      <div style={{
+        position: 'absolute', left: 0, right: 0, top: 16, height: 40,
+        padding: '0 16px', boxSizing: 'border-box',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <GlassIconButton label="Close layouts" tint="rgba(0,0,0,0.25)" gloss
+                         onClick={onClose}>
+          {icon('pb-editor-close.svg')}
+        </GlassIconButton>
+        {/* node 451:14974 — centred on the frame, not between the buttons, so it is
+            absolute over the row. pointerEvents:none keeps it off both buttons. */}
+        <p id="pb-layout-title" style={{
+          position: 'absolute', left: 0, right: 0, top: 12, margin: 0,
+          textAlign: 'center', pointerEvents: 'none',
+          fontFamily: DISPLAY, fontWeight: 700, fontSize: 14, lineHeight: '20px',
+          color: '#FFFFFF',
+        }}>Choose layout</p>
+        <GlassIconButton label="Apply layout" tint="transparent"
+                         accent={CONTINUE_ACCENT} gloss onClick={onConfirm}>
+          {icon('pb-editor-check.svg')}
+        </GlassIconButton>
+      </div>
+
+      {/* node 451:14986 — the five chips scroll: they measure ~430 against a 375
+          frame, which is what clips the last one in the node's own render. */}
+      <div style={{
+        position: 'absolute', left: 0, right: 0, top: 81,
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '0 16px', boxSizing: 'border-box',
+        overflowX: 'auto', overflowY: 'hidden',
+        scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch',
+      }}>
+        {LAYOUT_COUNTS.map(c => (
+          <CountChip key={c} label={countLabel(c)} active={c === count}
+                     onClick={() => onCount(c)} />
+        ))}
+      </div>
+
+      {/* node 451:14975 — rings at x 24 / 158 / 292, i.e. 24px gutters and a 12px
+          gap. Three 122-wide rings overflow 375, so this row scrolls too. */}
+      <div style={{
+        position: 'absolute', left: 0, right: 0, top: 164,
+        display: 'flex', alignItems: 'flex-start', gap: 12,
+        padding: '0 24px', boxSizing: 'border-box',
+        overflowX: 'auto', overflowY: 'hidden',
+        scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch',
+      }}>
+        {options.map((layout, i) => (
+          <LayoutCard key={i} index={i} layout={layout} photos={photos}
+                      pageAspect={pageAspect} width={cardW}
+                      selected={selected === `${count}-${i}`}
+                      onClick={() => onPick(i)} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -1044,16 +1379,49 @@ function PageViewHeader({ onBack }) {
 // is 147 tall, the navigator's 65px row sits 170 from the bottom (31 above the
 // toolbar's 139), and the strip fills what is left. Centring the book in that band
 // puts its top edge at 231.3 against the node's 231.
-function PageView({ aspect, pages, placed, uploaded, startSlot, onBack, onAdd }) {
+function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
+                   layouts, onSetLayout, onBack, onAdd }) {
   const { useState, useRef, useEffect, useLayoutEffect, useMemo } = React;
   const slots = useMemo(() => slotsFor(pages), [pages]);
   const [active, setActive] = useState(() => Math.min(startSlot, slots.length - 1));
-  const [vw, setVw] = useState(0);
+  // Both dimensions: the strip's band loses its bottom half to the layout drawer, and
+  // the book has to fit what is left rather than run underneath it.
+  const [box, setBox] = useState({ w: 0, h: 0 });
   const scroller = useRef(null);
   const leafRefs = useRef([]);
   const navRefs = useRef([]);
   const raf = useRef(0);
-  const centred = useRef(false);
+
+  // ── The layout drawer. 'open' → 'closing' → null, matching the action sheets.
+  // The draft is previewed live on the page the drawer was opened over, and only
+  // written back to the book on confirm; the close button puts the stored layout
+  // back before the drawer slides away.
+  const [drawer, setDrawer] = useState(null);
+  const [target, setTarget] = useState(0);
+  const [count, setCount] = useState(2);
+  const [draft, setDraft] = useState(null);
+
+  const openDrawer = () => {
+    const cur = layouts[active] || null;
+    // The node opens on the "2 photos" tab with its first card selected.
+    const c = cur ? Number(String(cur).split('-')[0]) : 2;
+    setTarget(active);
+    setCount(c);
+    setDraft(cur || `${c}-0`);
+    setDrawer('open');
+  };
+  const closeDrawer = () => {
+    setDraft(layouts[target] || null);
+    setDrawer('closing');
+    setTimeout(() => setDrawer(null), 320);
+  };
+  const confirmDrawer = () => {
+    onSetLayout(target, draft);
+    setDrawer('closing');
+    setTimeout(() => setDrawer(null), 320);
+  };
+  const layoutFor = i =>
+    layoutById(drawer && i === target ? draft : layouts[i]);
 
   // The strip's geometry is all derived from its own width, so it tracks the
   // viewport (390 on a phone, 402 in the desktop IOSDevice frame) and re-derives on
@@ -1062,7 +1430,7 @@ function PageView({ aspect, pages, placed, uploaded, startSlot, onBack, onAdd })
   useLayoutEffect(() => {
     const el = scroller.current;
     if (!el) return;
-    const measure = () => setVw(el.clientWidth);
+    const measure = () => setBox({ w: el.clientWidth, h: el.clientHeight });
     measure();
     if (typeof ResizeObserver === 'undefined') return;
     const ro = new ResizeObserver(measure);
@@ -1070,9 +1438,17 @@ function PageView({ aspect, pages, placed, uploaded, startSlot, onBack, onAdd })
     return () => ro.disconnect();
   }, []);
 
-  const pageW = vw * PV_PAGE_FRACTION;
+  // Width drives the zoom, as the node has it — but a portrait book in a band halved
+  // by the drawer is taller than the band, so it is scaled down to fit. With the
+  // drawer closed the band is always tall enough and this is a no-op.
+  let pageW = box.w * PV_PAGE_FRACTION;
+  let bookH = ((2 * pageW) / aspect) / BOOK.interior.height;
+  const maxH = box.h - 16;
+  if (box.h > 0 && bookH > maxH) {
+    pageW *= maxH / bookH;
+    bookH = maxH;
+  }
   const bookW = (2 * pageW) / BOOK.interior.width;
-  const bookH = ((2 * pageW) / aspect) / BOOK.interior.height;
 
   const centreOn = (i, behavior) => {
     const sc = scroller.current;
@@ -1085,13 +1461,13 @@ function PageView({ aspect, pages, placed, uploaded, startSlot, onBack, onAdd })
   };
 
   // Land on the page that was tapped, without an animation — the mode change is the
-  // transition. Deliberately not in the deps of anything: it runs once the first
-  // measurement has produced a laid-out strip.
+  // transition. Keyed on pageW rather than run once, so opening or closing the
+  // drawer (which re-scales the strip) leaves the same page centred instead of
+  // drifting by however much the books shrank.
   useLayoutEffect(() => {
-    if (centred.current || !vw) return;
-    centred.current = true;
+    if (!pageW) return;
     centreOn(active, 'auto');
-  }, [vw]);
+  }, [pageW]);
 
   // Which page is under the middle of the strip. rAF-throttled: a handful of rects
   // per frame during a drag.
@@ -1144,8 +1520,12 @@ function PageView({ aspect, pages, placed, uploaded, startSlot, onBack, onAdd })
         onScroll={onScroll}
         style={{
           position: 'absolute', left: 0, right: 0,
-          top: 'calc(env(safe-area-inset-top, 44px) + 103px)',
-          bottom: 'calc(235px + env(safe-area-inset-bottom, 0px))',
+          // With the drawer up the node keeps only its 93-tall blur band at the top
+          // (44 status bar + 49) and gives the rest of the upper half to the page.
+          top: drawer
+            ? 'calc(env(safe-area-inset-top, 44px) + 49px)'
+            : 'calc(env(safe-area-inset-top, 44px) + 103px)',
+          bottom: drawer ? PV_DRAWER_H : 'calc(235px + env(safe-area-inset-bottom, 0px))',
           display: 'flex', alignItems: 'center',
           // A gap of 8% of a page reads as a break between books without stranding
           // the strip on empty canvas. Not in the node, which shows one book.
@@ -1158,25 +1538,31 @@ function PageView({ aspect, pages, placed, uploaded, startSlot, onBack, onAdd })
         {/* Spacers, not padding: percentage widths on the books would resolve
             against the scroller's content box, which padding shrinks. These are
             what let the first and last page reach the centre of the viewport. */}
-        <div aria-hidden style={{ flex: `0 0 ${(vw - pageW) / 2}px` }} />
-        {vw > 0 && (
+        <div aria-hidden style={{ flex: `0 0 ${(box.w - pageW) / 2}px` }} />
+        {box.w > 0 && (
           <React.Fragment>
-            <CoverUnit w={bookW} h={bookH} pageW={pageW} frontRef={leafRef(0)} />
+            <CoverUnit w={bookW} h={bookH} pageW={pageW} frontRef={leafRef(0)}
+                       layout={layoutFor(0)} />
             {spreads.map(([l, r], i) => (
               <BookUnit key={i} w={bookW} h={bookH}>
                 <BigLeaf side="left" slotRef={leafRef(1 + 2 * i)}>
-                  <BigWell photo={l ? placed[l - 1] : null} pageW={pageW} />
+                  <BigWell photo={l ? placed[l - 1] : null} pool={uploaded}
+                           layout={layoutFor(1 + 2 * i)} pageW={pageW} />
                 </BigLeaf>
                 <BigLeaf side="right" slotRef={leafRef(2 + 2 * i)}>
-                  <BigWell photo={r ? placed[r - 1] : null} pageW={pageW} />
+                  <BigWell photo={r ? placed[r - 1] : null} pool={uploaded}
+                           layout={layoutFor(2 + 2 * i)} pageW={pageW} />
                 </BigLeaf>
               </BookUnit>
             ))}
           </React.Fragment>
         )}
-        <div aria-hidden style={{ flex: `0 0 ${(vw - pageW) / 2}px` }} />
+        <div aria-hidden style={{ flex: `0 0 ${(box.w - pageW) / 2}px` }} />
       </div>
 
+      {/* The drawer replaces the navigator and the toolbar for as long as it is up —
+          it covers the bottom half of the screen, which is where both live. */}
+      {!drawer && (
       <PageNavigator
         slots={slots} photoFor={photoFor} active={active}
         // Jump, don't animate. A smooth scroll from page 3 to page 24 drags the
@@ -1187,9 +1573,29 @@ function PageView({ aspect, pages, placed, uploaded, startSlot, onBack, onAdd })
         onAdd={onAdd} itemRefs={navRefs}
         bottom="calc(170px + env(safe-area-inset-bottom, 0px))"
       />
+      )}
 
-      <PageViewHeader onBack={onBack} />
-      <Toolbar photos={uploaded} tools={PV_TOOLS} gap={8} padX={16} />
+      <PageViewHeader onBack={onBack} controls={!drawer}
+                      height={drawer
+                        ? 'calc(env(safe-area-inset-top, 44px) + 49px)'
+                        : 'calc(env(safe-area-inset-top, 44px) + 103px)'} />
+
+      {/* Layout is the one live tool; the other seven are inert, as in the book view. */}
+      {!drawer && (
+        <Toolbar photos={uploaded} tools={PV_TOOLS} gap={8} padX={16}
+                 onTool={id => { if (id === 'layout') openDrawer(); }} />
+      )}
+
+      {drawer && (
+        <LayoutDrawer
+          closing={drawer === 'closing'} count={count} selected={draft}
+          options={LAYOUTS[count] || []} pageAspect={pageAspect}
+          photos={slotPhotos(photoFor(slots[target]), uploaded)}
+          onCount={c => { setCount(c); setDraft(`${c}-0`); }}
+          onPick={i => setDraft(`${count}-${i}`)}
+          onClose={closeDrawer} onConfirm={confirmDrawer}
+        />
+      )}
     </div>
   );
 }
@@ -1200,6 +1606,7 @@ function EditorScreen() {
   const [incoming] = useState(readIncomingPhotos);
   const [uploaded] = useState(() => incoming || readList('pb_uploaded'));
   const [placed, setPlaced] = useState(() => readList('pb_placed'));
+  const [layouts, setLayouts] = useState(readLayouts);
   // null = the book view; otherwise the slot index the page view opened on.
   const [pageView, setPageView] = useState(null);
   const [added, setAdded] = useState(() => {
@@ -1240,6 +1647,16 @@ function EditorScreen() {
     setPageView(slot);
   };
 
+  // Durable, like pb_placed: a reload keeps the templates the book was given.
+  const setLayout = (slot, id) => {
+    setLayouts(prev => {
+      const next = Object.assign({}, prev);
+      if (id) next[slot] = id; else delete next[slot];
+      sessionStorage.setItem('pb_layouts', JSON.stringify(next));
+      return next;
+    });
+  };
+
   const dismissSheet = () => {
     setSheet('closing');
     setTimeout(() => setSheet('gone'), 320);
@@ -1267,6 +1684,7 @@ function EditorScreen() {
   // Figma is inconsistent there, and the brief asks the spreads to represent the
   // format chosen on the previous step, so the format wins.
   const aspect = (2 * book.pageW) / book.pageH;
+  const pageAspect = book.pageW / book.pageH;
 
   return (
     <div style={{
@@ -1287,7 +1705,9 @@ function EditorScreen() {
 
       {pageView !== null ? (
         <PageView
-          aspect={aspect} pages={pages} placed={placed} uploaded={uploaded}
+          aspect={aspect} pageAspect={pageAspect} pages={pages}
+          placed={placed} uploaded={uploaded}
+          layouts={layouts} onSetLayout={setLayout}
           startSlot={pageView} onBack={() => setPageView(null)}
           onAdd={() => setAdded(n => n + 1)}
         />
@@ -1320,12 +1740,17 @@ function EditorScreen() {
             display: 'flex', flexDirection: 'column', gap: 47,
             padding: `0 ${GUTTER}px`, boxSizing: 'border-box',
           }}>
-            <CoverBlock aspect={aspect} onOpen={() => openPage(0)} />
+            <CoverBlock aspect={aspect} onOpen={() => openPage(0)}
+                        layout={layoutById(layouts[0])} />
             {spreads.map(([l, r], i) => (
               <SpreadBlock key={i} aspect={aspect} left={l} right={r} photos={placed}
                            showPlus={i < spreads.length - 1}
                            onAdd={() => setAdded(n => n + 1)}
-                           /* Slot 0 is the cover, then two per spread. */
+                           pool={uploaded}
+                           /* Slot 0 is the cover, then two per spread — the same
+                              indices the page view and pb_layouts use. */
+                           layoutFor={side => layoutById(
+                             layouts[1 + 2 * i + (side === 'right' ? 1 : 0)])}
                            onOpen={side => openPage(1 + 2 * i + (side === 'right' ? 1 : 0))} />
             ))}
           </div>
