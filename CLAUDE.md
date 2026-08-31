@@ -32,6 +32,7 @@ All 13 implementation tasks are done. Branch `feature/prototype-build` is demo-r
 | Editor — page view | mode of `editor.jsx` | ✅ Built — **Figma-verified** (node `451:14499`) |
 | Editor — choose layout | mode of `editor.jsx` | ✅ Built — **Figma-verified** (node `451:14921`) |
 | Editor — photo selected | mode of `editor.jsx` | ✅ Built — **Figma-verified** (node `451:14611`) |
+| Editor — arrange mode | mode of `editor.jsx` | ✅ Built — **Figma-verified** (node `451:15148`) |
 | Photo sources | `screens/photo-sources.html` + `.jsx` | ✅ Built — node `451:14202`; 2 of 8 covers verifiable, see below |
 | Image Picker | `image-picker/index.html` (pre-built, frozen) | ✅ Wired in |
 | Basket | `screens/basket.html` + `basket.jsx` | ✅ Done |
@@ -44,7 +45,7 @@ All 13 implementation tasks are done. Branch `feature/prototype-build` is demo-r
 
 - **Figma fidelity pass** — query Figma node IDs (see table below) to tighten colors, spacing, typography to exact Figma spec. Screens built from verbal descriptions rather than direct Figma calls due to MCP availability.
 - **Transition polish** — add push/pop slide animations between screens (navigation.js stubs are in place; CSS transitions not yet wired to the iframe-swap mechanism).
-- **Editor tools** — Photos, Arrange, Themes, Style, AI help and Options are inert by request, as are page view's eight *except* **Layout**, which opens the choose-layout drawer (`451:14921`). The selected-photo row (`451:14611`) is inert except **Back**, which deselects. The card's settings icon and the header's Continue arrow are inert for the same reason.
+- **Editor tools** — the book view's six are inert except **Arrange**, which opens arrange mode (`451:15148`); page view's eight are inert except **Layout**, which opens the choose-layout drawer (`451:14921`); and the selected-photo row (`451:14611`) is inert except **Back**, which deselects. The card's settings icon and the header's Continue arrow are inert for the same reason.
 - **My Photos tab** — superseded: the tab bar is now Home / Projects / Memories / Account
   (`509:19230`). The account screen's "My photos" row points at `photo-sources.html`. If a
   standalone grid distinct from the picker is needed, create `screens/my-photos.html`.
@@ -91,6 +92,7 @@ All 13 implementation tasks are done. Branch `feature/prototype-build` is demo-r
 | Editor — page view | `451:14499` | ✅ Built — page, navigator and toolbar all land on the node's numbers |
 | Editor — choose layout drawer | `451:14921` | ✅ Built — drawer, chips and cards land on the node's numbers; only its "2 photos" tab is designed |
 | Editor — photo selected | `451:14611` | ✅ Built — ring and selection toolbar exact; its navigator omission not carried over |
+| Editor — arrange mode | `451:15148` | ✅ Built — drag/drop, tap-to-swap and spread reorder; its duplicated scratch blocks not carried over |
 | Account / Profile | `451:14038` | ✅ Rebuilt — matches Figma; every band lands on the node's y exactly |
 | Photo sources (Album / My trips) | `451:14202` | ✅ Built — Albums grid exact; 6 of 8 covers unverifiable |
 | My Photos (image grid) | `451:14403` | ⬜ Not built (image-picker used instead) |
@@ -1247,7 +1249,7 @@ over `PHOTOS[]` positions 442, 472, 479, 481, strictly ascending.
 - `pb_uploaded` — everything the picker has handed over, written as soon as it arrives
   and regardless of how the prompt is answered: **declining auto-fill still leaves the
   photos uploaded.** This is what the Photos tool's thumbnails and count show.
-- `pb_placed` — what is actually on the pages. Durable, so a reload keeps the filled
+- `pb_placed` — what is actually on the pages. Arrange mode rewrites it in place. Durable, so a reload keeps the filled
   book instead of re-asking. `added` is re-derived from its length so a reloaded book
   keeps the spreads auto-fill appended.
 
@@ -1668,6 +1670,171 @@ another page each clear the selection and restore the eight-tool row; all six to
 hit-test across the row's scroll range; and there is no page overflow on either axis,
 no failing request, and `animation`/`transform` on `<body>` are both still `none`.
 
+#### Arrange mode (Figma `451:15148`)
+
+Tapping **Arrange** in the book view's toolbar turns the spreads into a compact
+scrolling list you rearrange by hand. Two tabs: **Photos** moves photographs between
+pages, **Pages** moves whole spreads through the book. A fourth mode of `EditorScreen`,
+alongside page view and its layout drawer.
+
+⚠️ The node is the fourth WIP frame named "test" and its list is scratch: six blocks
+in which spread 3 duplicates spread 2 and spread 6 duplicates spread 4, page captions
+reading 1 / 2-3 / 2-3 / 4-5 / 6-7 / 4-5, and the same 93-tall `backdrop-blur(25px)`
+band the other three frames carry. What it *does* give — and what the build takes — is
+**three distinct sheet treatments that map exactly onto the three states a drag has**:
+
+| node | treatment | state it becomes |
+|---|---|---|
+| `451:15152` | paper at `opacity: 0.10` | the spread being dragged |
+| `451:15163` | `rgba(248,248,248,0.5)` at `opacity: 0.5`, content scaled 152/164 | the spread under the finger |
+| `451:15187` | the plain sheet | everything else |
+| `451:15159` | an empty 164 box at `opacity: 0.5` | the hole a lifted photo leaves |
+
+Verified against those numbers: source `0.1`, target `0.5` at `scale(0.926829)`,
+neighbours `1`, and the source well's hole at `0.5`.
+
+#### ⚠️ Press-and-hold to lift, not drag-on-touch — it is what keeps the list scrollable
+Claiming the gesture on `pointerdown` would need `touch-action: none` on every photo,
+and photos are most of the list, so the page would barely scroll. Instead one handler
+serves both interactions the node asks for:
+
+- **a tap** (released inside 250ms having moved under 8px) selects; a second tap swaps;
+- **a press-and-hold** (250ms) lifts the item and then follows the finger.
+
+Moving more than 8px before the hold fires is read as a scroll and cancels the press —
+verified: a 30px drag before the hold leaves the order untouched, with no clone and no
+selection ring.
+
+**A window-level `pointerup`/`pointercancel` listener is the safety net.**
+`setPointerCapture` normally guarantees the release comes back to the element that took
+it, but capture can fail, or the element can unmount mid-drag — and a drag whose
+pointerup never arrives hangs with the clone stuck under the finger. That is not
+hypothetical; it happened under test. Whichever handler fires first clears `pending`,
+so the second is a no-op.
+
+**Edge auto-scroll** (within 80px of either end of the list, rAF-driven) is an addition.
+A 24-page book is far longer than the viewport, and without it you could only ever drop
+onto a target already on screen. Verified: a drag held at the bottom edge scrolled the
+list 0 → 770 and dropped on page 9, which starts off screen.
+
+**The drop target is hit-tested against live rects**, not cached ones — the list moves
+under the finger, including by auto-scroll. It hit-tests the *leaf box*, so the pointer
+does not have to be exactly on the photograph.
+
+#### ⚠️ Guard every page-number test on the page number itself
+The inside-cover leaves have no page number, and `sel` is `null` when nothing is
+selected — so `sel === n` rang **every inside cover permanently**. Caught by looking at
+a screenshot, not by a measurement. For the same reason a leaf with no page number is
+never registered as a drop target: a `null` key in the map makes `hitTest` hand back
+`NaN` as a page number, which would then corrupt `pb_placed`.
+
+#### What the gestures write
+- **`swapPhotos(a, b)`** — one operation serves every gesture. A drag onto an occupied
+  page swaps; onto an empty page it moves; tapping two photos swaps. Pages are 1-based,
+  as `pb_placed` is.
+- **`moveSpread(from, to)`** — the photos are re-laid onto pages 1..n in the new order
+  rather than the pages being renumbered, so the book's pagination never changes. Chunk
+  sizes are `[1, 2, 2, … 2, 1]` (the first spread carries only page 1, its other leaf
+  being the inside front cover; the last only page n) and they sum to n either way, so
+  reordering chunks of unequal size still lands exactly one photo per page. Verified:
+  `[2,3,1,4,…]` with spread 0 → position 1 gives `[3,1,2,4,…]`.
+- Both persist through one `writePlaced`, which **trims trailing nulls** — they carry
+  no information and would inflate the length `added` is re-derived from on reload.
+
+⚠️ **`pb_layouts` is deliberately not permuted** by `moveSpread`. It is keyed by slot
+index, and a template belongs to the page it is on rather than to the photo that
+happens to sit there — so moving a spread moves its pictures, not its layouts.
+
+#### ⚠️ A leaf here shows ONE photo, not its layout template
+`pb_placed` holds one photo per page — that is what auto-fill writes and what the
+navigator reads — so one photo per page is exactly what there is to rearrange, and
+**every gesture in this mode moves real, persisted data**. A page given a multi-photo
+template in the layout drawer therefore reads simpler here than in the book view, whose
+extra slots are filled from the upload pool as a *preview* (see `slotPhotos`).
+
+That difference is deliberate rather than an oversight: making the two agree means
+making placement **per-slot**, which is a change to the storage model — every reader of
+`pb_placed` plus `autoFill` and the `added` derivation — and not a side effect of this
+mode. Until then, dragging a pool-filled preview slot would be a gesture that could not
+persist, which is worse than not offering it.
+
+#### Geometry
+- **Blocks butt up against each other** — the node's 203 pitch is a 172 sheet plus a 31
+  caption strip with **no gap**, against the book view's 47. Only the strip is a
+  constant: the sheet's height follows the page format as everywhere else, so a
+  portrait book measures 237 + 31 = 268 rather than the node's square-leaved 203.
+- **`leafBox` is now shared** between `Leaf` and `ArrangeLeaf` so the two views cannot
+  drift. ⚠️ The node paints both arrange leaves white where the book view shades the
+  left one `#F5F5F5`; the book view wins, or the same sheet re-shades itself the moment
+  Arrange is tapped.
+- **The add pill is the node's smaller 56×26 r24** with a 16px plus, not the book
+  view's 56×38. The node has it straddling the block's bottom edge (top 189 of 203),
+  which with no gap between blocks would put it on the next sheet, so it is centred in
+  the caption strip instead. It appears after every spread but the last, per the book
+  view's rule.
+- **Page captions are white, not the node's black.** `451:15153` and its siblings are
+  12/28 black at 35% — unreadable on this near-black page, and plainly carried over
+  from a light context.
+- Header 236 on a 44 status bar (`env + 192`), title at 68, body at 97 with the node's
+  own line break, switcher at 158. The list starts 8 below the header.
+
+#### The header keeps its opaque top stop
+Unlike the page view's header, which drops the node's top stop to 55% alpha so the blur
+it sits on stays visible. Here the header is a real panel carrying two lines of copy and
+a control rather than a peek-through scrim, so the node's fully opaque `rgb(20,20,20)`
+is the intent — and a progressive blur under it would be invisible. Flat
+`backdrop-filter: blur(5px)`, as the node specifies.
+
+#### The switcher — `451:15255`
+343×40 at 16, r16, `rgba(0,0,0,0.8)` + `blur(10.95px)`, padding 4; the selected segment
+is a white r12 fill with `#333` text. Sampled against the node's render, the unselected
+side reads **(4,4,4)**, which is exactly 0.8 black over the header's own `rgb(20,20,20)`
+— so the 80% is real and must not be flattened to a solid. Expressed as 16px gutters
+rather than a fixed 343, so it measures 358 at 390 and 398 at 430.
+
+The node types the unselected label in **Brandon Text 14** — Figma's fallback for a face
+this project does not carry — so both labels take the SF stack at the node's 15/20
+−0.24.
+
+#### ⚠️ The Done button's `mix-blend-mode` was resolved to a flat colour
+`451:15240` is `#00C2C9` at `mix-blend-mode: overlay`. Implemented literally that is the
+trap the editor's Continue button already records — WebKit cannot blend across a
+composited layer boundary, and this sits in a stacking context with backdrop-filtered
+siblings. Sampling the node's own render instead: over the opaque part of its band
+(`rgb(27,27,27)`) the button resolves to **(0,41,42)**, which is exactly `2·base·blend`,
+the overlay formula for a dark base. So the blend ships as `#00292A`, with the node's
+`inset 0 0 27px rgba(0,0,0,0.25)` on top.
+
+The consequence, and it is a real one: the button no longer brightens where light
+content sits behind it — the node samples (0,69,74) where a white sheet shows through
+its translucent band. Recovering that would mean re-introducing the blend.
+
+#### Not in the design
+- **The floating clone.** The node fades the source but puts nothing under the finger,
+  and a drag with nothing under the finger reads as broken. It is positioned against
+  the arrange root rather than `position: fixed`, so it is also correct inside the
+  desktop `IOSDevice` frame — verified there, with the finger landing inside the clone.
+- **The tap-selection and drag-hover rings** (`inset 0 0 0 2px #00C2C9`). The node shows
+  neither state; the colour is its own accent, taken from the Done button.
+- **The Pages tab entirely.** Only the Photos tab is drawn, so its copy — "Drag and drop
+  a spread to move it, or tap 2 pages to swap their photos." — is written to the node's
+  pattern.
+- **Edge auto-scroll**, and the 160ms opacity/transform transition between drag states.
+
+#### Verified
+Driven at 390×844, 430×932, 320×568 and in the desktop `IOSDevice` frame with a filled
+24-page book: header title at 68 and body at 97 with the node's line break, switcher
+16/158/40 at r16 on `rgba(0,0,0,0.8)` with Photos selected white on `#333`, list top
+200, 13 blocks at a 31px caption strip, add pill 56×26, Done 338×53 r55 on
+`rgb(0,41,42)` sitting 25 above the bottom. Tap-tap swaps two pages
+(`1,2,3…` → `2,1,3…`); a held drag swaps page 2 with page 3; a spread moved from
+position 0 to 1 gives `[3,1,2,4,…]`; all three persist to `pb_placed`. Drag states hit
+the node's `0.1` / `0.5` / `scale(0.926829)` exactly, the hole reads `0.5`, the hover
+ring is `#00C2C9` 2px inset. A pre-hold move cancels the press. Auto-scroll runs 0 → 770
+and stops on release, and the clone is cleared every time. Done returns to the book view
+at its former scroll offset. No page overflow on either axis at any width, no failing
+request, and `animation`/`transform` on `<body>` are both still `none`.
+
 #### Header progressive blur — reused from the image picker
 `IOSProgressiveBlur` in `shared/ios-frame.jsx` is the image picker's header effect
 (`image-picker/image-picker.jsx` ~1850) extracted so the editor can share it rather
@@ -2020,6 +2187,7 @@ splash.html
                                      └─(replace)─> home.html
                                                 ├─(push)─> product-photobook.html
                                                 │          └─(push)─> editor.html  ← Continue arrow inert
+                                                │                     └─ Arrange tool ─> arrange mode (in-screen) → Done
                                                 │                     └─ tap any page ─> page view mode (in-screen)
                                                 │                        └─ Layout tool ─> choose-layout drawer (in-screen)
                                                 │                        └─ tap a photo ─> selected state + selection toolbar (in-screen)

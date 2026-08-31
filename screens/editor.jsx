@@ -141,6 +141,18 @@ function GutterArt({ file, offsets, width, opacity }) {
 // #F5F5F5 and right leaves white throughout the node: gutter shading, not content.
 // Padding is 8 on the outer edge and 12 on the gutter edge, mirrored, which lands
 // the placeholder 12 from the sheet edge and 8 from the spine on both sides.
+// The leaf's own box, shared with arrange mode so the two views cannot drift.
+function leafBox(left) {
+  return {
+    width: '50%', height: '100%', boxSizing: 'border-box',
+    background: left ? '#F5F5F5' : '#FFFFFF',
+    boxShadow: '0px 1px 1.5px rgba(0,0,0,0.3), 0px 1px 1.5px rgba(0,0,0,0.1)',
+    paddingTop: 8, paddingBottom: 8,
+    paddingLeft: left ? 8 : 12, paddingRight: left ? 12 : 8,
+    display: 'flex',
+  };
+}
+
 function Leaf({ side, photo, onOpen, label, layout, pool }) {
   const left = side === 'left';
   return (
@@ -153,19 +165,13 @@ function Leaf({ side, photo, onOpen, label, layout, pool }) {
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); }
       } : undefined}
       {...(onOpen ? press(0.97) : {})}
-      style={{
-      width: '50%', height: '100%', boxSizing: 'border-box',
-      background: left ? '#F5F5F5' : '#FFFFFF',
-      boxShadow: '0px 1px 1.5px rgba(0,0,0,0.3), 0px 1px 1.5px rgba(0,0,0,0.1)',
-      paddingTop: 8, paddingBottom: 8,
-      paddingLeft: left ? 8 : 12, paddingRight: left ? 12 : 8,
-      display: 'flex',
+      style={Object.assign(leafBox(left), {
       cursor: onOpen ? 'pointer' : 'default',
       // The press scale reads as the page being pushed in toward the spine rather
       // than the whole sheet shrinking, which is what a centred origin would give.
       transformOrigin: left ? 'right center' : 'left center',
       transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
-    }}>
+    })}>
       {/* A relative box for the layout to position its slots inside; with no layout
           set LayoutWell falls back to the single full-page well the node draws. */}
       <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
@@ -1703,6 +1709,524 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
   );
 }
 
+// ── Arrange mode — Figma node 451:15148.
+//
+// A mode of the book view (Arrange is its second tool): the spreads become a compact
+// scrolling list you rearrange by hand. Two tabs — Photos moves photographs between
+// pages, Pages moves whole spreads through the book.
+//
+// ⚠️ The node is the fourth WIP frame named "test" and its list is scratch: six
+// blocks in which spread 3 duplicates spread 2 and spread 6 duplicates spread 4, its
+// page captions read 1 / 2-3 / 2-3 / 4-5 / 6-7 / 4-5, and it carries the same 93-tall
+// backdrop-blur band the other three frames do. What it *does* give, and what is
+// built, is three distinct sheet treatments which map cleanly onto the three states
+// a drag has:
+//   451:15152  paper at opacity 0.10          → the spread being dragged
+//   451:15163  rgba(248,248,248,0.5) at 0.5   → the spread under the finger
+//   451:15187  the plain sheet                → everything else
+// and, on the source spread, an empty 164 box at opacity 0.5 where a photo used to
+// be (451:15159) — the hole a lifted photo leaves.
+
+// node: each block is 203 tall — a 172 sheet plus a 31 caption strip, and the blocks
+// have no gap between them (against the book view's 47). The sheet's own height
+// follows the page format, as everywhere else, so only the strip is a constant.
+const ARR_CAPTION = 31;
+// node 451:15220/15222 — a smaller add pill than the book view's 56×38.
+const ARR_ADD = { w: 56, h: 26, icon: 16 };
+// The tap-selection and drag-hover rings are additions; the node shows neither. This
+// is the design's own accent, taken from the Done button's #00C2C9.
+const ARR_ACCENT = '#00C2C9';
+
+// node 451:15240 — the CTA is #00C2C9 at mix-blend-mode: overlay. Implemented
+// literally that is the trap the editor's Continue button already records: WebKit
+// cannot blend across a composited layer boundary, and this sits in a stacking
+// context with backdrop-filtered siblings. Sampling the node's own render instead,
+// over the opaque part of its band (rgb(27,27,27)) the button resolves to (0,41,42) —
+// which is exactly 2·base·blend, the overlay formula for a dark base. So the blend is
+// carried as the flat colour it resolves to.
+//
+// ⚠️ The consequence is that the button no longer brightens where light content sits
+// behind it: the node samples (0,69,74) where a white sheet shows through its
+// translucent band. Chasing that back would mean re-introducing the blend.
+const DONE_FILL = '#00292A';
+
+const HOLD_MS = 250;
+const MOVE_TOL = 8;
+
+// ── The Photos / Pages switcher — node 451:15255 ("Switcher with icons").
+// 343×40 at 16, r16, rgba(0,0,0,0.8) + blur(10.95px), padding 4; the selected
+// segment is a white r12 fill. Sampled against the node: the unselected side reads
+// (4,4,4), which is 0.8 black over the header's own rgb(20,20,20) — so the 80% is
+// real and must not be flattened to a solid.
+//
+// The node types the unselected label in Brandon Text 14 — Figma's fallback for a
+// face this file does not carry — so both labels take the project's SF stack at the
+// node's 15/20 −0.24.
+function ArrangeSwitcher({ tab, onTab }) {
+  const seg = (id, label) => {
+    const on = tab === id;
+    return (
+      <button type="button" key={id} onClick={() => onTab(id)}
+        aria-pressed={on}
+        style={{
+          flex: '1 0 0', minWidth: 0, height: '100%', padding: 4,
+          border: 'none', borderRadius: 12, cursor: 'pointer',
+          background: on ? 'var(--colour-foreground-fg-white, #FFFFFF)' : 'transparent',
+          fontFamily: TEXT, fontWeight: 600, fontSize: 15, lineHeight: '20px',
+          letterSpacing: '-0.24px', textAlign: 'center',
+          color: on ? 'var(--colour-foreground-fg-black, #333333)' : '#FFFFFF',
+          WebkitTapHighlightColor: 'transparent',
+        }}>{label}</button>
+    );
+  };
+  return (
+    <div role="tablist" aria-label="Arrange what" style={{
+      display: 'flex', alignItems: 'center', height: 40, padding: 4,
+      boxSizing: 'border-box', borderRadius: 16,
+      background: 'rgba(0,0,0,0.8)',
+      backdropFilter: 'blur(10.95px)', WebkitBackdropFilter: 'blur(10.95px)',
+    }}>
+      {seg('photos', 'Photos')}
+      {seg('pages', 'Pages')}
+    </div>
+  );
+}
+
+// ── Header — node 451:15241. 236 tall on a 44 status bar, a flat backdrop-blur(5px)
+// under the node's own gradient.
+//
+// This one keeps the node's fully opaque top stop, unlike the page view's header
+// (which drops it to 55% so the blur it sits on stays visible). Here the header is a
+// real panel carrying two lines of copy and a control, not a peek-through scrim, so
+// opaque is the intent — and a progressive blur would be pointless under it.
+function ArrangeHeader({ tab, onTab }) {
+  const top = 'max(68px, calc(env(safe-area-inset-top, 44px) + 24px))';
+  return (
+    <div style={{
+      position: 'absolute', left: 0, right: 0, top: 0, zIndex: 6,
+      height: 'calc(env(safe-area-inset-top, 44px) + 192px)',
+      backdropFilter: 'blur(5px)', WebkitBackdropFilter: 'blur(5px)',
+      backgroundImage:
+        'linear-gradient(to bottom, rgb(20,20,20) 73.671%, rgba(39,39,39,0) 96.296%)',
+    }}>
+      {/* node 451:15253 / 451:15254 — title at 68, body at 97, both 334 wide */}
+      <p style={{
+        position: 'absolute', left: 0, right: 0, top, margin: 0, textAlign: 'center',
+        fontFamily: TEXT, fontWeight: 600, fontSize: 16, lineHeight: '21px',
+        letterSpacing: '-0.32px', color: '#FFFFFF',
+      }}>Arrange mode</p>
+      <p style={{
+        position: 'absolute', left: 0, right: 0, top: `calc(${top} + 29px)`,
+        margin: '0 auto', maxWidth: 334, textAlign: 'center',
+        fontFamily: TEXT, fontSize: 16, lineHeight: '21px', letterSpacing: '-0.32px',
+        color: 'var(--colour-foreground-fg-grey, #CCCCCC)',
+      }}>
+        {/* The node's own line break on the Photos tab. The Pages copy is an
+            addition — the node only draws the Photos tab. */}
+        {tab === 'photos' ? (
+          <React.Fragment>
+            Drag and drop photo to move it,<br />
+            or tap 2 photos to swap with each other.
+          </React.Fragment>
+        ) : (
+          <React.Fragment>
+            Drag and drop a spread to move it,<br />
+            or tap 2 pages to swap their photos.
+          </React.Fragment>
+        )}
+      </p>
+      <div style={{
+        position: 'absolute', left: 16, right: 16, top: `calc(${top} + 90px)`,
+      }}>
+        <ArrangeSwitcher tab={tab} onTab={onTab} />
+      </div>
+    </div>
+  );
+}
+
+// ── One page of a spread in the list.
+//
+// `leafBox` is the book view's, so a spread does not change colour as you move
+// between the two views. ⚠️ The node paints both arrange leaves white where the book
+// view shades the left one #F5F5F5 — the book view wins, since the same sheet
+// otherwise re-shades itself the moment Arrange is tapped.
+function ArrangeLeaf({ side, n, photo, hole, ring, onPointerDown, leafRef }) {
+  const left = side === 'left';
+  return (
+    <div ref={leafRef}
+         data-arr-page={n || undefined}
+         onPointerDown={n ? onPointerDown : undefined}
+         style={Object.assign(leafBox(left), {
+           position: 'relative',
+           cursor: n ? 'grab' : 'default',
+           WebkitTapHighlightColor: 'transparent',
+           // The list scrolls vertically and a photo is most of a leaf, so the
+           // gesture is only claimed once the press-and-hold fires — see the
+           // comment on `press` in ArrangeView. touch-action therefore stays at
+           // its default here and the browser keeps the scroll until then.
+         })}>
+      <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+        {/* node 451:15159 — the hole a lifted photo leaves: the empty well at half
+            opacity, keeping its shadow, so the page still reads as having a slot. */}
+        <PhotoWell photo={hole ? null : photo}
+                   style={{ position: 'absolute', inset: 0, flex: 'none',
+                            opacity: hole ? 0.5 : 1 }} />
+        {ring && (
+          <span aria-hidden style={{
+            position: 'absolute', inset: 0, pointerEvents: 'none',
+            boxShadow: `inset 0 0 0 2px ${ARR_ACCENT}`,
+          }} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// node 451:15153 etc. put the page numbers at 12/28 in **black** at 35% — unreadable
+// on this near-black page, and plainly carried over from a light context. The book
+// view's white at the same size and opacity is used instead.
+function ArrangeCaption({ left, right, onAdd }) {
+  const s = {
+    fontFamily: TEXT, fontSize: 12, lineHeight: '28px',
+    color: '#FFFFFF', opacity: 0.35,
+  };
+  return (
+    <div style={{
+      position: 'relative', height: ARR_CAPTION, display: 'flex',
+      justifyContent: 'space-between', alignItems: 'flex-start',
+    }}>
+      <span aria-hidden style={s}>{left || ''}</span>
+      <span aria-hidden style={s}>{right || ''}</span>
+      {onAdd && (
+        // The node has this straddling the block's bottom edge (top 189 of 203),
+        // which with no gap between blocks would put it on the next sheet. Centred
+        // in the caption strip instead.
+        <button type="button" onClick={onAdd} aria-label="Add spread here"
+          {...press(0.9)}
+          style={{
+            position: 'absolute', left: `calc(50% - ${ARR_ADD.w / 2}px)`,
+            top: (ARR_CAPTION - ARR_ADD.h) / 2,
+            width: ARR_ADD.w, height: ARR_ADD.h, borderRadius: 24, padding: 0,
+            border: 'none', background: 'var(--colour-foreground-fg-black, #333333)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', transition: 'transform 140ms ease',
+            WebkitTapHighlightColor: 'transparent',
+          }}>
+          <img src={`${A}/pb-editor-plus.svg`} alt=""
+               width={ARR_ADD.icon} height={ARR_ADD.icon} style={{ display: 'block' }} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── Arrange mode.
+//
+// ⚠️ A leaf here shows **one photo**, not its layout template. `pb_placed` holds one
+// photo per page — that is what auto-fill writes and what every other view reads —
+// so one photo per page is exactly what there is to rearrange, and every gesture in
+// this mode moves real, persisted data. A page given a multi-photo template in the
+// layout drawer therefore reads simpler here than in the book view, whose extra slots
+// are filled from the upload pool as a *preview* (see slotPhotos). Unifying the two
+// means making placement per-slot, which is a change to the storage model and not a
+// side effect of this mode.
+function ArrangeView({ aspect, pages, placed, onSwapPhotos, onMoveSpread, onAdd, onDone }) {
+  const { useState, useRef, useEffect } = React;
+  const [tab, setTab] = useState('photos');
+  // The first of a tap-tap pair: a page number on the Photos tab, a page number on
+  // Pages too (a tap there swaps two pages' photos, per the copy).
+  const [sel, setSel] = useState(null);
+  const [drag, setDrag] = useState(null);
+
+  const root = useRef(null);
+  const scroller = useRef(null);
+  const pending = useRef(null);
+  const pageEls = useRef({});
+  const spreadEls = useRef({});
+  const autoRaf = useRef(0);
+  const autoDir = useRef(0);
+  const finishRef = useRef(() => {});
+
+  const spreads = spreadsFor(pages);
+  const photoAt = n => (n ? placed[n - 1] || null : null);
+
+  // Switching tabs abandons a half-made pair, and a drag can never outlive the tab
+  // it was started on.
+  const switchTab = t => { setTab(t); setSel(null); };
+
+  // ── Edge auto-scroll. A 24-page book is far longer than the viewport, so without
+  // this you could only ever drop onto a target that was already visible.
+  const stopAuto = () => {
+    autoDir.current = 0;
+    if (autoRaf.current) { cancelAnimationFrame(autoRaf.current); autoRaf.current = 0; }
+  };
+  const edgeScroll = y => {
+    const sc = scroller.current;
+    if (!sc) return;
+    const r = sc.getBoundingClientRect();
+    const M = 80;
+    let d = 0;
+    if (y < r.top + M) d = -Math.min(14, (r.top + M - y) / 4);
+    else if (y > r.bottom - M) d = Math.min(14, (y - (r.bottom - M)) / 4);
+    autoDir.current = d;
+    if (d && !autoRaf.current) {
+      const step = () => {
+        const el = scroller.current;
+        if (!el || !autoDir.current) { autoRaf.current = 0; return; }
+        el.scrollTop += autoDir.current;
+        autoRaf.current = requestAnimationFrame(step);
+      };
+      autoRaf.current = requestAnimationFrame(step);
+    }
+  };
+  useEffect(() => stopAuto, []);
+
+  // A safety net on the window. setPointerCapture normally guarantees the release
+  // comes back to the element that took it, but capture can fail (or the element can
+  // unmount mid-drag) and a drag whose pointerup never arrives would hang with the
+  // clone stuck under the finger. Registered only while a press is live, and it runs
+  // the same `finish` the element's own handler does — whichever fires first clears
+  // `pending`, so the second is a no-op.
+  useEffect(() => {
+    const up = e => finishRef.current(e, false);
+    const cancel = e => finishRef.current(e, true);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', cancel);
+    return () => {
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', cancel);
+    };
+  }, []);
+
+  // Which target is under (x, y). Rects are read live rather than cached: the list
+  // scrolls under the finger, including by auto-scroll.
+  const hitTest = (x, y) => {
+    const els = tab === 'photos' ? pageEls.current : spreadEls.current;
+    let hit = null;
+    Object.keys(els).forEach(k => {
+      const el = els[k];
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) hit = Number(k);
+    });
+    return hit;
+  };
+
+  // ── The gesture. One handler gives both interactions the node asks for:
+  //   a tap (released before the hold, having barely moved) selects, and a second
+  //   tap swaps; a press-and-hold lifts the item and then follows the finger.
+  //
+  // ⚠️ Press-and-hold rather than an immediate drag is what keeps the list
+  // scrollable. Claiming the gesture on pointerdown would need touch-action:none on
+  // every photo, and photos are most of the list — the page would barely scroll.
+  // Moving more than MOVE_TOL before the hold fires is read as a scroll and cancels
+  // the press.
+  const onPointerDown = (page, spread) => e => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const el = e.currentTarget;
+    stopAuto();
+    const p = {
+      page, spread, el, pointerId: e.pointerId,
+      sx: e.clientX, sy: e.clientY, lifted: false, timer: 0,
+    };
+    pending.current = p;
+    p.timer = setTimeout(() => {
+      if (pending.current !== p) return;
+      p.lifted = true;
+      try { el.setPointerCapture(p.pointerId); } catch (err) { /* not fatal */ }
+      const src = tab === 'photos' ? el : spreadEls.current[spread];
+      const r = (src || el).getBoundingClientRect();
+      const rr = root.current ? root.current.getBoundingClientRect() : { left: 0, top: 0 };
+      p.grabX = p.sx - r.left;
+      p.grabY = p.sy - r.top;
+      setSel(null);
+      setDrag({
+        page, spread, w: r.width, h: r.height,
+        rootX: rr.left, rootY: rr.top,
+        x: p.sx, y: p.sy, grabX: p.grabX, grabY: p.grabY, over: null,
+      });
+    }, HOLD_MS);
+  };
+
+  const onPointerMove = e => {
+    const p = pending.current;
+    if (!p) return;
+    if (!p.lifted) {
+      if (Math.abs(e.clientX - p.sx) > MOVE_TOL || Math.abs(e.clientY - p.sy) > MOVE_TOL) {
+        clearTimeout(p.timer);
+        pending.current = null;
+      }
+      return;
+    }
+    // The clone is pointer-events:none, so this never hit-tests the clone itself.
+    e.preventDefault();
+    const over = hitTest(e.clientX, e.clientY);
+    setDrag(d => (d ? Object.assign({}, d, { x: e.clientX, y: e.clientY, over }) : d));
+    edgeScroll(e.clientY);
+  };
+
+  const finish = (e, cancelled) => {
+    const p = pending.current;
+    if (!p) return;
+    clearTimeout(p.timer);
+    pending.current = null;
+    stopAuto();
+    if (!p.lifted) {
+      // A tap. Both tabs swap two pages' photos; the node's copy says so for Photos
+      // and the Pages tab reuses it, which is the only tap that means anything there.
+      const n = p.page;
+      if (!n) return;
+      if (sel == null) setSel(n);
+      else if (sel === n) setSel(null);
+      else { onSwapPhotos(sel, n); setSel(null); }
+      return;
+    }
+    const over = cancelled ? null : hitTest(e.clientX, e.clientY);
+    setDrag(null);
+    if (over == null) return;
+    if (tab === 'photos') {
+      if (over !== p.page) onSwapPhotos(p.page, over);
+    } else if (over !== p.spread) {
+      onMoveSpread(p.spread, over);
+    }
+  };
+
+  finishRef.current = finish;
+
+  const dragging = !!drag;
+  // ⚠️ Both guard on `n` first. The inside-cover leaves have no page number, and
+  // `sel` is null when nothing is selected — so `sel === n` would ring every inside
+  // cover permanently.
+  const hole = n => !!n && dragging && tab === 'photos' && drag.page === n;
+  const ringed = n => (!n ? false : dragging
+    ? (tab === 'photos' && drag.over === n && drag.page !== n)
+    : sel === n);
+
+  // node 451:15152 / 451:15163 — the dragged spread's paper drops to 10%, and the
+  // spread under the finger to 50% with its content scaled to the node's 152/164.
+  const sheetOpacity = i => {
+    if (!dragging || tab !== 'pages') return 1;
+    if (drag.spread === i) return 0.1;
+    return drag.over === i ? 0.5 : 1;
+  };
+  const sheetScale = i =>
+    (dragging && tab === 'pages' && drag.over === i && drag.spread !== i ? 152 / 164 : 1);
+
+  // Only a real page is a drop target. Registering an inside cover would put a
+  // "null" key in the map, and hitTest would hand back NaN as a page number.
+  const pageRef = n => (n ? (el => { pageEls.current[n] = el; }) : undefined);
+
+  const leaves = (i, pair) => (
+    <React.Fragment>
+      <ArrangeLeaf side="left" n={pair[0]} photo={photoAt(pair[0])}
+                   hole={hole(pair[0])} ring={ringed(pair[0])}
+                   onPointerDown={onPointerDown(pair[0], i)}
+                   leafRef={pageRef(pair[0])} />
+      <ArrangeLeaf side="right" n={pair[1]} photo={photoAt(pair[1])}
+                   hole={hole(pair[1])} ring={ringed(pair[1])}
+                   onPointerDown={onPointerDown(pair[1], i)}
+                   leafRef={pageRef(pair[1])} />
+    </React.Fragment>
+  );
+
+  return (
+    <div ref={root} style={{
+      position: 'absolute', inset: 0, animation: 'pbFadeIn 220ms ease both',
+    }}>
+      <div
+        ref={scroller}
+        onPointerMove={onPointerMove}
+        onPointerUp={e => finish(e, false)}
+        onPointerCancel={e => finish(e, true)}
+        style={{
+          position: 'absolute', left: 0, right: 0,
+          // node: the list starts at 244 on a 236-tall header, i.e. 8 below it.
+          top: 'calc(env(safe-area-inset-top, 44px) + 200px)',
+          bottom: 0,
+          overflowY: 'auto', overflowX: 'hidden',
+          WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none',
+        }}>
+        <div style={{
+          display: 'flex', flexDirection: 'column',
+          // The node's blocks butt up against each other — no gap, against the book
+          // view's 47.
+          padding: `0 ${GUTTER}px`, boxSizing: 'border-box',
+        }}>
+          {spreads.map((pair, i) => (
+            <div key={i} ref={el => { spreadEls.current[i] = el; }}
+                 style={{
+                   position: 'relative',
+                   opacity: sheetOpacity(i),
+                   transform: `scale(${sheetScale(i)})`,
+                   transformOrigin: 'center',
+                   transition: 'opacity 160ms ease, transform 160ms ease',
+                 }}>
+              <Sheet aspect={aspect} interior={leaves(i, pair)}>
+                <GutterArt file="pb-editor-spine.png" offsets={[-4]} width={8} />
+              </Sheet>
+              <ArrangeCaption left={pair[0]} right={pair[1]}
+                              onAdd={i < spreads.length - 1 ? () => onAdd() : null} />
+            </div>
+          ))}
+          {/* Room for the Done band, which is absolutely positioned over the list. */}
+          <div aria-hidden style={{
+            height: 'calc(120px + env(safe-area-inset-bottom, 0px))',
+          }} />
+        </div>
+      </div>
+
+      <ArrangeHeader tab={tab} onTab={switchTab} />
+
+      {/* node 451:15239 — a 161-tall gradient band carrying the CTA. */}
+      <div style={{
+        position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 6,
+        height: 'calc(161px + env(safe-area-inset-bottom, 0px))',
+        pointerEvents: 'none',
+        backgroundImage:
+          'linear-gradient(to bottom, rgba(0,0,0,0) 0.2%, rgb(27,27,27) 73.53%)',
+      }}>
+        <button type="button" onClick={onDone} {...press(0.97)} style={{
+          position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+          bottom: 'max(25px, calc(env(safe-area-inset-bottom, 0px) + 8px))',
+          width: 338, maxWidth: 'calc(100% - 32px)', boxSizing: 'border-box',
+          padding: '16px 24px', borderRadius: 55, border: 'none',
+          background: DONE_FILL,
+          boxShadow: 'inset 0px 0px 27px rgba(0,0,0,0.25)',
+          fontFamily: TEXT, fontWeight: 600, fontSize: 16, lineHeight: '21px',
+          letterSpacing: '-0.32px', textAlign: 'center',
+          color: 'var(--colour-foreground-fg-white, #FFFFFF)',
+          cursor: 'pointer', pointerEvents: 'auto',
+          transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
+        }}>Done</button>
+      </div>
+
+      {/* The floating clone. Not in the design — the node shows the source faded but
+          nothing under the finger, and a drag with nothing under the finger reads as
+          broken. Positioned against the arrange root rather than `fixed`, so it is
+          also correct inside the desktop IOSDevice frame. */}
+      {drag && (
+        <div aria-hidden style={{
+          position: 'absolute', zIndex: 30, pointerEvents: 'none',
+          left: drag.x - drag.grabX - drag.rootX,
+          top: drag.y - drag.grabY - drag.rootY,
+          width: drag.w, height: drag.h,
+          opacity: 0.9, transform: 'scale(1.04)', transformOrigin: 'center',
+          filter: 'drop-shadow(0px 12px 20px rgba(0,0,0,0.5))',
+        }}>
+          {tab === 'photos' ? (
+            <div style={Object.assign(leafBox(false), { width: '100%' })}>
+              <PhotoWell photo={photoAt(drag.page)} />
+            </div>
+          ) : (
+            <Sheet aspect={aspect}
+                   interior={leaves(drag.spread, spreads[drag.spread] || [null, null])} />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EditorScreen() {
   const { useState, useEffect, useRef } = React;
   const [book] = useState(readBook);
@@ -1712,6 +2236,8 @@ function EditorScreen() {
   const [layouts, setLayouts] = useState(readLayouts);
   // null = the book view; otherwise the slot index the page view opened on.
   const [pageView, setPageView] = useState(null);
+  // Arrange mode — node 451:15148. A third mode of this screen, alongside page view.
+  const [arrange, setArrange] = useState(false);
   const [added, setAdded] = useState(() => {
     // A book reloaded with more photos than pages keeps the spreads auto-fill added.
     const p = readList('pb_placed');
@@ -1745,9 +2271,57 @@ function EditorScreen() {
     bookScroller.current = el;
     if (el) el.scrollTop = bookScrollTop.current;
   };
-  const openPage = slot => {
+  const stashBookScroll = () => {
     if (bookScroller.current) bookScrollTop.current = bookScroller.current.scrollTop;
-    setPageView(slot);
+  };
+  const openPage = slot => { stashBookScroll(); setPageView(slot); };
+  // Arrange's list has its own rhythm (203 pitch against the book view's 243), so
+  // there is no offset to carry across — the book view simply comes back where it was.
+  const openArrange = () => { stashBookScroll(); setArrange(true); };
+
+  const writePlaced = list => {
+    // Trailing nulls carry no information and would inflate the length `added` is
+    // re-derived from on reload.
+    const out = list.slice();
+    while (out.length && !out[out.length - 1]) out.pop();
+    sessionStorage.setItem('pb_placed', JSON.stringify(out));
+    return out;
+  };
+
+  // ── Arrange: swap the photos on two pages. One operation serves every gesture the
+  // mode offers — a drag onto an occupied page swaps, a drag onto an empty one moves,
+  // and tapping two photos swaps. Pages are 1-based, as pb_placed is.
+  const swapPhotos = (a, b) => {
+    setPlaced(prev => {
+      const next = prev.slice();
+      while (next.length < Math.max(a, b)) next.push(null);
+      const t = next[a - 1] || null;
+      next[a - 1] = next[b - 1] || null;
+      next[b - 1] = t;
+      return writePlaced(next);
+    });
+  };
+
+  // ── Arrange: move a whole spread through the book.
+  //
+  // The photos are re-laid onto pages 1..n in the new order rather than the pages
+  // being renumbered, so the book's pagination never changes. Chunk sizes are
+  // [1, 2, 2, … 2, 1] — the first spread carries only page 1 (its other leaf is the
+  // inside front cover) and the last only page n — and they sum to n either way, so
+  // reordering chunks of unequal size still lands exactly one photo per page.
+  //
+  // ⚠️ `pb_layouts` is keyed by slot index and is deliberately *not* permuted: a
+  // template belongs to the page it is on, not to the photo that happens to sit
+  // there. Moving a spread moves its pictures, not its layouts.
+  const moveSpread = (from, to) => {
+    setPlaced(prev => {
+      const chunks = spreadsFor(book.pages + added * 2).map(
+        pair => pair.filter(n => n).map(n => prev[n - 1] || null));
+      if (from < 0 || from >= chunks.length || to < 0 || to >= chunks.length) return prev;
+      const moved = chunks.splice(from, 1)[0];
+      chunks.splice(to, 0, moved);
+      return writePlaced([].concat.apply([], chunks));
+    });
   };
 
   // Durable, like pb_placed: a reload keeps the templates the book was given.
@@ -1806,7 +2380,14 @@ function EditorScreen() {
         @keyframes pbFadeIn   { from { opacity: 0; } to { opacity: 1; } }
       `}</style>
 
-      {pageView !== null ? (
+      {arrange ? (
+        <ArrangeView
+          aspect={aspect} pages={pages} placed={placed}
+          onSwapPhotos={swapPhotos} onMoveSpread={moveSpread}
+          onAdd={() => setAdded(n => n + 1)}
+          onDone={() => setArrange(false)}
+        />
+      ) : pageView !== null ? (
         <PageView
           aspect={aspect} pageAspect={pageAspect} pages={pages}
           placed={placed} uploaded={uploaded}
@@ -1866,7 +2447,9 @@ function EditorScreen() {
       </div>
 
       <Header onClose={() => window.navigation.pop()} />
-      <Toolbar photos={uploaded} />
+      {/* Arrange is the book view's one live tool; the other five are inert. */}
+      <Toolbar photos={uploaded}
+               onTool={id => { if (id === 'arrange') openArrange(); }} />
 
       {(sheet === 'open' || sheet === 'closing') && (
         incoming ? (
