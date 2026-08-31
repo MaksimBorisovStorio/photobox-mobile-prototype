@@ -131,6 +131,9 @@ function GutterArt({ file, offsets, width, opacity }) {
   return offsets.map(dx => (
     <div key={dx} aria-hidden style={{
       position: 'absolute', left: `calc(50% + ${dx}px)`, top: 1, bottom: 1,
+      // Decorative, and it sits over the spine — without this it swallows a press
+      // aimed at the leaf underneath, so a spread could not be picked up there.
+      pointerEvents: 'none',
       width, opacity: opacity || 1,
       backgroundImage: `url(${A}/${file})`, backgroundSize: '100% 100%',
     }} />
@@ -153,7 +156,7 @@ function leafBox(left) {
   };
 }
 
-function Leaf({ side, photo, onOpen, label, layout, pool }) {
+function Leaf({ side, photos, onOpen, label, layout }) {
   const left = side === 'left';
   return (
     <div
@@ -175,7 +178,7 @@ function Leaf({ side, photo, onOpen, label, layout, pool }) {
       {/* A relative box for the layout to position its slots inside; with no layout
           set LayoutWell falls back to the single full-page well the node draws. */}
       <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
-        <LayoutWell layout={layout} photos={slotPhotos(photo, pool)} />
+        <LayoutWell layout={layout} photos={photos} />
       </div>
     </div>
   );
@@ -183,21 +186,27 @@ function Leaf({ side, photo, onOpen, label, layout, pool }) {
 
 // Photo well — node 451:15614. Empty it is #D9D9D9 with the 24px add-image icon;
 // once auto-fill has placed a photo it fills the well. Still inert either way.
+// ⚠️ `draggable={false}` on both images is load-bearing, not tidiness. An <img> is
+// natively draggable, so the browser starts an HTML5 drag as soon as the pointer moves
+// on one — and that fires `pointercancel`, which killed every press-and-hold drag in
+// arrange mode and the page navigator the instant the finger moved. Measured:
+// gotpointercapture → pointermove → dragstart → pointercancel, all within 2ms.
 function PhotoWell({ photo, style, iconSize = 24 }) {
   return (
     <div aria-hidden style={Object.assign({
       position: 'relative', flex: 1, minWidth: 0, overflow: 'hidden',
       background: '#D9D9D9',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
+      WebkitUserSelect: 'none', userSelect: 'none',
     }, style)}>
       {photo ? (
-        <img src={photo} alt="" loading="lazy" style={{
+        <img src={photo} alt="" loading="lazy" draggable={false} style={{
           position: 'absolute', inset: 0, width: '100%', height: '100%',
-          objectFit: 'cover', display: 'block',
+          objectFit: 'cover', display: 'block', WebkitUserDrag: 'none',
         }} />
       ) : (
         <img src={`${A}/pb-editor-add-image.svg`} alt="" width={iconSize} height={iconSize}
-             style={{ display: 'block' }} />
+             draggable={false} style={{ display: 'block', WebkitUserDrag: 'none' }} />
       )}
     </div>
   );
@@ -291,6 +300,33 @@ function layoutById(id) {
 function slotPhotos(photo, pool) {
   if (!photo) return [];
   return [photo].concat((pool || []).filter(p => p !== photo));
+}
+
+// ── A page's photos, one per layout slot.
+//
+// `pb_placed[n-1]` is either a single photo — what auto-fill writes, and what every
+// page held before arrange mode could move individual slots — or an **array**, one
+// entry per slot. A page becomes an array the first time a slot on it is moved: what
+// you were shown (the pool-filled preview below) becomes what you actually have, which
+// is the only way a drag on a multi-photo page can persist.
+function pagePhotos(placed, n, slots, pool) {
+  if (!n) return [];
+  const count = Math.max(1, slots || 1);
+  const entry = placed[n - 1];
+  if (Array.isArray(entry)) {
+    const out = entry.slice(0, count);
+    while (out.length < count) out.push(null);
+    return out;
+  }
+  if (!entry) return [];
+  return slotPhotos(entry, pool).slice(0, count);
+}
+
+// The one photo that stands for a page — a navigator thumbnail, a caption, a clone.
+function pageThumb(placed, n) {
+  const entry = n ? placed[n - 1] : null;
+  if (Array.isArray(entry)) return entry.find(Boolean) || null;
+  return entry || null;
 }
 
 // A well subdivided by a layout. It positions itself absolutely inside its parent,
@@ -397,10 +433,10 @@ function AddSpreadButton({ onClick }) {
 // ── Cover — node 451:15622. Back cover carries a 50×18 placeholder bottom-left;
 // the front carries "Add text" over a photo well. The double 14px hinge strips at
 // 50% ±(11,3) reproduce the node's overlapping pair.
-function CoverBlock({ aspect, onOpen, layout }) {
+// The cover's own interior, shared with arrange mode so the two views draw the same
+// cover. `onOpen` is optional: arrange shows the cover but does not open it.
+function CoverInterior({ onOpen, layout }) {
   return (
-    <div style={{ position: 'relative', width: '100%' }}>
-      <Sheet aspect={aspect} interior={
         <div style={{ position: 'relative', width: '100%', height: '100%' }}>
           <div aria-hidden style={{
             position: 'absolute', left: 6, bottom: 5, width: 50, height: 18,
@@ -433,7 +469,13 @@ function CoverBlock({ aspect, onOpen, layout }) {
             </div>
           </div>
         </div>
-      }>
+  );
+}
+
+function CoverBlock({ aspect, onOpen, layout }) {
+  return (
+    <div style={{ position: 'relative', width: '100%' }}>
+      <Sheet aspect={aspect} interior={<CoverInterior onOpen={onOpen} layout={layout} />}>
         <GutterArt file="pb-editor-hinge.png" offsets={[-11, -3]} width={14} opacity={0.5} />
       </Sheet>
       <Caption right="Cover" />
@@ -446,16 +488,19 @@ function CoverBlock({ aspect, onOpen, layout }) {
 // The inside-front and inside-back leaves carry no page number, so they stay empty.
 function SpreadBlock({ aspect, left, right, showPlus, onAdd, photos, onOpen,
                       layoutFor, pool }) {
-  const at = n => (n ? photos[n - 1] : null);
   const name = n => (n ? `page ${n}` : 'the inside cover');
+  const at = (n, side) => {
+    const layout = layoutFor && layoutFor(side);
+    return pagePhotos(photos, n, layout ? layout.length : 1, pool);
+  };
   return (
     <div style={{ position: 'relative', width: '100%' }}>
       <Sheet aspect={aspect} interior={
         <React.Fragment>
-          <Leaf side="left" photo={at(left)} label={name(left)} pool={pool}
+          <Leaf side="left" photos={at(left, 'left')} label={name(left)}
                 layout={layoutFor && layoutFor('left')}
                 onOpen={onOpen && (() => onOpen('left'))} />
-          <Leaf side="right" photo={at(right)} label={name(right)} pool={pool}
+          <Leaf side="right" photos={at(right, 'right')} label={name(right)}
                 layout={layoutFor && layoutFor('right')}
                 onOpen={onOpen && (() => onOpen('right'))} />
         </React.Fragment>
@@ -1060,14 +1105,14 @@ function BigLeaf({ side, slotRef, children }) {
 // The well, positioned on the node's own insets. `iconSize` scales the empty-state
 // glyph with the page: 24px is right on a 164px leaf in the book view and lost on a
 // 310px one here.
-function BigWell({ photo, pool, layout, pageW, onSelect, selected }) {
+function BigWell({ photos, layout, pageW, onSelect, selected }) {
   return (
     <div style={{
       position: 'absolute',
       left: PV_WELL.left, right: PV_WELL.right,
       top: PV_WELL.top, bottom: PV_WELL.bottom,
     }}>
-      <LayoutWell layout={layout} photos={slotPhotos(photo, pool)}
+      <LayoutWell layout={layout} photos={photos}
                   iconSize={Math.round(pageW * 0.13)}
                   onSelect={onSelect} selected={selected} />
     </div>
@@ -1115,9 +1160,19 @@ function CoverUnit({ w, h, pageW, frontRef, layout }) {
 // shadow paints the same ring over the thumb's outer 2px and keeps every item a
 // fixed 41 — the reason the status banners and the collection covers already use an
 // inset shadow rather than a border.
-function NavThumb({ photo, active, label, spine, onClick, itemRef }) {
+// ⚠️ press(0.9) must be spread BEFORE onPointerDown and its handler composed into
+// ours. Spread after, press's own onPointerDown silently overwrites the drag handler —
+// JSX gives the later prop — and the drag simply never starts.
+function NavThumb({ photo, active, label, spine, onClick, itemRef,
+                   onPointerDown, dragging, dropTarget }) {
   return (
-    <button ref={itemRef} type="button" onClick={onClick} {...press(0.9)}
+    <button ref={itemRef} type="button" onClick={onClick}
+            onDragStart={e => e.preventDefault()}
+            {...press(0.9)}
+            onPointerDown={e => {
+              e.currentTarget.style.transform = 'scale(0.9)';
+              if (onPointerDown) onPointerDown(e);
+            }}
       aria-label={spine ? 'Cover' : (label ? `Page ${label}` : 'Inside cover')}
       aria-current={active ? 'true' : undefined}
       style={{
@@ -1135,12 +1190,17 @@ function NavThumb({ photo, active, label, spine, onClick, itemRef }) {
         )}
         <span style={{
           width: NAV_THUMB, height: NAV_THUMB, borderRadius: 2, overflow: 'hidden',
-          background: '#FFFFFF', opacity: active ? 1 : 0.5,
-          boxShadow: active ? 'inset 0 0 0 2px #008E93' : 'none',
+          background: '#FFFFFF',
+          // The page being dragged reads as lifted out of the row.
+          opacity: dragging ? 0.25 : (active ? 1 : 0.5),
+          boxShadow: dropTarget
+            ? `inset 0 0 0 2px ${ARR_ACCENT}`
+            : (active ? 'inset 0 0 0 2px #008E93' : 'none'),
         }}>
           {photo && (
-            <img src={photo} alt="" loading="lazy" style={{
+            <img src={photo} alt="" loading="lazy" draggable={false} style={{
               width: '100%', height: '100%', objectFit: 'cover', display: 'block',
+              WebkitUserDrag: 'none',
             }} />
           )}
         </span>
@@ -1175,7 +1235,8 @@ function NavAdd({ onClick }) {
 // ── Navigator row — node 451:14513. Leaves of one spread sit 1px apart and
 // consecutive spreads 8px apart, which is what makes the pairing read; the row
 // scrolls, since a 24-page book is far wider than any phone.
-function PageNavigator({ slots, photoFor, active, onPick, onAdd, itemRefs, bottom }) {
+function PageNavigator({ slots, photoFor, active, onPick, onAdd, itemRefs, bottom,
+                        onThumbDown, onMove, onUp, dragIndex, overIndex }) {
   const groups = [];
   slots.forEach((s, i) => {
     const g = groups[groups.length - 1];
@@ -1183,7 +1244,11 @@ function PageNavigator({ slots, photoFor, active, onPick, onAdd, itemRefs, botto
     else groups.push({ unit: s.unit, items: [i] });
   });
   return (
-    <div style={{
+    <div
+      onPointerMove={onMove}
+      onPointerUp={e => onUp && onUp(e, false)}
+      onPointerCancel={e => onUp && onUp(e, true)}
+      style={{
       position: 'absolute', left: 0, right: 0, bottom, zIndex: 5,
       display: 'flex', alignItems: 'flex-start', gap: 8,
       padding: '0 16px', boxSizing: 'border-box',
@@ -1200,6 +1265,8 @@ function PageNavigator({ slots, photoFor, active, onPick, onAdd, itemRefs, botto
               <NavThumb key={i} label={slots[i].label} spine={slots[i].unit === 0}
                         photo={photoFor(slots[i])} active={i === active}
                         onClick={() => onPick(i)}
+                        onPointerDown={onThumbDown && onThumbDown(i)}
+                        dragging={dragIndex === i} dropTarget={overIndex === i}
                         itemRef={el => { itemRefs.current[i] = el; }} />
             ))}
           </div>
@@ -1458,7 +1525,7 @@ function LayoutDrawer({ closing, count, selected, options, photos, pageAspect,
 // toolbar's 139), and the strip fills what is left. Centring the book in that band
 // puts its top edge at 231.3 against the node's 231.
 function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
-                   layouts, onSetLayout, onBack, onAdd }) {
+                   layouts, onSetLayout, onSwapPages, onBack, onAdd }) {
   const { useState, useRef, useEffect, useLayoutEffect, useMemo } = React;
   const slots = useMemo(() => slotsFor(pages), [pages]);
   const [active, setActive] = useState(() => Math.min(startSlot, slots.length - 1));
@@ -1469,6 +1536,95 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
   const leafRefs = useRef([]);
   const navRefs = useRef([]);
   const raf = useRef(0);
+  const rootRef = useRef(null);
+
+  // ── Dragging a page in the navigator. Not in the node, which only taps a thumbnail
+  // to jump to it — but a page strip you cannot reorder is the obvious thing to reach
+  // for, so the same press-and-hold gesture arrange mode uses is wired up here and
+  // dropping one page on another swaps them. A plain tap still jumps, via the
+  // thumbnail's own onClick.
+  const [navDrag, setNavDrag] = useState(null);
+  const navPending = useRef(null);
+  const navTouchBlock = useRef(null);
+  const suppressClick = useRef(false);
+
+  const releaseNavTouch = () => {
+    if (!navTouchBlock.current) return;
+    window.removeEventListener('touchmove', navTouchBlock.current, { passive: false });
+    navTouchBlock.current = null;
+  };
+  useEffect(() => releaseNavTouch, []);
+
+  const navHit = (x, y) => {
+    let hit = null;
+    navRefs.current.forEach((el, i) => {
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) hit = i;
+    });
+    return hit;
+  };
+
+  const onThumbDown = i => e => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    // The cover is not a page and cannot be reordered.
+    if (!slots[i] || !slots[i].n) return;
+    const el = e.currentTarget;
+    const p = { i, el, pointerId: e.pointerId, sx: e.clientX, sy: e.clientY,
+                lifted: false, timer: 0 };
+    navPending.current = p;
+    p.timer = setTimeout(() => {
+      if (navPending.current !== p) return;
+      p.lifted = true;
+      try { el.setPointerCapture(p.pointerId); } catch (err) { /* not fatal */ }
+      // Same reason as arrange: on touch only a non-passive touchmove preventDefault
+      // stops the row scrolling out from under the drag.
+      if (!navTouchBlock.current) {
+        const h = ev => ev.preventDefault();
+        window.addEventListener('touchmove', h, { passive: false });
+        navTouchBlock.current = h;
+      }
+      const r = el.getBoundingClientRect();
+      const rr = rootRef.current
+        ? rootRef.current.getBoundingClientRect() : { left: 0, top: 0 };
+      setNavDrag({ i, w: r.width, h: r.height,
+                   grabX: p.sx - r.left, grabY: p.sy - r.top,
+                   rootX: rr.left, rootY: rr.top, x: p.sx, y: p.sy, over: null });
+    }, HOLD_MS);
+  };
+
+  const onNavMove = e => {
+    const p = navPending.current;
+    if (!p) return;
+    if (!p.lifted) {
+      if (Math.abs(e.clientX - p.sx) > MOVE_TOL || Math.abs(e.clientY - p.sy) > MOVE_TOL) {
+        clearTimeout(p.timer);
+        navPending.current = null;
+      }
+      return;
+    }
+    e.preventDefault();
+    const over = navHit(e.clientX, e.clientY);
+    setNavDrag(d => (d ? Object.assign({}, d, { x: e.clientX, y: e.clientY, over }) : d));
+  };
+
+  const onNavUp = (e, cancelled) => {
+    const p = navPending.current;
+    if (!p) return;
+    clearTimeout(p.timer);
+    navPending.current = null;
+    releaseNavTouch();
+    if (!p.lifted) return;               // a tap — the thumbnail's onClick handles it
+    // A drag still ends in a click on the source thumbnail; without this the preview
+    // would jump to the page you just dragged away.
+    suppressClick.current = true;
+    setTimeout(() => { suppressClick.current = false; }, 0);
+    const over = cancelled ? null : navHit(e.clientX, e.clientY);
+    setNavDrag(null);
+    if (over == null || over === p.i) return;
+    const a = slots[p.i], b = slots[over];
+    if (a && b && a.n && b.n && onSwapPages) onSwapPages(a.n, b.n);
+  };
 
   // ── Selected photo — node 451:14611. `{slot, i}`: which page in the strip, and
   // which slot of that page's layout. It lives here rather than in the leaf because
@@ -1597,8 +1753,10 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
     }
   }, [active]);
 
-  const photoFor = s => (s.n ? placed[s.n - 1] : null);
+  const photoFor = s => pageThumb(placed, s.n);
   const spreads = spreadsFor(pages);
+  const pageAt = (n, layout) =>
+    pagePhotos(placed, n, layout ? layout.length : 1, uploaded);
   // Slot indices are 0 for the cover then two per spread, so a spread's leaves are
   // 1 + 2i and 2 + 2i. Added spreads are appended, so existing indices never move.
   const leafRef = i => el => { leafRefs.current[i] = el; };
@@ -1608,7 +1766,7 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
     (selected && selected.slot === slot ? selected.i : null);
 
   return (
-    <div style={{
+    <div ref={rootRef} style={{
       position: 'absolute', inset: 0,
       animation: 'pbFadeIn 220ms ease both',
     }}>
@@ -1646,12 +1804,12 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
             {spreads.map(([l, r], i) => (
               <BookUnit key={i} w={bookW} h={bookH}>
                 <BigLeaf side="left" slotRef={leafRef(1 + 2 * i)}>
-                  <BigWell photo={l ? placed[l - 1] : null} pool={uploaded}
+                  <BigWell photos={pageAt(l, layoutFor(1 + 2 * i))}
                            layout={layoutFor(1 + 2 * i)} pageW={pageW}
                            onSelect={pick(1 + 2 * i)} selected={selectedIn(1 + 2 * i)} />
                 </BigLeaf>
                 <BigLeaf side="right" slotRef={leafRef(2 + 2 * i)}>
-                  <BigWell photo={r ? placed[r - 1] : null} pool={uploaded}
+                  <BigWell photos={pageAt(r, layoutFor(2 + 2 * i))}
                            layout={layoutFor(2 + 2 * i)} pageW={pageW}
                            onSelect={pick(2 + 2 * i)} selected={selectedIn(2 + 2 * i)} />
                 </BigLeaf>
@@ -1671,10 +1829,39 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
         // preview through twenty spreads, and because the scroll handler tracks the
         // centred page the whole way, the selection ring races through every
         // thumbnail in between. One cut sets `active` once.
-        onPick={i => { setActive(i); centreOn(i, 'auto'); }}
+        onPick={i => {
+          if (suppressClick.current) return;
+          setActive(i); centreOn(i, 'auto');
+        }}
         onAdd={onAdd} itemRefs={navRefs}
+        onThumbDown={onThumbDown} onMove={onNavMove} onUp={onNavUp}
+        dragIndex={navDrag ? navDrag.i : -1}
+        overIndex={navDrag && navDrag.over !== navDrag.i ? navDrag.over : -1}
         bottom="calc(170px + env(safe-area-inset-bottom, 0px))"
       />
+      )}
+
+      {/* The dragged thumbnail, following the finger. */}
+      {navDrag && (
+        <div aria-hidden style={{
+          position: 'absolute', zIndex: 30, pointerEvents: 'none',
+          left: navDrag.x - navDrag.grabX - navDrag.rootX,
+          top: navDrag.y - navDrag.grabY - navDrag.rootY,
+          width: navDrag.w, height: navDrag.h,
+          display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+        }}>
+          <span style={{
+            width: NAV_THUMB, height: NAV_THUMB, borderRadius: 2, overflow: 'hidden',
+            background: '#FFFFFF', transform: 'scale(1.15)',
+            boxShadow: '0 8px 16px rgba(0,0,0,0.6)',
+          }}>
+            {photoFor(slots[navDrag.i]) && (
+              <img src={photoFor(slots[navDrag.i])} alt="" draggable={false} style={{
+                width: '100%', height: '100%', objectFit: 'cover', display: 'block',
+              }} />
+            )}
+          </span>
+        </div>
       )}
 
       <PageViewHeader onBack={onBack} controls={!drawer}
@@ -1850,33 +2037,58 @@ function ArrangeHeader({ tab, onTab }) {
 // between the two views. ⚠️ The node paints both arrange leaves white where the book
 // view shades the left one #F5F5F5 — the book view wins, since the same sheet
 // otherwise re-shades itself the moment Arrange is tapped.
-function ArrangeLeaf({ side, n, photo, hole, ring, onPointerDown, leafRef }) {
+// `slotDown` is the Photos tab — one drag handle per layout slot. `leafDown` is the
+// Pages tab, where the unit is the whole spread: the handle has to be the leaf, not the
+// photos on it, or pressing the sheet itself does nothing and the spread cannot be
+// picked up at all.
+function ArrangeLeaf({ side, n, photos, layout, holeSlot, ringSlot,
+                      slotDown, leafDown, slotRef }) {
   const left = side === 'left';
+  const slots = layout && layout.length ? layout : FULL_PAGE;
   return (
-    <div ref={leafRef}
-         data-arr-page={n || undefined}
-         onPointerDown={n ? onPointerDown : undefined}
+    <div onDragStart={e => e.preventDefault()}
+         onPointerDown={n ? leafDown : undefined}
          style={Object.assign(leafBox(left), {
-           position: 'relative',
-           cursor: n ? 'grab' : 'default',
-           WebkitTapHighlightColor: 'transparent',
-           // The list scrolls vertically and a photo is most of a leaf, so the
-           // gesture is only claimed once the press-and-hold fires — see the
-           // comment on `press` in ArrangeView. touch-action therefore stays at
-           // its default here and the browser keeps the scroll until then.
-         })}>
+      position: 'relative',
+      cursor: n && leafDown ? 'grab' : undefined,
+      WebkitTapHighlightColor: 'transparent',
+      WebkitUserSelect: 'none', userSelect: 'none',
+      // The list scrolls vertically and a photo is most of a leaf, so the gesture is
+      // only claimed once the press-and-hold fires — see the comment on the gesture
+      // in ArrangeView. touch-action therefore stays at its default here.
+    })}>
       <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
-        {/* node 451:15159 — the hole a lifted photo leaves: the empty well at half
-            opacity, keeping its shadow, so the page still reads as having a slot. */}
-        <PhotoWell photo={hole ? null : photo}
-                   style={{ position: 'absolute', inset: 0, flex: 'none',
-                            opacity: hole ? 0.5 : 1 }} />
-        {ring && (
-          <span aria-hidden style={{
-            position: 'absolute', inset: 0, pointerEvents: 'none',
-            boxShadow: `inset 0 0 0 2px ${ARR_ACCENT}`,
-          }} />
-        )}
+        {slots.map((sl, i) => {
+          const photo = photos[i] || null;
+          const hole = holeSlot === i;
+          const ring = ringSlot === i;
+          return (
+            <div key={i}
+                 ref={slotRef ? slotRef(i) : undefined}
+                 onPointerDown={n && slotDown ? slotDown(i) : undefined}
+                 onDragStart={e => e.preventDefault()}
+                 style={{
+                   position: 'absolute',
+                   left: `${sl.x}%`, top: `${sl.y}%`,
+                   width: `${sl.w}%`, height: `${sl.h}%`,
+                   cursor: n ? 'grab' : 'default',
+                   WebkitTapHighlightColor: 'transparent',
+                 }}>
+              {/* node 451:15159 — the hole a lifted photo leaves: the empty well at
+                  half opacity, keeping its shadow, so the slot still reads as a slot. */}
+              <PhotoWell photo={hole ? null : photo}
+                         iconSize={Math.max(10, Math.round(24 * Math.min(sl.w, sl.h) / 100))}
+                         style={{ position: 'absolute', inset: 0, flex: 'none',
+                                  opacity: hole ? 0.5 : 1 }} />
+              {ring && (
+                <span aria-hidden style={{
+                  position: 'absolute', inset: 0, pointerEvents: 'none',
+                  boxShadow: `inset 0 0 0 2px ${ARR_ACCENT}`,
+                }} />
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -1930,8 +2142,9 @@ function ArrangeCaption({ left, right, onAdd }) {
 // are filled from the upload pool as a *preview* (see slotPhotos). Unifying the two
 // means making placement per-slot, which is a change to the storage model and not a
 // side effect of this mode.
-function ArrangeView({ aspect, pages, placed, onSwapPhotos, onMoveSpread, onAdd, onDone }) {
-  const { useState, useRef, useEffect } = React;
+function ArrangeView({ aspect, pages, placed, uploaded, layouts,
+                      onSwapSlots, onSwapPages, onMoveSpread, onAdd, onDone }) {
+  const { useState, useRef, useEffect, useMemo } = React;
   const [tab, setTab] = useState('photos');
   // The first of a tap-tap pair: a page number on the Photos tab, a page number on
   // Pages too (a tap there swaps two pages' photos, per the copy).
@@ -1941,14 +2154,26 @@ function ArrangeView({ aspect, pages, placed, onSwapPhotos, onMoveSpread, onAdd,
   const root = useRef(null);
   const scroller = useRef(null);
   const pending = useRef(null);
-  const pageEls = useRef({});
+  // Photos-tab targets are individual slots, keyed "page:slot" — a 4-photo page has
+  // four of them. Pages-tab targets are whole spreads, keyed by index.
+  const slotEls = useRef({});
   const spreadEls = useRef({});
   const autoRaf = useRef(0);
   const autoDir = useRef(0);
   const finishRef = useRef(() => {});
 
   const spreads = spreadsFor(pages);
-  const photoAt = n => (n ? placed[n - 1] || null : null);
+  // pb_layouts is keyed by slot index, so a page number has to be mapped back to one.
+  const layoutByPage = useMemo(() => {
+    const m = {};
+    slotsFor(pages).forEach((sl, i) => { if (sl.n) m[sl.n] = layoutById(layouts[i]); });
+    return m;
+  }, [pages, layouts]);
+  const slotsOn = n => {
+    const l = layoutByPage[n];
+    return l && l.length ? l.length : 1;
+  };
+  const photosOn = n => pagePhotos(placed, n, slotsOn(n), uploaded);
 
   // Switching tabs abandons a half-made pair, and a drag can never outlive the tab
   // it was started on.
@@ -2001,15 +2226,20 @@ function ArrangeView({ aspect, pages, placed, onSwapPhotos, onMoveSpread, onAdd,
   // Which target is under (x, y). Rects are read live rather than cached: the list
   // scrolls under the finger, including by auto-scroll.
   const hitTest = (x, y) => {
-    const els = tab === 'photos' ? pageEls.current : spreadEls.current;
+    const els = tab === 'photos' ? slotEls.current : spreadEls.current;
     let hit = null;
     Object.keys(els).forEach(k => {
       const el = els[k];
       if (!el) return;
       const r = el.getBoundingClientRect();
-      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) hit = Number(k);
+      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) hit = k;
     });
-    return hit;
+    if (hit == null) return null;
+    return tab === 'photos' ? hit : Number(hit);
+  };
+  const parseSlot = key => {
+    const [n, i] = String(key).split(':').map(Number);
+    return { n, i, slots: slotsOn(n) };
   };
 
   // ── The gesture. One handler gives both interactions the node asks for:
@@ -2021,12 +2251,32 @@ function ArrangeView({ aspect, pages, placed, onSwapPhotos, onMoveSpread, onAdd,
   // every photo, and photos are most of the list — the page would barely scroll.
   // Moving more than MOVE_TOL before the hold fires is read as a scroll and cancels
   // the press.
-  const onPointerDown = (page, spread) => e => {
+  // ⚠️ Once the hold has fired we must stop the browser scrolling the list. On touch,
+  // `preventDefault` on a pointermove does nothing — `touch-action` governs, and it
+  // cannot be `none` here or the list would barely scroll at all (photos are most of
+  // it). A non-passive `touchmove` listener that preventDefaults is the one thing that
+  // does work, so it is attached on lift and removed on release. Without it a real
+  // finger scrolls the page and the drag is cancelled.
+  const blockTouch = useRef(null);
+  const holdTouch = () => {
+    if (blockTouch.current) return;
+    const h = e => e.preventDefault();
+    window.addEventListener('touchmove', h, { passive: false });
+    blockTouch.current = h;
+  };
+  const releaseTouch = () => {
+    if (!blockTouch.current) return;
+    window.removeEventListener('touchmove', blockTouch.current, { passive: false });
+    blockTouch.current = null;
+  };
+  useEffect(() => releaseTouch, []);
+
+  const onPointerDown = (page, slot, spread) => e => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     const el = e.currentTarget;
     stopAuto();
     const p = {
-      page, spread, el, pointerId: e.pointerId,
+      page, slot, spread, el, pointerId: e.pointerId,
       sx: e.clientX, sy: e.clientY, lifted: false, timer: 0,
     };
     pending.current = p;
@@ -2034,6 +2284,7 @@ function ArrangeView({ aspect, pages, placed, onSwapPhotos, onMoveSpread, onAdd,
       if (pending.current !== p) return;
       p.lifted = true;
       try { el.setPointerCapture(p.pointerId); } catch (err) { /* not fatal */ }
+      holdTouch();
       const src = tab === 'photos' ? el : spreadEls.current[spread];
       const r = (src || el).getBoundingClientRect();
       const rr = root.current ? root.current.getBoundingClientRect() : { left: 0, top: 0 };
@@ -2041,7 +2292,7 @@ function ArrangeView({ aspect, pages, placed, onSwapPhotos, onMoveSpread, onAdd,
       p.grabY = p.sy - r.top;
       setSel(null);
       setDrag({
-        page, spread, w: r.width, h: r.height,
+        page, slot, spread, w: r.width, h: r.height,
         rootX: rr.left, rootY: rr.top,
         x: p.sx, y: p.sy, grabX: p.grabX, grabY: p.grabY, over: null,
       });
@@ -2071,21 +2322,30 @@ function ArrangeView({ aspect, pages, placed, onSwapPhotos, onMoveSpread, onAdd,
     clearTimeout(p.timer);
     pending.current = null;
     stopAuto();
+    releaseTouch();
     if (!p.lifted) {
       // A tap. Both tabs swap two pages' photos; the node's copy says so for Photos
       // and the Pages tab reuses it, which is the only tap that means anything there.
       const n = p.page;
       if (!n) return;
-      if (sel == null) setSel(n);
-      else if (sel === n) setSel(null);
-      else { onSwapPhotos(sel, n); setSel(null); }
+      if (tab === 'photos') {
+        const key = `${n}:${p.slot}`;
+        if (sel == null) setSel(key);
+        else if (sel === key) setSel(null);
+        else { onSwapSlots(parseSlot(sel), parseSlot(key)); setSel(null); }
+      } else {
+        if (sel == null) setSel(n);
+        else if (sel === n) setSel(null);
+        else { onSwapPages(sel, n); setSel(null); }
+      }
       return;
     }
     const over = cancelled ? null : hitTest(e.clientX, e.clientY);
     setDrag(null);
     if (over == null) return;
     if (tab === 'photos') {
-      if (over !== p.page) onSwapPhotos(p.page, over);
+      const from = `${p.page}:${p.slot}`;
+      if (over !== from) onSwapSlots(parseSlot(from), parseSlot(over));
     } else if (over !== p.spread) {
       onMoveSpread(p.spread, over);
     }
@@ -2094,13 +2354,23 @@ function ArrangeView({ aspect, pages, placed, onSwapPhotos, onMoveSpread, onAdd,
   finishRef.current = finish;
 
   const dragging = !!drag;
-  // ⚠️ Both guard on `n` first. The inside-cover leaves have no page number, and
-  // `sel` is null when nothing is selected — so `sel === n` would ring every inside
-  // cover permanently.
-  const hole = n => !!n && dragging && tab === 'photos' && drag.page === n;
-  const ringed = n => (!n ? false : dragging
-    ? (tab === 'photos' && drag.over === n && drag.page !== n)
-    : sel === n);
+  // ⚠️ Both guard on `n` first. The inside-cover leaves have no page number, and `sel`
+  // is null when nothing is selected — so a bare equality test would mark every inside
+  // cover permanently. (That bug shipped once; it rang every inside cover.)
+  const holeSlot = n =>
+    (!!n && dragging && tab === 'photos' && drag.page === n ? drag.slot : -1);
+  const ringSlot = n => {
+    if (!n) return -1;
+    if (dragging) {
+      if (tab !== 'photos' || drag.over == null) return -1;
+      const t = parseSlot(drag.over);
+      return (t.n === n && `${t.n}:${t.i}` !== `${drag.page}:${drag.slot}`) ? t.i : -1;
+    }
+    if (tab === 'pages') return sel === n ? 0 : -1;
+    if (sel == null) return -1;
+    const t = parseSlot(sel);
+    return t.n === n ? t.i : -1;
+  };
 
   // node 451:15152 / 451:15163 — the dragged spread's paper drops to 10%, and the
   // spread under the finger to 50% with its content scaled to the node's 152/164.
@@ -2112,20 +2382,21 @@ function ArrangeView({ aspect, pages, placed, onSwapPhotos, onMoveSpread, onAdd,
   const sheetScale = i =>
     (dragging && tab === 'pages' && drag.over === i && drag.spread !== i ? 152 / 164 : 1);
 
-  // Only a real page is a drop target. Registering an inside cover would put a
-  // "null" key in the map, and hitTest would hand back NaN as a page number.
-  const pageRef = n => (n ? (el => { pageEls.current[n] = el; }) : undefined);
+  // Only a real page registers drop targets. An inside cover would put "null:0" in the
+  // map and hitTest would hand back NaN as a page number.
+  const slotRefFor = n => (n ? (i => el => { slotEls.current[`${n}:${i}`] = el; }) : null);
 
+  const leaf = (n, side, spread) => (
+    <ArrangeLeaf side={side} n={n} photos={photosOn(n)} layout={layoutByPage[n]}
+                 holeSlot={holeSlot(n)} ringSlot={ringSlot(n)}
+                 slotDown={n && tab === 'photos' ? (i => onPointerDown(n, i, spread)) : null}
+                 leafDown={n && tab === 'pages' ? onPointerDown(n, 0, spread) : null}
+                 slotRef={tab === 'photos' ? slotRefFor(n) : null} />
+  );
   const leaves = (i, pair) => (
     <React.Fragment>
-      <ArrangeLeaf side="left" n={pair[0]} photo={photoAt(pair[0])}
-                   hole={hole(pair[0])} ring={ringed(pair[0])}
-                   onPointerDown={onPointerDown(pair[0], i)}
-                   leafRef={pageRef(pair[0])} />
-      <ArrangeLeaf side="right" n={pair[1]} photo={photoAt(pair[1])}
-                   hole={hole(pair[1])} ring={ringed(pair[1])}
-                   onPointerDown={onPointerDown(pair[1], i)}
-                   leafRef={pageRef(pair[1])} />
+      {leaf(pair[0], 'left', i)}
+      {leaf(pair[1], 'right', i)}
     </React.Fragment>
   );
 
@@ -2152,6 +2423,17 @@ function ArrangeView({ aspect, pages, placed, onSwapPhotos, onMoveSpread, onAdd,
           // view's 47.
           padding: `0 ${GUTTER}px`, boxSizing: 'border-box',
         }}>
+          {/* The cover. The node's list starts at [inside front | 1] and shows no
+              cover at all, which reads as the book being cut off — the book view has
+              always led with it. It is not a drop target and not draggable: it is not
+              a page, and the node's own navigator treats it as a single entry. */}
+          <div style={{ position: 'relative' }}>
+            <Sheet aspect={aspect} interior={<CoverInterior layout={layoutById(layouts[0])} />}>
+              <GutterArt file="pb-editor-hinge.png" offsets={[-11, -3]} width={14}
+                         opacity={0.5} />
+            </Sheet>
+            <ArrangeCaption right="Cover" />
+          </div>
           {spreads.map((pair, i) => (
             <div key={i} ref={el => { spreadEls.current[i] = el; }}
                  style={{
@@ -2185,8 +2467,14 @@ function ArrangeView({ aspect, pages, placed, onSwapPhotos, onMoveSpread, onAdd,
         backgroundImage:
           'linear-gradient(to bottom, rgba(0,0,0,0) 0.2%, rgb(27,27,27) 73.53%)',
       }}>
+        {/* ⚠️ Centred with `left/right: 0` + `margin: auto`, NOT
+            `left: 50%; transform: translateX(-50%)`. press() assigns
+            `style.transform = scale(...)` on pointerdown, which overwrites the whole
+            transform — so a translateX centring is destroyed by the first tap and the
+            button jumps half its width to the right and stays there. Any element that
+            both centres with a transform and uses press() has this bug. */}
         <button type="button" onClick={onDone} {...press(0.97)} style={{
-          position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+          position: 'absolute', left: 0, right: 0, margin: '0 auto',
           bottom: 'max(25px, calc(env(safe-area-inset-bottom, 0px) + 8px))',
           width: 338, maxWidth: 'calc(100% - 32px)', boxSizing: 'border-box',
           padding: '16px 24px', borderRadius: 55, border: 'none',
@@ -2214,9 +2502,8 @@ function ArrangeView({ aspect, pages, placed, onSwapPhotos, onMoveSpread, onAdd,
           filter: 'drop-shadow(0px 12px 20px rgba(0,0,0,0.5))',
         }}>
           {tab === 'photos' ? (
-            <div style={Object.assign(leafBox(false), { width: '100%' })}>
-              <PhotoWell photo={photoAt(drag.page)} />
-            </div>
+            <PhotoWell photo={(photosOn(drag.page) || [])[drag.slot] || null}
+                       style={{ position: 'absolute', inset: 0, flex: 'none' }} />
           ) : (
             <Sheet aspect={aspect}
                    interior={leaves(drag.spread, spreads[drag.spread] || [null, null])} />
@@ -2288,9 +2575,41 @@ function EditorScreen() {
     return out;
   };
 
-  // ── Arrange: swap the photos on two pages. One operation serves every gesture the
-  // mode offers — a drag onto an occupied page swaps, a drag onto an empty one moves,
-  // and tapping two photos swaps. Pages are 1-based, as pb_placed is.
+  // ── Arrange, Photos tab: swap two individual slots. One operation serves every
+  // gesture — a drag onto an occupied slot swaps, onto an empty one moves, and tapping
+  // two photos swaps.
+  //
+  // A page whose entry is still a single photo is **materialised** into a per-slot
+  // array first: the extra slots of a multi-photo layout were being previewed from the
+  // upload pool, and the moment you move one of them that preview has to become real
+  // data or the drag could not persist. Single-slot pages stay plain strings.
+  const swapSlots = (A, B) => {
+    setPlaced(prev => {
+      const next = prev.slice();
+      const ensure = t => {
+        while (next.length < t.n) next.push(null);
+        if (t.slots > 1 && !Array.isArray(next[t.n - 1])) {
+          const filled = pagePhotos(prev, t.n, t.slots, uploaded);
+          next[t.n - 1] = filled.length ? filled : new Array(t.slots).fill(null);
+        }
+      };
+      ensure(A); ensure(B);
+      const read = t => {
+        const e = next[t.n - 1];
+        return Array.isArray(e) ? (e[t.i] || null) : (t.i === 0 ? (e || null) : null);
+      };
+      const write = (t, v) => {
+        const e = next[t.n - 1];
+        if (Array.isArray(e)) { const a = e.slice(); a[t.i] = v || null; next[t.n - 1] = a; }
+        else next[t.n - 1] = v || null;
+      };
+      const va = read(A), vb = read(B);
+      write(A, vb); write(B, va);
+      return writePlaced(next);
+    });
+  };
+
+  // ── Arrange, Pages tab: swap two whole pages, whatever each is holding.
   const swapPhotos = (a, b) => {
     setPlaced(prev => {
       const next = prev.slice();
@@ -2383,7 +2702,8 @@ function EditorScreen() {
       {arrange ? (
         <ArrangeView
           aspect={aspect} pages={pages} placed={placed}
-          onSwapPhotos={swapPhotos} onMoveSpread={moveSpread}
+          uploaded={uploaded} layouts={layouts}
+          onSwapSlots={swapSlots} onSwapPages={swapPhotos} onMoveSpread={moveSpread}
           onAdd={() => setAdded(n => n + 1)}
           onDone={() => setArrange(false)}
         />
@@ -2391,7 +2711,7 @@ function EditorScreen() {
         <PageView
           aspect={aspect} pageAspect={pageAspect} pages={pages}
           placed={placed} uploaded={uploaded}
-          layouts={layouts} onSetLayout={setLayout}
+          layouts={layouts} onSetLayout={setLayout} onSwapPages={swapPhotos}
           startSlot={pageView} onBack={() => setPageView(null)}
           onAdd={() => setAdded(n => n + 1)}
         />

@@ -1805,7 +1805,9 @@ never registered as a drop target: a `null` key in the map makes `hitTest` hand 
 index, and a template belongs to the page it is on rather than to the photo that
 happens to sit there — so moving a spread moves its pictures, not its layouts.
 
-#### ⚠️ A leaf here shows ONE photo, not its layout template
+#### ~~A leaf here shows ONE photo, not its layout template~~ — superseded
+⚠️ **Reversed.** Arrange now renders every slot of a page's layout and each one drags;
+see **Placement is per-slot now** below. The reasoning kept here for the record:
 `pb_placed` holds one photo per page — that is what auto-fill writes and what the
 navigator reads — so one photo per page is exactly what there is to rearrange, and
 **every gesture in this mode moves real, persisted data**. A page given a multi-photo
@@ -2203,6 +2205,97 @@ cross-origin image requests**, and no failing request or JS error on either scre
 25 new files are in the service-worker precache (`photobox-v29`), so the photos are now
 genuinely available offline.
 
+#### Four bugs found in arrange mode after it shipped, and what each taught
+
+**1. `press()` destroys a transform-based centring.** The Done button was
+`left: 50%; transform: translateX(-50%)`, and `press()` assigns
+`style.transform = 'scale(0.97)'` on pointerdown — wiping the translate. The first tap
+shifted the button 169px right and it never came back (pointerup sets `scale(1)`, not
+the translate). It now centres with `left/right: 0` + `margin: 0 auto`. ⚠️ **Any element
+that both centres with a transform and uses `press()` has this bug** — there are
+several `translateX(-50%)` call sites in `home.jsx`, `splash.jsx` and
+`onboarding-shell.jsx`; they are safe only because none of them is pressable.
+
+**2. ⚠️ An `<img>` is natively draggable, and that cancels a pointer drag.** Every
+press-and-hold drag died the instant the finger moved. The event log says why:
+
+```
+gotpointercapture  DIV
+pointermove        DIV
+dragstart          IMG   ← the browser's own HTML5 image drag
+pointercancel      DIV   ← which cancels the pointer, so the drag ends
+```
+
+`PhotoWell` now sets `draggable={false}` on both its images, and the arrange leaves,
+slots and navigator thumbnails also refuse `dragstart` outright. **Any custom pointer
+drag over an image needs this**; it is invisible until you actually try to drag.
+
+**3. ⚠️ `{...press(0.9)}` spread *after* `onPointerDown` silently overwrites it.** JSX
+gives the later prop, so the navigator's drag handler was replaced by press's own
+scale handler and the drag simply never started — no error, nothing in the console.
+`NavThumb` now spreads `press` first and composes both into one handler.
+
+**4. `GutterArt` swallowed presses.** The spine strip is decorative but sits over the
+middle of the sheet, so a press aimed at the leaf beneath it did nothing — which is
+exactly where you reach to pick up a spread. It is now `pointerEvents: 'none'`.
+
+#### Arrange mode shows the cover, and every photo on a page
+Both were wrong on the first pass:
+
+- **The cover is now the first block.** The node's list starts at [inside front | 1] and
+  shows no cover at all, which reads as the book being cut off — the book view has
+  always led with it. It is not draggable and not a drop target: it is not a page.
+  `CoverInterior` was extracted so the two views draw the identical cover.
+- **A page shows all of its layout's slots, and each one drags.** The first pass showed
+  one photo per page, on the grounds that `pb_placed` held one photo per page. That was
+  the wrong call — a page given a 4-photo template in the layout drawer looked broken
+  in arrange.
+
+#### ⚠️ Placement is per-slot now — `pb_placed` entries may be arrays
+`pb_placed[n-1]` is **either** a single photo — what auto-fill writes, and what every
+page held before — **or an array, one entry per layout slot**. `pagePhotos(placed, n,
+slots, pool)` resolves either shape, and `pageThumb(placed, n)` gives the one photo that
+stands for a page (a navigator thumbnail, a drag clone).
+
+A page **materialises** into an array the first time one of its slots is moved: the
+extra slots of a multi-photo layout were being previewed from the upload pool, and the
+moment you drag one of them that preview has to become real data or the gesture could
+not persist. Single-slot pages stay plain strings, so nothing about the common case
+changed. Verified: dragging slot 2 of a 4-slot page 3 onto page 1 turned
+`["01","02","03","04"]` into `["02","02",["03","01","01","04"],"04"]` — the swap landed
+and the page materialised.
+
+`Leaf` and `BigWell` now take a resolved `photos` array rather than `photo` + `pool`, so
+the book view, the page view and arrange all render a page the same way.
+
+#### Pages can be dragged in the page view's navigator too
+Not in the node, which only taps a thumbnail to jump — but a page strip you cannot
+reorder is the obvious thing to reach for. The same press-and-hold gesture lifts a
+thumbnail; dropping it on another swaps those two pages. A plain tap still jumps, and a
+drag suppresses the click that would otherwise follow it (`suppressClick`), or the
+preview would jump to the page you had just dragged away. The cover is not a page and
+cannot be picked up.
+
+#### ⚠️ On touch, only a non-passive `touchmove` preventDefault stops the scroll
+`preventDefault` on a pointermove does nothing for touch — `touch-action` governs, and
+it cannot be `none` on these elements or the list would barely scroll (photos are most
+of it). So on lift, both arrange mode and the navigator attach a
+`window.addEventListener('touchmove', h, { passive: false })` that preventDefaults, and
+remove it on release. Without it a real finger scrolls the page and the drag is
+cancelled — which is not reproducible with a mouse.
+
+#### Verified
+Driven with **real mouse input**, not synthesised events (the earlier pass used
+`dispatchEvent`, which never triggers `dragstart` and so hid bug 2 entirely). At
+390×844 with a 24-page book and a 4-photo template on page 3: Done holds `offCentre: 0`
+through press and release; the list runs Cover / 1 / 2 / 3 / … with 15 blocks; page 3
+shows 4 slots. Photos-tab drag swaps a slot and materialises the page; Pages-tab drag
+moves a spread (`[01][02,03][04,05]` → `[02,03][01][04,05]`); navigator drag swaps
+pages 2 and 5. Book view still renders 43 images with 4 wells on page 3, page view has
+24 navigator thumbs and 27 selectable photos, the selection toolbar is intact, and the
+layout drawer still shows 3 cards with 12 photos. No page overflow, no failing request,
+no JS error.
+
 ### Testing a mobile layout in headless Chrome
 `--window-size=375,1366` does **not** give a 375px layout: headless Chrome clamps the
 viewport to a 500px minimum, so the page lays out at 500 and the screenshot merely
@@ -2415,7 +2508,7 @@ sparkle on its own at any width, with the splash glow layers) and `GlassIconButt
 
 ### service-worker.js
 Precaches every screen HTML + JSX, the shared assets (incl. fonts and splash SVGs),
-manifest.json, the 25 mock photos and the image-picker files. Cache name `photobox-v30`.
+manifest.json, the 25 mock photos and the image-picker files. Cache name `photobox-v31`.
 
 **Strategy: network-first, cache fallback** — and same-origin requests are fetched
 with `cache: 'no-store'`. Both parts are deliberate:
