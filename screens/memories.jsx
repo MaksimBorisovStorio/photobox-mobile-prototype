@@ -127,7 +127,8 @@ function MemoriesScreen() {
         {/* gap-[24px] from Figma's flex column, then gap-[16px] between cards */}
         <div style={{ ...hRow, gap: 16, marginTop: 24 }}>
           {FEATURED.map((a, i) => (
-            <div key={i} style={{
+            <div key={i} onClick={() => window.navigation.push('memory-detail.html')} {...press(0.97)} style={{
+              cursor: 'pointer', transition: 'transform 140ms ease',
               position: 'relative', flexShrink: 0,
               width: 283, height: 344, borderRadius: 32,
               overflow: 'hidden', border: '1px solid #f4f4f4',
