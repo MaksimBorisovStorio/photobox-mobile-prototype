@@ -158,6 +158,7 @@ function MemoryDetailScreen() {
 
           {/* Create button — node 511:22523: teal pill, centered, top 390 */}
           <button
+            onClick={() => window.navigation.push('memory-create.html')}
             {...press(0.97)}
             style={{
               position: 'absolute', top: 390,
