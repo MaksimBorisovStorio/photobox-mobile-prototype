@@ -41,7 +41,7 @@ const TABS = [
   // No projects screen exists; the editor holds the in-progress book, which is what
   // the "Continue editing" banner points at too.
   { id: 'projects', label: 'Projects', icon: 'hb-tab-projects.svg', href: 'editor.html' },
-  { id: 'memories', label: 'Memories', icon: 'hb-tab-memories.svg', href: 'photo-sources.html' },
+  { id: 'memories', label: 'Memories', icon: 'hb-tab-memories.svg', href: 'memories.html' },
   { id: 'account',  label: 'Account',  icon: 'hb-tab-account.svg',  href: 'account.html' },
 ];
 
