@@ -37,12 +37,14 @@ const TAB_LABEL_FONT = '-apple-system, "SF Pro Text", system-ui, sans-serif';
 const TABS = [
   // Home now carries an href too: the bar is no longer home-only, so from any
   // other tab destination the Home tab has to be able to navigate back to it.
-  { id: 'home',     label: 'Home',     icon: 'hb-tab-home.svg', href: 'home.html' },
+  // iconActive = filled teal variant; icon = dark outline inactive variant.
+  { id: 'home',     label: 'Home',     icon: 'hb-tab-home-inactive.svg', iconActive: 'hb-tab-home.svg',          href: 'home.html' },
   // No projects screen exists; the editor holds the in-progress book, which is what
-  // the "Continue editing" banner points at too.
-  { id: 'projects', label: 'Projects', icon: 'hb-tab-projects.svg', href: 'editor.html' },
-  { id: 'memories', label: 'Memories', icon: 'hb-tab-memories.svg', href: 'memories.html' },
-  { id: 'account',  label: 'Account',  icon: 'hb-tab-account.svg',  href: 'account.html' },
+  // the "Continue editing" banner points at too. No filled active variant from Figma
+  // yet — CSS filter converts the outline to teal for the active state.
+  { id: 'projects', label: 'Projects', icon: 'hb-tab-projects.svg',       iconActive: null,                       href: 'editor.html' },
+  { id: 'memories', label: 'Memories', icon: 'hb-tab-memories.svg',       iconActive: 'hb-tab-memories-active.svg', href: 'memories.html' },
+  { id: 'account',  label: 'Account',  icon: 'hb-tab-account.svg',        iconActive: 'hb-tab-account-active.svg',  href: 'account.html' },
 ];
 
 // 16 top + 50 pill + the bottom inset. The node's 25 is the home-indicator gap on a
@@ -136,9 +138,19 @@ function TabBar({ activeTab, onTabChange }) {
                     borderRadius: 100, background: 'rgba(120,120,128,0.12)',
                   }} />
                 )}
-                <img src={`../shared/assets/${tab.icon}`} alt=""
-                     width={24} height={24}
-                     style={{ display: 'block', position: 'relative' }} />
+                <img
+                     src={`../shared/assets/${on && tab.iconActive ? tab.iconActive : tab.icon}`}
+                     alt="" width={24} height={24}
+                     style={{
+                       display: 'block', position: 'relative',
+                       // Most tabs have a dedicated filled teal SVG for the active state
+                       // (iconActive) — use it directly. Projects has no filled variant
+                       // yet; fall back to CSS filter: brightness(0) blacks the outline,
+                       // then the chain converts black → #008D95 ≈ the brand teal.
+                       filter: on && !tab.iconActive
+                         ? 'brightness(0) saturate(100%) invert(41%) sepia(100%) saturate(544%) hue-rotate(145deg) brightness(62%)'
+                         : 'none',
+                     }} />
                 <span style={{
                   position: 'relative',
                   fontFamily: TAB_LABEL_FONT, fontSize: 10, fontWeight: 590,

@@ -107,17 +107,15 @@ function MemoryDetailScreen() {
             maskImage: 'linear-gradient(to bottom, transparent 0%, black 50%)',
           }} />
 
-          {/* Back button — node 511:22519 */}
+          {/* Back button — node 511:22519: rgba(0,0,0,0.11) circle, no blur */}
           <button
             onClick={() => window.history.back()}
             {...press(0.95)}
             style={{
               position: 'absolute', left: 16, top: 60,
               width: 40, height: 40, borderRadius: 20,
-              background: 'rgba(0,0,0,0.28)',
-              backdropFilter: 'blur(8px)',
-              WebkitBackdropFilter: 'blur(8px)',
-              border: '0.5px solid rgba(255,255,255,0.15)',
+              background: 'rgba(0,0,0,0.11)',
+              border: 'none',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', padding: 8,
               WebkitTapHighlightColor: 'transparent',
@@ -128,16 +126,14 @@ function MemoryDetailScreen() {
             <img src="../shared/assets/mem-icon-back.svg" alt="Back" width={24} height={24} />
           </button>
 
-          {/* More button — node 512:23709 */}
+          {/* More button — node 512:23709: rgba(0,0,0,0.11) circle, no blur */}
           <button
             {...press(0.95)}
             style={{
               position: 'absolute', right: 16, top: 60,
               width: 40, height: 40, borderRadius: 20,
-              background: 'rgba(0,0,0,0.28)',
-              backdropFilter: 'blur(8px)',
-              WebkitBackdropFilter: 'blur(8px)',
-              border: '0.5px solid rgba(255,255,255,0.15)',
+              background: 'rgba(0,0,0,0.11)',
+              border: 'none',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', padding: 8,
               WebkitTapHighlightColor: 'transparent',

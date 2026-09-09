@@ -42,7 +42,7 @@ function MemoryCreateScreen() {
         {/* ── Header: back button + "Create" heading ── */}
         <div style={{ position: 'relative' }}>
 
-          {/* Back button — sits on light bg so no dark tint needed */}
+          {/* Back button — node 512:23599: near-transparent bg, teal icon */}
           <button
             onClick={() => window.history.back()}
             {...press(0.95)}
@@ -51,15 +51,14 @@ function MemoryCreateScreen() {
               top: 'max(72px, calc(env(safe-area-inset-top, 44px) + 28px))',
               left: 21,
               width: 40, height: 40, borderRadius: 20,
-              background: 'none', border: 'none',
+              background: 'rgba(255,255,255,0.01)', border: 'none',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', padding: 8,
               WebkitTapHighlightColor: 'transparent',
               transition: 'transform 140ms ease',
             }}
           >
-            <img src="../shared/assets/mem-icon-back.svg" alt="Back" width={24} height={24}
-                 style={{ filter: 'brightness(0)' }} />
+            <img src="../shared/assets/mem-icon-back-teal.svg" alt="Back" width={24} height={24} />
           </button>
 
           {/* "Create" heading — top 144px in Figma (56px status + 88px gap) */}
