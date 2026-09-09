@@ -693,10 +693,8 @@ const tealWash = (w, h, matrix) =>
 // Header, then a `gap: 24` column: an audience chip row, a 2×2 product grid and a
 // full-width "Show all" button.
 //
-// ⚠️ The four idea cards have **no artwork in the design** — 509:20179 and its three
-// siblings are white cards whose image wells are empty, with only the caption filled
-// in. They are built that way rather than inventing product shots; drop an `img` into
-// the well above the caption once the design has them.
+// The four idea cards now have product photos — 509:20179 and siblings (nodes 579:2123–
+// 579:2128 added by designer). Photos downloaded from Figma to shared/assets/idea-*.png.
 const IDEA_CHIPS = [
   { id: 'friend',   label: 'Best friend', icon: 'hb-chip-group.svg', active: true },
   { id: 'mum',      label: 'For mum',     icon: 'hb-chip-face.svg' },
@@ -707,11 +705,11 @@ const IDEA_CHIPS = [
 ];
 
 const IDEA_CARDS = [
-  { id: 'prints',   title: 'Favorite moments print set' },
+  { id: 'prints',   title: 'Favorite moments print set', img: '../shared/assets/idea-prints.png' },
   // The node breaks this one by hand rather than letting it wrap.
-  { id: 'mug',      title: 'Inside-joke\nPhoto Mug' },
-  { id: 'cushion',  title: 'Memory Collage Cushion' },
-  { id: 'calendar', title: 'Friendship Calendar' },
+  { id: 'mug',      title: 'Inside-joke\nPhoto Mug',    img: '../shared/assets/idea-mug.png' },
+  { id: 'cushion',  title: 'Memory Collage Cushion',    img: '../shared/assets/idea-cushion.png' },
+  { id: 'calendar', title: 'Friendship Calendar',       img: '../shared/assets/idea-calendar.png' },
 ];
 
 function IdeasSection() {
@@ -789,6 +787,16 @@ function IdeasSection() {
                 WebkitTapHighlightColor: 'transparent',
               }}
             >
+              {/* Image well — node 579:2123: 131 tall, pinned to the card's top. */}
+              {c.img && (
+                <div style={{
+                  position: 'absolute', left: 0, top: 0, width: '100%', height: 131,
+                  overflow: 'hidden',
+                }}>
+                  <img src={c.img} alt=""
+                       style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                </div>
+              )}
               {/* Caption — node 509:20402: 84 tall, pinned to the card's bottom. */}
               <div style={{
                 position: 'absolute', left: 0, bottom: 0, width: '100%', height: 84,

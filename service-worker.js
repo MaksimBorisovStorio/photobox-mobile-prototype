@@ -1,5 +1,5 @@
 // service-worker.js
-const CACHE = 'photobox-v31';  // bump to evict a stale cache
+const CACHE = 'photobox-v32';  // bump to evict a stale cache
 // Paths are relative to this file's URL, not root-absolute: GitHub Pages serves a
 // project site from /<repo>/, where a leading slash would resolve above the app and
 // 404 every entry. c.add() and the fetch handler both work off the request URL, so
@@ -65,6 +65,10 @@ const PRECACHE = [
   'shared/assets/create-calendars.png',
   'shared/assets/create-prints.png',
   'shared/assets/create-mugs.png',
+  'shared/assets/idea-prints.png',
+  'shared/assets/idea-mug.png',
+  'shared/assets/idea-cushion.png',
+  'shared/assets/idea-calendar.png',
   'shared/assets/pb-shot-a.jpg',
   'shared/assets/pb-shot-b.jpg',
   'shared/assets/pb-shot-xl.jpg',
