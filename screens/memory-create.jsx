@@ -51,14 +51,15 @@ function MemoryCreateScreen() {
               top: 'max(72px, calc(env(safe-area-inset-top, 44px) + 28px))',
               left: 21,
               width: 40, height: 40, borderRadius: 20,
-              background: 'rgba(255,255,255,0.01)', border: 'none',
+              background: 'none', border: 'none',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', padding: 8,
               WebkitTapHighlightColor: 'transparent',
               transition: 'transform 140ms ease',
             }}
           >
-            <img src="../shared/assets/mem-icon-back.svg" alt="Back" width={24} height={24} />
+            <img src="../shared/assets/mem-icon-back.svg" alt="Back" width={24} height={24}
+                 style={{ filter: 'brightness(0)' }} />
           </button>
 
           {/* "Create" heading — top 144px in Figma (56px status + 88px gap) */}

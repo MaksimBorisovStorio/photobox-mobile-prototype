@@ -91,15 +91,20 @@ function MemoryDetailScreen() {
 
           {/* Frosted white gradient — node 511:21987: h-377, from 47.7% transparent
               to 89.3% white, with backdrop-blur. Fades the photo into white for the
-              stats row below. */}
+              stats row below.
+              The mask restricts the blur to the lower half so the photo stays sharp
+              where the gradient is still transparent (the couple). Without it, the
+              45px backdropFilter blurs the full 377px zone including the clear area. */}
           <div style={{
             position: 'absolute', left: 0, right: 0, bottom: 0, height: 377,
             background: 'linear-gradient(to bottom,' +
-              ' rgba(255,255,255,0.01) 0%,' +
-              ' rgba(255,255,255,0.8) 40%,' +
-              ' #ffffff 75%)',
+              ' rgba(255,255,255,0) 0%,' +
+              ' rgba(255,255,255,0.75) 50%,' +
+              ' #ffffff 80%)',
             backdropFilter: 'blur(45px)',
             WebkitBackdropFilter: 'blur(45px)',
+            WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 50%)',
+            maskImage: 'linear-gradient(to bottom, transparent 0%, black 50%)',
           }} />
 
           {/* Back button — node 511:22519 */}
@@ -109,11 +114,15 @@ function MemoryDetailScreen() {
             style={{
               position: 'absolute', left: 16, top: 60,
               width: 40, height: 40, borderRadius: 20,
-              background: 'rgba(0,0,0,0.11)', border: 'none',
+              background: 'rgba(0,0,0,0.28)',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+              border: '0.5px solid rgba(255,255,255,0.15)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', padding: 8,
               WebkitTapHighlightColor: 'transparent',
               transition: 'transform 140ms ease',
+              boxSizing: 'border-box',
             }}
           >
             <img src="../shared/assets/mem-icon-back.svg" alt="Back" width={24} height={24} />
@@ -125,11 +134,15 @@ function MemoryDetailScreen() {
             style={{
               position: 'absolute', right: 16, top: 60,
               width: 40, height: 40, borderRadius: 20,
-              background: 'rgba(0,0,0,0.11)', border: 'none',
+              background: 'rgba(0,0,0,0.28)',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+              border: '0.5px solid rgba(255,255,255,0.15)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', padding: 8,
               WebkitTapHighlightColor: 'transparent',
               transition: 'transform 140ms ease',
+              boxSizing: 'border-box',
             }}
           >
             <img src="../shared/assets/mem-icon-more.svg" alt="More" width={24} height={24} />
@@ -156,13 +169,16 @@ function MemoryDetailScreen() {
             }}>12–21 July, 2025</p>
           </div>
 
-          {/* Create button — node 511:22523: teal pill, centered, top 390 */}
+          {/* Create button — node 511:22523: teal pill, centered, top 390.
+              Centred with left/right:0 + margin:auto rather than translateX(-50%)
+              because press() assigns style.transform = scale(0.97), wiping a
+              translateX and snapping the button to the left edge on tap. */}
           <button
             onClick={() => window.navigation.push('memory-create.html')}
             {...press(0.97)}
             style={{
               position: 'absolute', top: 390,
-              left: '50%', transform: 'translateX(-50%)',
+              left: 0, right: 0, width: 'fit-content', margin: '0 auto',
               display: 'flex', alignItems: 'center', gap: 8,
               padding: '16px 24px 16px 16px', borderRadius: 55,
               background: '#007377', border: 'none',
