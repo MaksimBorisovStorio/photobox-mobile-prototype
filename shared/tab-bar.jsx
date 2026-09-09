@@ -147,8 +147,12 @@ function TabBar({ activeTab, onTabChange }) {
                        // (iconActive) — use it directly. Projects has no filled variant
                        // yet; fall back to CSS filter: brightness(0) blacks the outline,
                        // then the chain converts black → #008D95 ≈ the brand teal.
+                       // CSS filter for Projects active (no filled SVG yet): black → #007377.
+                       // Chain: brightness(0)→black, invert(41%)→gray(105),
+                       // sepia(100%)→(142,126,98), saturate(544%)→H=38° vivid,
+                       // hue-rotate(144deg)→H=182°, brightness(50%)→(0,116,120)≈#007377.
                        filter: on && !tab.iconActive
-                         ? 'brightness(0) saturate(100%) invert(41%) sepia(100%) saturate(544%) hue-rotate(145deg) brightness(62%)'
+                         ? 'brightness(0) saturate(100%) invert(41%) sepia(100%) saturate(544%) hue-rotate(144deg) brightness(50%)'
                          : 'none',
                      }} />
                 <span style={{
@@ -156,9 +160,7 @@ function TabBar({ activeTab, onTabChange }) {
                   fontFamily: TAB_LABEL_FONT, fontSize: 10, fontWeight: 590,
                   lineHeight: '12px', textAlign: 'center',
                   letterSpacing: on ? '-0.1px' : 0,
-                  color: on
-                    ? 'var(--Extended-brand-colours-Secondary-400, #008E93)'
-                    : '#1A1A1A',
+                  color: on ? '#007377' : '#1A1A1A',
                 }}>{tab.label}</span>
               </button>
             );
