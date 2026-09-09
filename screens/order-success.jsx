@@ -1,96 +1,137 @@
-// screens/order-success.jsx
-function OrderSuccessScreen() {
-  const [visible, setVisible] = React.useState(false);
-  React.useEffect(() => {
-    const t = setTimeout(() => setVisible(true), 50);
-    return () => clearTimeout(t);
-  }, []);
+// screens/order-success.jsx — Figma 519:26366 "Order Confirmation"
+const OS_A = '../shared/assets';
+const OS_DISPLAY = '-apple-system, "SF Pro Display", system-ui, sans-serif';
+const OS_TEACHERS = '"Teachers", -apple-system, system-ui, sans-serif';
 
-  const { order } = window.MOCK;
+function OrderSuccessScreen() {
+  // Figma frame assumes 56px status bar; offset content below it by the actual safe area
+  const safeTop = 'env(safe-area-inset-top, 44px)';
+  // T(figmaY) → CSS calc placing the element (figmaY - 56)px below the safe-area end
+  const T = n => `calc(${safeTop} + ${n - 56}px)`;
 
   return (
-    <div style={{ position:'relative', width:'100%', height:'100%', background:'var(--color-bg)', display:'flex', flexDirection:'column' }}>
-      <IOSStatusBar dark={false} />
+    <div style={{
+      position: 'relative', width: '100%', height: '100%', overflow: 'hidden',
+      background: 'linear-gradient(-18.76deg, rgb(144,206,208) 25.15%, rgb(0,142,147) 69.92%, rgb(0,115,119) 92.63%)',
+    }}>
 
-      {/* Centered success content */}
+      {/* Dynamic Island */}
       <div style={{
-        flex:1, display:'flex', flexDirection:'column',
-        alignItems:'center', justifyContent:'center',
-        paddingTop:'env(safe-area-inset-top, 44px)',
-        paddingBottom:120,
-        paddingLeft:24, paddingRight:24,
-        textAlign:'center',
+        position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
+        width: 120, height: 34, borderRadius: 20, background: '#000',
+      }} />
+
+      {/* Status bar — time */}
+      <div style={{
+        position: 'absolute', top: 17, left: 26,
+        fontFamily: OS_DISPLAY, fontSize: 15, fontWeight: 600, color: '#fff',
+        letterSpacing: '-0.3px',
+      }}>9:41</div>
+
+      {/* Check circle — Figma y=200 */}
+      <div style={{
+        position: 'absolute', top: T(200), left: '50%', transform: 'translateX(-50%)',
+        width: 78, height: 78, borderRadius: 39,
+        background: 'rgba(255,255,255,0.18)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
-        {/* Animated checkmark */}
-        <div style={{
-          width:80, height:80, borderRadius:40,
-          background:'var(--color-primary)',
-          display:'flex', alignItems:'center', justifyContent:'center',
-          transform: visible ? 'scale(1)' : 'scale(0)',
-          transition: 'transform 500ms cubic-bezier(0.34, 1.3, 0.64, 1)',
-          transitionDelay: '200ms',
-        }}>
-          <svg width="36" height="27" viewBox="0 0 36 27" fill="none">
-            <path d="M3 13.5L13.5 24L33 3" stroke="white" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </div>
+        <img src={`${OS_A}/pb-confirm-checkmark.svg`} width={40} height={30} alt="" style={{ display: 'block' }} />
+      </div>
 
-        <h1 style={{ fontSize:28, fontWeight:700, color:'#000', margin:'24px 0 0' }}>
-          Order confirmed!
-        </h1>
-        <p style={{ fontSize:17, color:'var(--color-text-secondary)', margin:'8px 0 0' }}>
-          Thank you for your order
-        </p>
+      {/* "Order placed!" — Figma y=300 */}
+      <div style={{
+        position: 'absolute', top: T(300), left: '50%', transform: 'translateX(-50%)',
+        width: 320, textAlign: 'center',
+        fontFamily: OS_DISPLAY, fontSize: 28, fontWeight: 700, color: '#fff',
+        letterSpacing: '-0.4px',
+      }}>Order placed!</div>
 
-        {/* Order card */}
+      {/* Subtitle — Figma y=348 */}
+      <div style={{
+        position: 'absolute', top: T(348), left: '50%', transform: 'translateX(-50%)',
+        width: 260, textAlign: 'center',
+        fontFamily: OS_DISPLAY, fontSize: 14, fontWeight: 400,
+        color: 'rgba(255,255,255,0.8)', lineHeight: '20px',
+      }}>We've received your order and we're getting it ready.</div>
+
+      {/* Order number card — Figma y=411, 334×74 */}
+      <div style={{
+        position: 'absolute', top: T(411), left: '50%', transform: 'translateX(-50%)',
+        width: 334, height: 74, borderRadius: 14,
+        background: 'rgba(255,255,255,0.2)',
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center', gap: 4,
+      }}>
         <div style={{
-          width:'100%', background:'var(--color-surface)',
-          borderRadius:22, overflow:'hidden',
-          marginTop:32, textAlign:'left',
-        }}>
-          {[
-            { label: 'Order number', value: order.number },
-            { label: 'Estimated delivery', value: order.estimatedDelivery },
-            { label: 'Total paid', value: `€${order.total.toFixed(2)}`, teal: true },
-          ].map((row, i, arr) => (
-            <div key={row.label} style={{
-              display:'flex', justifyContent:'space-between', alignItems:'center',
-              padding:'14px 16px',
-              borderBottom: i < arr.length - 1 ? '0.5px solid rgba(60,60,67,0.12)' : 'none',
-            }}>
-              <span style={{ fontSize:15, color:'var(--color-text-secondary)' }}>{row.label}</span>
-              <span style={{
-                fontSize:15, fontWeight:600,
-                color: row.teal ? 'var(--color-primary)' : '#000',
-              }}>{row.value}</span>
-            </div>
-          ))}
+          fontFamily: OS_DISPLAY, fontSize: 10, fontWeight: 500,
+          color: 'rgba(255,255,255,0.55)', letterSpacing: '0.5px',
+        }}>Order number</div>
+        <div style={{
+          fontFamily: OS_DISPLAY, fontSize: 22, fontWeight: 700,
+          color: '#fff', letterSpacing: '-0.3px',
+        }}>PBX482910</div>
+      </div>
+
+      {/* Delivery card — Figma y=495, 334×57 */}
+      <div style={{
+        position: 'absolute', top: T(495), left: '50%', transform: 'translateX(-50%)',
+        width: 334, height: 57, borderRadius: 14,
+        background: 'rgba(255,255,255,0.2)',
+        display: 'flex', flexDirection: 'row',
+        alignItems: 'center', padding: '0 16px', gap: 12,
+        boxSizing: 'border-box',
+      }}>
+        <img src={`${OS_A}/pb-confirm-check.svg`} width={18} height={18} alt="" style={{ display: 'block', flexShrink: 0 }} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <div style={{
+            fontFamily: OS_DISPLAY, fontSize: 11, fontWeight: 400,
+            color: 'rgba(255,255,255,0.55)',
+          }}>Estimated delivery</div>
+          <div style={{
+            fontFamily: OS_DISPLAY, fontSize: 14, fontWeight: 700, color: '#fff',
+          }}>28–30 August 2026</div>
         </div>
       </div>
 
-      {/* CTA */}
-      <div style={{
-        position:'absolute', bottom:0, left:0, right:0,
-        padding:'12px 16px',
-        paddingBottom:'calc(env(safe-area-inset-bottom, 0px) + 16px)',
-        background:'linear-gradient(to top, var(--color-bg) 60%, transparent)',
-      }}>
-        <button
-          onClick={() => window.navigation.push('home.html')}
-          onPointerDown={e => e.currentTarget.style.transform = 'scale(0.97)'}
-          onPointerUp={e => e.currentTarget.style.transform = 'scale(1)'}
-          onPointerLeave={e => e.currentTarget.style.transform = 'scale(1)'}
-          style={{
-            width:'100%', height:56, borderRadius:28,
-            background:'var(--color-primary)', color:'#fff', border:'none',
-            fontSize:17, fontWeight:700, cursor:'pointer',
-            transition:'transform 140ms ease',
-            boxShadow:'0 4px 14px rgba(14,158,142,0.35)',
-          }}
-        >
-          Continue shopping
-        </button>
-      </div>
+      {/* "Track your order" — Figma y=622, white pill */}
+      {/* Centred with left/right:0 + margin:auto to avoid transform collision with press scale */}
+      <button
+        onClick={() => window.navigation.push('account.html')}
+        onPointerDown={e => e.currentTarget.style.transform = 'scale(0.97)'}
+        onPointerUp={e => e.currentTarget.style.transform = 'scale(1)'}
+        onPointerLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+        style={{
+          position: 'absolute', top: T(622),
+          left: 0, right: 0, margin: '0 auto',
+          width: 354, height: 72, borderRadius: 32,
+          background: '#fff', border: 'none', cursor: 'pointer',
+          fontFamily: OS_TEACHERS, fontSize: 18, fontWeight: 700, color: '#333',
+          boxShadow: 'inset 0 0 20px rgba(0,77,74,0.05)',
+          transition: 'transform 140ms ease',
+          WebkitTapHighlightColor: 'transparent',
+        }}
+      >Track your order</button>
+
+      {/* "Back to home" — Figma y=711, teal pill */}
+      <button
+        onClick={() => window.navigation.replace('home.html')}
+        onPointerDown={e => e.currentTarget.style.transform = 'scale(0.97)'}
+        onPointerUp={e => e.currentTarget.style.transform = 'scale(1)'}
+        onPointerLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+        style={{
+          position: 'absolute', top: T(711),
+          left: 0, right: 0, margin: '0 auto',
+          width: 354, height: 72, borderRadius: 32,
+          background: '#007377',
+          border: '1px solid rgba(255,255,255,0.11)',
+          cursor: 'pointer',
+          fontFamily: OS_TEACHERS, fontSize: 18, fontWeight: 700, color: '#fff',
+          boxShadow: 'inset 0 0 20px rgba(255,255,255,0.55)',
+          transition: 'transform 140ms ease',
+          WebkitTapHighlightColor: 'transparent',
+        }}
+      >Back to home</button>
+
     </div>
   );
 }

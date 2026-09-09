@@ -1,5 +1,5 @@
 // service-worker.js
-const CACHE = 'photobox-v37';  // bump to evict a stale cache
+const CACHE = 'photobox-v40';  // bump to evict a stale cache
 // Paths are relative to this file's URL, not root-absolute: GitHub Pages serves a
 // project site from /<repo>/, where a leading slash would resolve above the app and
 // 404 every entry. c.add() and the fetch handler both work off the request URL, so
@@ -178,6 +178,28 @@ const PRECACHE = [
   'shared/assets/pb-editor-tool-stickers.svg',
   'shared/assets/pb-editor-tool-smartdesign.svg',
   'shared/assets/pb-editor-tool-delete.svg',
+  // Editor review + basket + checkout + order confirmation assets
+  'shared/assets/pb-review-thumb.png',
+  'shared/assets/pb-review-pages-a.png',
+  'shared/assets/pb-review-pages-b.png',
+  'shared/assets/pb-review-radio.svg',
+  'shared/assets/pb-review-basket.svg',
+  'shared/assets/pb-review-info.svg',
+  'shared/assets/pb-basket-thumb.png',
+  'shared/assets/pb-basket-promo-check.svg',
+  'shared/assets/pb-basket-plus.svg',
+  'shared/assets/pb-basket-minus.svg',
+  'shared/assets/pb-basket-check.svg',
+  'shared/assets/pb-basket-applied.svg',
+  'shared/assets/pb-basket-edit.svg',
+  'shared/assets/pb-basket-eye.svg',
+  'shared/assets/pb-basket-duplicate.svg',
+  'shared/assets/pb-basket-options.svg',
+  'shared/assets/pb-basket-delete.svg',
+  'shared/assets/pb-checkout-thumb.png',
+  'shared/assets/pb-icon-back-teal.svg',
+  'shared/assets/pb-confirm-check.svg',
+  'shared/assets/pb-confirm-checkmark.svg',
   'shared/assets/pb-editor-book-block.svg',
   'shared/assets/pb-editor-book-sheet-a.svg',
   'shared/assets/pb-editor-book-sheet-b.svg',
@@ -204,8 +226,12 @@ const PRECACHE = [
   'screens/editor.jsx',
   'screens/photo-sources.html',
   'screens/photo-sources.jsx',
+  'screens/editor-review.html',
+  'screens/editor-review.jsx',
   'screens/basket.html',
   'screens/basket.jsx',
+  'screens/checkout.html',
+  'screens/checkout.jsx',
   'screens/checkout-delivery.html',
   'screens/checkout-delivery.jsx',
   'screens/checkout-payment.html',
