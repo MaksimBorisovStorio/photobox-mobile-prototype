@@ -102,10 +102,7 @@ function MemoriesScreen() {
         {/* ── Header ──────────────────────────────────────────── */}
         {/* node 509:20422: sticky title "Memories" in Teachers Bold 42px */}
         <div style={{
-          paddingTop: 'max(56px, calc(env(safe-area-inset-top, 44px) + 12px))',
-          padding: '0 20px',
-          paddingTop: 'max(56px, calc(env(safe-area-inset-top, 44px) + 12px))',
-          paddingBottom: 16,
+          padding: `max(56px, calc(env(safe-area-inset-top, 44px) + 12px)) 20px 16px`,
         }}>
           <p style={{
             margin: 0,
