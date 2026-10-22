@@ -1,148 +1,147 @@
 // shared/onboarding-shell.jsx
-// Shared chrome for the three onboarding slides.
-// Figma: "onboarding" section — slide 1 node 451:13808, slide 3 node 451:13823.
-// All three slides are identical except the illustration, the copy and the
-// active dot, so the layout lives here once.
+// Shared pieces for the start flow — Figma section 683:3565: START SCREEN, 1st step
+// (welcome), 2ND SCREEN (photo access) and 3RD SCREEN (notifications).
+//
+// Replaces the old three-slide shell (wash, gallery dots, white pill CTA). The primary
+// went green in this design, and the two permission screens are now a light page with
+// an illustration, a headline and a stacked primary / skip pair.
+//
+// ⚠️ Top-level declarations in a classic script land in the global lexical scope, so
+// every name here is `Ob…` / `OB_…` to stay clear of PB_DISPLAY and friends.
 
-// PB_DISPLAY comes from shared/brand.jsx, which must load before this file.
+const OB_HEAD = '"Bricolage Grotesque", "DM Sans", -apple-system, system-ui, sans-serif';
+const OB_UI = '"Rethink Sans", "DM Sans", -apple-system, system-ui, sans-serif';
+const OB_HEAD_VARIATION = '"opsz" 14, "wdth" 100';   // pinned by the design
 
-// Gallery indicator — Figma node 451:13817 (44×16 pill, dots at x=10/22/34).
-function GalleryIndicator({ active = 1 }) {
-  return (
-    <svg width="44" height="16" viewBox="0 0 44 16" fill="none" style={{ display: 'block' }}>
-      <rect width="44" height="16" rx="8" fill="black" fillOpacity="0.5" />
-      {[10, 22, 34].map((cx, i) => (
-        <circle key={cx} cx={cx} cy="8" r="2" fill="white" opacity={i + 1 === active ? 1 : 0.2} />
-      ))}
-    </svg>
-  );
-}
-
-// Illustration coordinates are lifted verbatim from the 390-wide Figma frames, so
-// both art slots live in a 390-wide box centred on the viewport — on a wider phone
-// the whole illustration centres instead of hugging the left edge. Decorative, so
-// pointer events pass straight through to the CTA underneath.
-const ART_FRAME = {
-  position: 'absolute', left: '50%', top: 0, width: 390, height: '100%',
-  transform: 'translateX(-50%)', pointerEvents: 'none',
+// Figma's Button: r16, 56 tall, Rethink Sans Bold 17/20.
+//   primary — green fill with the lighter 1px rim
+//   light   — #EFEFEF with a warm rim (welcome screen's "Continue as guest")
+//   ghost   — no fill: "Skip" on the light pages, whose fill is the page colour
+const OB_BUTTONS = {
+  primary: { background: 'var(--pb-green)', border: '1px solid var(--pb-green-rim)', color: '#FFFFFF' },
+  light:   { background: '#EFEFEF', border: '1px solid #EBE2D9', color: '#000000' },
+  ghost:   { background: 'var(--pb-paper)', border: '1px solid transparent', color: '#000000' },
 };
 
-function OnboardingShell({ slide, title, body, ctaLabel = 'Continue', onNext, children, foreground }) {
+function ObButton({ kind = 'primary', children, onClick }) {
   const press = s => ({
     onPointerDown: e => { e.currentTarget.style.transform = `scale(${s})`; },
     onPointerUp:   e => { e.currentTarget.style.transform = 'scale(1)'; },
     onPointerLeave:e => { e.currentTarget.style.transform = 'scale(1)'; },
   });
+  return (
+    <button
+      onClick={onClick}
+      {...press(0.97)}
+      style={{
+        width: '100%', height: 56, boxSizing: 'border-box', flex: 'none',
+        borderRadius: 16, padding: '0 24px', cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+        transition: 'transform 140ms ease',
+        fontFamily: OB_UI, fontWeight: 700, fontSize: 17, lineHeight: '20px',
+        whiteSpace: 'nowrap', WebkitTapHighlightColor: 'transparent',
+        ...OB_BUTTONS[kind],
+      }}
+    >{children}</button>
+  );
+}
+
+// The bottom of every start-flow screen: 24px gutters, 8px between the buttons, and
+// the node's 32px of air underneath (lifted to the home-indicator inset on device).
+const OB_BUTTON_STACK = {
+  display: 'flex', flexDirection: 'column', gap: 8, width: '100%',
+  boxSizing: 'border-box',
+  padding: '0 24px max(32px, env(safe-area-inset-bottom, 0px))',
+};
+
+// Illustration coordinates are lifted from the 430-wide Figma frames, so the art lives
+// in a 430-wide box centred on the viewport — on a 390 phone it simply overhangs a
+// little on each side, which the art's own margins absorb.
+const OB_ART_W = 430;
+
+// The two permission screens. Layout, top to bottom:
+//   art      flex: 1 — the illustration is centred in whatever is left
+//   title    Bricolage Grotesque SemiBold 28/36 −1.1857, #023C42, 373 wide, 62 above
+//            the buttons (node: title bottom 669, first button 731)
+//   buttons  primary + skip
+//
+// `artHeight` is the height of the illustration's own coordinate space and `artBias`
+// nudges it off the exact centre of the free area, in px, so each screen can land
+// where its node has it (see each screen for the numbers).
+//
+// `artWidth` / `artFit` are how much of that space has to stay on screen — the widest
+// span of ink, and the height above which the art may run into the headline. On a phone
+// too small for them the art scales down about its centre instead of colliding with the
+// copy or running off the side; on anything the nodes were drawn for the scale is 1.
+function OnboardingPrompt({
+  title, artHeight, artBias = 0, artWidth = OB_ART_W, artFit = artHeight, children,
+  primaryLabel, onPrimary, skipLabel = 'Skip', onSkip,
+}) {
+  const { useRef, useState, useLayoutEffect } = React;
+  const areaRef = useRef(null);
+  const [fit, setFit] = useState(1);
+
+  useLayoutEffect(() => {
+    const el = areaRef.current;
+    if (!el) return undefined;
+    const measure = () => {
+      const r = el.getBoundingClientRect();
+      setFit(Math.max(0.4, Math.min(1, r.width / artWidth, r.height / artFit)));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [artWidth, artFit]);
 
   return (
     <div style={{
-      position: 'relative', width: '100%', height: '100%',
-      background: '#EBF7F8', overflow: 'hidden',
+      position: 'relative', width: '100%', height: '100%', overflow: 'hidden',
+      background: 'var(--pb-paper)',
+      display: 'flex', flexDirection: 'column',
     }}>
-      {/* Brand wash — same stops as the splash, centred low (50% 88.68%) so the
-          deep teal sits behind the white copy. Figma node 451:13808 fill. */}
-      <div style={{
-        position: 'absolute', inset: 0,
-        background: 'radial-gradient(815.74% 113.98% at 50% 88.68%, var(--pb-wash-stops))',
-      }} />
+      <style>{`
+        @keyframes obRise {
+          from { opacity: 0; transform: translateY(14px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
 
-      {/* Illustration, behind the bottom panel — so the panel's backdrop blur softens
-          whatever reaches down into it, exactly as the Figma frames do. */}
-      <div aria-hidden style={ART_FRAME}>{children}</div>
-
-      {/* Bottom panel — node 451:13813: 484 tall, blurs the artwork behind it */}
-      <div style={{
-        position: 'absolute', bottom: 0, left: 0, width: '100%', height: 484,
-        boxSizing: 'border-box',
-        display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'flex-end', gap: 24,
-        padding: '32px 20px 0',
-        // Figma pads 24px; on-device we lift to the safe area so the CTA clears
-        // the home indicator.
-        paddingBottom: 'max(24px, env(safe-area-inset-bottom, 0px))',
+      <div aria-hidden ref={areaRef} style={{
+        flex: '1 1 0', minHeight: 0, position: 'relative',
+        marginTop: 'max(44px, env(safe-area-inset-top, 0px))',
+        pointerEvents: 'none',
       }}>
-        {/* ⚠️ The node declares `backdrop-blur: 28.65px` on this panel and it is
-            deliberately NOT implemented. Figma's own render of all three frames shows
-            no blur at all — the panel's fill is rgba(222,241,242,0.01) and Figma
-            modulates a background blur by the layer's own fill alpha, so 1% of the
-            blur is 1% visible. Measured on node 451:13841: the album tile that runs
-            behind this panel keeps 4.78 units of horizontal detail in Figma's render
-            where a live 28.65px backdrop-filter leaves 1.75 — the artwork came out
-            visibly washed out against the design. The panel is therefore a plain
-            translucent layer; the wash gradient behind it is what carries the
-            transition, and it needs no seam-hiding mask because there is no seam.
-            Put the blur back and the illustrations go soft again. */}
-        <div aria-hidden style={{
-          position: 'absolute', inset: 0, pointerEvents: 'none',
-          zIndex: 0,
-          background: 'rgba(222,241,242,0.01)',
-        }} />
-        {/* Copy — node 451:13814 */}
-        {/* Figma gaps are 16 here and 24 below, on a 40px subhead line box. Since
-            the panel is bottom-anchored, tightening that line box to 24px pulls the
-            whole stack 15px down, so 8px is given back below and 8px between the
-            two lines — copy lands exactly where the design has it, measured. */}
         <div style={{
-          position: 'relative', zIndex: 1, marginBottom: 8,
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24,
-          width: '100%', textAlign: 'center', color: '#FFFFFF',
-          textShadow: '0px 0px 10px rgba(0,115,119,0.5)',
-        }}>
-          {/* Headline leading is Figma's 40px — measured off the reference, the
-              two headline lines sit exactly 40px apart.
-              The -0.2px tracking is not in the Figma node: DM Sans is a shade
-              wider than Google Sans Flex, enough that slide 3's second line
-              measured 350px against 350px available and wrapped to a third line.
-              Drop this once the real Google Sans Flex woff2 is in place. */}
-          <p style={{
-            margin: 0, width: '100%',
-            fontFamily: PB_DISPLAY, fontWeight: 600, fontSize: 28, lineHeight: '40px',
-            letterSpacing: '-0.2px',
-          }}>{title}</p>
-          {/* Figma inherits 40px here too, which is invisible on its one-line copy
-              but blows out the moment the body wraps. 24px keeps it tight. */}
-          <p style={{
-            margin: 0, width: '100%', maxWidth: 350,
-            fontFamily: PB_DISPLAY, fontWeight: 500, fontSize: 16, lineHeight: '24px',
-          }}>{body}</p>
-        </div>
-
-        <div style={{ position: 'relative', zIndex: 1, width: 44, height: 16 }}>
-          <GalleryIndicator active={slide} />
-        </div>
-
-        {/* CTA — node 451:13822: 338×72, r55, Teachers Bold 20/32 */}
-        <div style={{
-          position: 'relative', zIndex: 1,
-          display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center', width: '100%',
-        }}>
-          <button
-            onClick={onNext}
-            {...press(0.97)}
-            style={{
-              width: '100%', maxWidth: 338, height: 72, borderRadius: 55,
-              background: 'var(--colour-foreground-fg-white, #FFFFFF)',
-              border: 'none', padding: '0 24px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              cursor: 'pointer', transition: 'transform 140ms ease',
-              fontFamily: '"Teachers", -apple-system, system-ui, sans-serif',
-              fontWeight: 700, fontSize: 20, lineHeight: '32px',
-              color: 'var(--colour-foreground-fg-secondary, #007377)',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {ctaLabel}
-          </button>
-        </div>
+          position: 'absolute', left: '50%', width: OB_ART_W, height: artHeight,
+          top: `calc(50% - ${artHeight / 2}px + ${artBias}px)`,
+          transform: `translateX(-50%) scale(${fit})`,
+        }}>{children}</div>
       </div>
 
-      {/* Illustration parts Figma paints AFTER the panel, so they stay sharp where
-          they overlap it: slide 2's front album tile and its two labels, slide 3's
-          notification stack. */}
-      {foreground ? <div aria-hidden style={ART_FRAME}>{foreground}</div> : null}
+      <h1 style={{
+        flex: 'none', margin: '0 auto 62px', width: 373, maxWidth: 'calc(100% - 32px)',
+        textAlign: 'center', textWrap: 'balance',
+        fontFamily: OB_HEAD, fontWeight: 600, fontSize: 28, lineHeight: '36px',
+        letterSpacing: '-1.1857px', color: 'var(--pb-ink)',
+        fontVariationSettings: OB_HEAD_VARIATION,
+        animation: 'obRise 520ms cubic-bezier(0.22, 1, 0.36, 1) 160ms both',
+      }}>{title}</h1>
+
+      <div style={{
+        ...OB_BUTTON_STACK, flex: 'none',
+        animation: 'obRise 520ms cubic-bezier(0.22, 1, 0.36, 1) 260ms both',
+      }}>
+        <ObButton kind="primary" onClick={onPrimary}>{primaryLabel}</ObButton>
+        <ObButton kind="ghost" onClick={onSkip}>{skipLabel}</ObButton>
+      </div>
     </div>
   );
 }
 
-Object.assign(window, { OnboardingShell, GalleryIndicator });
+// Honour the system setting: the loops below hold on a composed frame instead of moving.
+function obReducedMotion() {
+  return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+}
+
+Object.assign(window, { ObButton, OnboardingPrompt, obReducedMotion });

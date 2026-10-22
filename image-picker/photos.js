@@ -7,25 +7,22 @@
 // the prototype with it — which also meant the "offline-capable PWA" was never true
 // for photos. The set is now local, so it cannot break again and works offline.
 //
-// The pool is the design's own photographs, pulled from the Figma file's image fills
-// (mock-01..25, in shared/assets/photos/) plus six of the collection-cover photos the
-// repo already carries. Paths are relative and resolve identically from /image-picker/
-// and from /screens/ — which matters, because the picker hands these strings to the
-// editor through sessionStorage.pb_photos.
+// The pool is a real camera roll: 413 photos from
+// github.com/MaksimBorisovStorio/trip-to-canada-photos — the Canada trip (5–14 July
+// 2025, 317 photos) in date order, then the "Weekend in Berlin" album (96). Resized to
+// 800px on the long edge as shared/assets/photos/trip/t-001..413.jpg (~70KB each).
+// Paths are relative and resolve identically from /image-picker/ and from /screens/ —
+// which matters, because the picker hands these strings to the editor through
+// sessionStorage.pb_photos.
+const TRIP_COUNT = 413;
 const MOCK_PHOTOS = [];
-for (let i = 1; i <= 25; i++) {
-  MOCK_PHOTOS.push(`../shared/assets/photos/mock-${String(i).padStart(2, '0')}.webp`);
+for (let i = 1; i <= TRIP_COUNT; i++) {
+  MOCK_PHOTOS.push(`../shared/assets/photos/trip/t-${String(i).padStart(3, '0')}.jpg`);
 }
-[
-  'pb-src-canada.jpg', 'pb-src-cappadocia.jpg', 'pb-src-etna.jpg',
-  'pb-src-guadalupe.jpg', 'pb-src-italy.jpg', 'ob-album-photo.jpg',
-].forEach(f => MOCK_PHOTOS.push(`../shared/assets/${f}`));
 
-// Walk the pool by a stride coprime to its length: every photo is used once before
-// any repeats, and consecutive slots are far apart in the list, so a screenful of the
-// grid never shows the same picture twice.
-const PHOTO_STRIDE = 7;
-function photoFor(n) { return MOCK_PHOTOS[(n * PHOTO_STRIDE) % MOCK_PHOTOS.length]; }
+// Walked in order, so the grid reads as one trip the way a real roll does; the grid has
+// more slots than photos, so the last ~70 slots wrap round to the start.
+function photoFor(n) { return MOCK_PHOTOS[(n - 1) % MOCK_PHOTOS.length]; }
 
 // ⚠️ Only the third element (the aspect) is still read: it used to size the picsum
 // request as well. The picker's tiles are always 1:1 and its aspect toggle switches

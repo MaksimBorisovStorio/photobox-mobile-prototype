@@ -1,5 +1,5 @@
 // service-worker.js
-const CACHE = 'photobox-v41';  // bump to evict a stale cache
+const CACHE = 'photobox-v47';  // bump to evict a stale cache
 // Paths are relative to this file's URL, not root-absolute: GitHub Pages serves a
 // project site from /<repo>/, where a leading slash would resolve above the app and
 // 404 every entry. c.add() and the fetch handler both work off the request URL, so
@@ -20,6 +20,17 @@ const PRECACHE = [
   'shared/assets/splash-star-base.svg',
   'shared/assets/icon-notification.svg',
   // Onboarding illustrations (Figma nodes 451:13809 / 451:13841 / 451:13824)
+  'shared/assets/pb-font-bricolage.woff2',
+  'shared/assets/pb-font-rethinksans.woff2',
+  'shared/assets/pb2-logo.svg',
+  'shared/assets/pb2-logo-sm.svg',
+  'shared/assets/pb2-welcome-poster.jpg',
+  'shared/assets/welcome.mp4',
+  'shared/assets/pb2-cover-florence.jpg',
+  'shared/assets/pb2-icon-trips.svg',
+  'shared/assets/pb2-icon-photos.svg',
+  'shared/assets/pb2-notif-icon.png',
+  'shared/assets/pb2-phone.webp',
   'shared/assets/ob-products.webp',
   'shared/assets/ob-album-photo.jpg',
   'shared/assets/ob-icon-trips.svg',
@@ -175,6 +186,7 @@ const PRECACHE = [
   'shared/assets/pb-editor-tool-addphoto.svg',
   'shared/assets/pb-editor-tool-addtext.svg',
   'shared/assets/pb-editor-tool-layout.svg',
+  'shared/assets/pb-editor-tool-spacing.svg',
   'shared/assets/pb-editor-tool-stickers.svg',
   'shared/assets/pb-editor-tool-smartdesign.svg',
   'shared/assets/pb-editor-tool-delete.svg',
@@ -267,6 +279,10 @@ self.addEventListener('activate', e => {
 // every successful fetch — still serves the whole flow offline.
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  // Media elements ask for byte ranges and need a genuine 206 back. The re-fetch below
+  // goes by URL, which drops the Range header and answers 200 with the whole file —
+  // Chrome copes, Safari refuses to play it. Leave range requests to the browser.
+  if (e.request.headers.has('range')) return;
   e.respondWith((async () => {
     try {
       // Same-origin files bypass the browser HTTP cache: fetch(e.request) can be
