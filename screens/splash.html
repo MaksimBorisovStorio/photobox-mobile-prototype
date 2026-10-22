@@ -7,11 +7,11 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Photobox">
-  <meta name="theme-color" content="#0E9E8E">
+  <meta name="theme-color" content="#007F70">
   <link rel="manifest" href="../manifest.json">
   <link rel="stylesheet" href="../shared/styles.css">
   <style>
-    html, body { background: #EBF7F8; }
+    html, body { background: #007F70; }
   </style>
   <script crossorigin="anonymous" src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
   <script crossorigin="anonymous" src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
@@ -37,7 +37,7 @@
     function App() {
       const mobile = useIsMobile();
       if (mobile) return (
-        <div style={{ position:'fixed', inset:0, background:'#EBF7F8', overflow:'hidden' }}>
+        <div style={{ position:'fixed', inset:0, background:'#007F70', overflow:'hidden' }}>
           <SplashScreen />
         </div>
       );

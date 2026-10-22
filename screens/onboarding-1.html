@@ -7,9 +7,10 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Photobox">
+  <meta name="theme-color" content="#007F70">
   <link rel="manifest" href="../manifest.json">
   <link rel="stylesheet" href="../shared/styles.css">
-  <style> html, body { background: #EBF7F8; margin:0; padding:0; } ::-webkit-scrollbar{display:none;} </style>
+  <style> html, body { background: #007F70; margin:0; padding:0; } ::-webkit-scrollbar{display:none;} </style>
   <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
@@ -35,7 +36,7 @@
     function App() {
       const mobile = useIsMobile();
       if (mobile) return (
-        <div style={{position:'fixed', inset:0, background:'#EBF7F8', overflow:'hidden'}}>
+        <div style={{position:'fixed', inset:0, background:'#007F70', overflow:'hidden'}}>
           <OnboardingScreen />
         </div>
       );

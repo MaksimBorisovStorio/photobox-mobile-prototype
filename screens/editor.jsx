@@ -145,10 +145,11 @@ function GutterArt({ file, offsets, width, opacity }) {
 // Padding is 8 on the outer edge and 12 on the gutter edge, mirrored, which lands
 // the placeholder 12 from the sheet edge and 8 from the spine on both sides.
 // The leaf's own box, shared with arrange mode so the two views cannot drift.
-function leafBox(left) {
+// `color` is a page colour chosen with the Color tool; it replaces the theme's paper.
+function leafBox(left, t = CLASSIC, color) {
   return {
     width: '50%', height: '100%', boxSizing: 'border-box',
-    background: left ? '#F5F5F5' : '#FFFFFF',
+    background: color || (left ? t.alt : t.page), transition: 'background 240ms ease',
     boxShadow: '0px 1px 1.5px rgba(0,0,0,0.3), 0px 1px 1.5px rgba(0,0,0,0.1)',
     paddingTop: 8, paddingBottom: 8,
     paddingLeft: left ? 8 : 12, paddingRight: left ? 12 : 8,
@@ -156,8 +157,12 @@ function leafBox(left) {
   };
 }
 
-function Leaf({ side, photos, onOpen, label, layout }) {
+// `blank` is an inside-cover leaf: it carries no page number and cannot hold a photo,
+// so it is plain paper — no well, no placeholder, nothing to tap.
+function Leaf({ side, photos, onOpen, label, layout, onEmpty, blank, n }) {
   const left = side === 'left';
+  const t = useTheme();
+  const { colors } = React.useContext(BookPaint);
   return (
     <div
       role={onOpen ? 'button' : undefined}
@@ -168,7 +173,7 @@ function Leaf({ side, photos, onOpen, label, layout }) {
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); }
       } : undefined}
       {...(onOpen ? press(0.97) : {})}
-      style={Object.assign(leafBox(left), {
+      style={Object.assign(leafBox(left, t, n ? slotColor(colors, n + 1) : null), {
       cursor: onOpen ? 'pointer' : 'default',
       // The press scale reads as the page being pushed in toward the spine rather
       // than the whole sheet shrinking, which is what a centred origin would give.
@@ -177,8 +182,10 @@ function Leaf({ side, photos, onOpen, label, layout }) {
     })}>
       {/* A relative box for the layout to position its slots inside; with no layout
           set LayoutWell falls back to the single full-page well the node draws. */}
-      <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
-        <LayoutWell layout={layout} photos={photos} />
+      {/* A size container, so the theme's sticker can size itself to the page. */}
+      <div style={{ position: 'relative', flex: 1, minWidth: 0, containerType: 'size' }}>
+        {!blank && <LayoutWell layout={layout} photos={photos} onEmpty={onEmpty} />}
+        {!blank && <ThemeSticker n={n} />}
       </div>
     </div>
   );
@@ -191,14 +198,16 @@ function Leaf({ side, photos, onOpen, label, layout }) {
 // on one — and that fires `pointercancel`, which killed every press-and-hold drag in
 // arrange mode and the page navigator the instant the finger moved. Measured:
 // gotpointercapture → pointermove → dragstart → pointercancel, all within 2ms.
-function PhotoWell({ photo, style, iconSize = 24 }) {
+// The theme's frame shape is applied here, so every view that draws a well gets it.
+function PhotoWell({ photo, style, iconSize = 24, index }) {
+  const t = useTheme();
   return (
     <div aria-hidden style={Object.assign({
       position: 'relative', flex: 1, minWidth: 0, overflow: 'hidden',
-      background: '#D9D9D9',
+      background: t.well,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       WebkitUserSelect: 'none', userSelect: 'none',
-    }, style)}>
+    }, frameStyle(t, index), style)}>
       {photo ? (
         <img src={photo} alt="" loading="lazy" draggable={false} style={{
           position: 'absolute', inset: 0, width: '100%', height: '100%',
@@ -233,6 +242,9 @@ const LAYOUTS = {
     [{ x: 0, y: 0, w: 100, h: 100 }],
     [{ x: 10, y: 10, w: 80, h: 80 }],
     [{ x: 0, y: 0, w: 100, h: 68.5 }],
+    [{ x: 0, y: 31.5, w: 100, h: 68.5 }],
+    [{ x: 20, y: 0, w: 60, h: 100 }],
+    [{ x: 20, y: 20, w: 60, h: 60 }],
   ],
   2: [
     // 451:14976 — the node's selected card. Its rect reduces to 10 / 30.6 / 38 / 44.1;
@@ -244,6 +256,10 @@ const LAYOUTS = {
     // page empty rather than centring the pair.
     [{ x: 30, y: 0, w: 40, h: 48.5 }, { x: 30, y: 51.5, w: 40, h: 48.5 }],
     [{ x: 0, y: 0, w: 100, h: 48.5 }, { x: 0, y: 51.5, w: 100, h: 48.5 }],
+    [{ x: 0, y: 0, w: 64.5, h: 100 }, { x: 67.5, y: 0, w: 32.5, h: 100 }],
+    [{ x: 0, y: 0, w: 32.5, h: 100 }, { x: 35.5, y: 0, w: 64.5, h: 100 }],
+    [{ x: 0, y: 0, w: 100, h: 64.5 }, { x: 0, y: 67.5, w: 100, h: 32.5 }],
+    [{ x: 0, y: 0, w: 100, h: 32.5 }, { x: 0, y: 35.5, w: 100, h: 64.5 }],
   ],
   3: [
     [{ x: 0, y: 0, w: 64.5, h: 100 },
@@ -252,6 +268,14 @@ const LAYOUTS = {
      { x: 0, y: 67.5, w: 48.5, h: 32.5 }, { x: 51.5, y: 67.5, w: 48.5, h: 32.5 }],
     [{ x: 0, y: 0, w: 100, h: 31.333 }, { x: 0, y: 34.333, w: 100, h: 31.333 },
      { x: 0, y: 68.667, w: 100, h: 31.333 }],
+    [{ x: 0, y: 0, w: 32.5, h: 48.5 }, { x: 0, y: 51.5, w: 32.5, h: 48.5 },
+     { x: 35.5, y: 0, w: 64.5, h: 100 }],
+    [{ x: 0, y: 0, w: 48.5, h: 32.5 }, { x: 51.5, y: 0, w: 48.5, h: 32.5 },
+     { x: 0, y: 35.5, w: 100, h: 64.5 }],
+    [{ x: 0, y: 0, w: 100, h: 48.5 },
+     { x: 0, y: 51.5, w: 48.5, h: 48.5 }, { x: 51.5, y: 51.5, w: 48.5, h: 48.5 }],
+    [{ x: 0, y: 0, w: 31.333, h: 100 }, { x: 34.333, y: 0, w: 31.333, h: 100 },
+     { x: 68.667, y: 0, w: 31.333, h: 100 }],
   ],
   4: [
     [{ x: 0, y: 0, w: 48.5, h: 48.5 }, { x: 51.5, y: 0, w: 48.5, h: 48.5 },
@@ -261,6 +285,13 @@ const LAYOUTS = {
      { x: 67.5, y: 68.667, w: 32.5, h: 31.333 }],
     [{ x: 0, y: 0, w: 100, h: 22.75 }, { x: 0, y: 25.75, w: 100, h: 22.75 },
      { x: 0, y: 51.5, w: 100, h: 22.75 }, { x: 0, y: 77.25, w: 100, h: 22.75 }],
+    [{ x: 0, y: 0, w: 32.5, h: 31.333 }, { x: 0, y: 34.333, w: 32.5, h: 31.333 },
+     { x: 0, y: 68.667, w: 32.5, h: 31.333 }, { x: 35.5, y: 0, w: 64.5, h: 100 }],
+    [{ x: 0, y: 0, w: 100, h: 64.5 },
+     { x: 0, y: 67.5, w: 31.333, h: 32.5 }, { x: 34.333, y: 67.5, w: 31.333, h: 32.5 },
+     { x: 68.667, y: 67.5, w: 31.333, h: 32.5 }],
+    [{ x: 0, y: 0, w: 22.75, h: 100 }, { x: 25.75, y: 0, w: 22.75, h: 100 },
+     { x: 51.5, y: 0, w: 22.75, h: 100 }, { x: 77.25, y: 0, w: 22.75, h: 100 }],
   ],
   // The chip reads "5+", so this set runs 5, 5 and 6 slots.
   5: [
@@ -270,12 +301,50 @@ const LAYOUTS = {
     [{ x: 0, y: 0, w: 48.5, h: 48.5 }, { x: 51.5, y: 0, w: 48.5, h: 48.5 },
      { x: 0, y: 51.5, w: 31.333, h: 48.5 }, { x: 34.333, y: 51.5, w: 31.333, h: 48.5 },
      { x: 68.667, y: 51.5, w: 31.333, h: 48.5 }],
+    [{ x: 0, y: 0, w: 48.5, h: 100 },
+     { x: 51.5, y: 0, w: 22.75, h: 48.5 }, { x: 77.25, y: 0, w: 22.75, h: 48.5 },
+     { x: 51.5, y: 51.5, w: 22.75, h: 48.5 }, { x: 77.25, y: 51.5, w: 22.75, h: 48.5 }],
+    [{ x: 0, y: 0, w: 48.5, h: 31.333 }, { x: 51.5, y: 0, w: 48.5, h: 31.333 },
+     { x: 0, y: 34.333, w: 48.5, h: 31.333 }, { x: 51.5, y: 34.333, w: 48.5, h: 31.333 },
+     { x: 0, y: 68.667, w: 48.5, h: 31.333 }, { x: 51.5, y: 68.667, w: 48.5, h: 31.333 }],
+    [{ x: 0, y: 0, w: 31.333, h: 31.333 }, { x: 34.333, y: 0, w: 31.333, h: 31.333 },
+     { x: 68.667, y: 0, w: 31.333, h: 31.333 },
+     { x: 0, y: 34.333, w: 31.333, h: 31.333 }, { x: 34.333, y: 34.333, w: 31.333, h: 31.333 },
+     { x: 68.667, y: 34.333, w: 31.333, h: 31.333 },
+     { x: 0, y: 68.667, w: 31.333, h: 31.333 }, { x: 34.333, y: 68.667, w: 31.333, h: 31.333 },
+     { x: 68.667, y: 68.667, w: 31.333, h: 31.333 }],
     [{ x: 0, y: 0, w: 31.333, h: 48.5 }, { x: 34.333, y: 0, w: 31.333, h: 48.5 },
      { x: 68.667, y: 0, w: 31.333, h: 48.5 },
      { x: 0, y: 51.5, w: 31.333, h: 48.5 }, { x: 34.333, y: 51.5, w: 31.333, h: 48.5 },
      { x: 68.667, y: 51.5, w: 31.333, h: 48.5 }],
   ],
 };
+
+// Frames from the designer's layout sheet (Frame 2438–2446), converted from their
+// 362×456 page coordinates into fractions of the well. Unlike the templates above they
+// keep generous page margins and, for 2439 / 2440, sit off-axis on purpose.
+LAYOUTS[1].push(
+    // Frame 2438
+    [{ x: 28.84, y: 32.9, w: 42.29, h: 33.86 }],
+    // Frame 2442
+    [{ x: 22.4, y: 3.46, w: 56.39, h: 90.78 }],
+    // Frame 2443
+    [{ x: 0, y: 27.75, w: 100, h: 42.44 }],
+);
+LAYOUTS[2].push(
+    // Frame 2439
+    [{ x: 15.66, y: 15.97, w: 35.24, h: 33.86 }, { x: 50.9, y: 49.83, w: 38.0, h: 33.61 }],
+    // Frame 2440
+    [{ x: 14.43, y: 14.25, w: 42.29, h: 33.86 }, { x: 44.47, y: 51.55, w: 42.29, h: 33.86 }],
+);
+LAYOUTS[3].push(
+    // Frame 2444
+    [{ x: 14.43, y: 14.25, w: 72.02, h: 33.86 }, { x: 14.43, y: 51.55, w: 33.4, h: 33.86 }, { x: 53.36, y: 51.55, w: 33.1, h: 33.86 }],
+    // Frame 2446
+    [{ x: 14.43, y: 14.25, w: 72.02, h: 33.86 }, { x: 14.43, y: 51.55, w: 33.1, h: 33.86 }, { x: 53.36, y: 51.55, w: 33.1, h: 33.86 }],
+    // Frame 2445
+    [{ x: 14.43, y: 14.25, w: 37.7, h: 69.43 }, { x: 56.73, y: 14.25, w: 37.7, h: 34.59 }, { x: 56.73, y: 53.51, w: 37.7, h: 30.18 }],
+);
 
 // Chip order — node 451:14988..14997. "5+ photos" is the node's own label.
 const LAYOUT_COUNTS = [1, 2, 3, 4, 5];
@@ -285,11 +354,622 @@ const countLabel = c =>
 // A layout is stored as "<count>-<index>" so it survives a reload as a plain string
 // and stays readable in sessionStorage.
 const FULL_PAGE = LAYOUTS[1][0];
+//
+// A hand-adjusted template appends its rects after a `|`: "2-1|0,0,60,100;63,0,37,100".
+// The part before the bar is still the preset, so the drawer keeps highlighting it.
 function layoutById(id) {
   if (!id) return null;
-  const parts = String(id).split('-');
+  const [base, custom] = String(id).split('|');
+  if (custom) {
+    const rects = custom.split(';').map(r => r.split(',').map(Number));
+    if (rects.every(r => r.length === 4 && r.every(isFinite))) {
+      return rects.map(([x, y, w, h]) => ({ x, y, w, h }));
+    }
+  }
+  const parts = base.split('-');
   const set = LAYOUTS[parts[0]];
   return (set && set[Number(parts[1])]) || null;
+}
+// ── Spacing — one slider that moves both the gutters between photos and the margin
+// between the photos and the page edge. `t` runs 0..1; SP_DEFAULT is the look the
+// templates were drawn with (3% gutters, ~5% margins), so nothing moves until the
+// slider does. At 0 the gutters close and the outer photos bleed to the page edge,
+// which sits one PV_WELL inset outside the well (SP_BLEED_*, in % of the well).
+//
+// The offsets are `cqw`/`cqh` — container units of the LayoutWell root — so a
+// template stays resolution-independent and a given `t` is the same on a 114px card
+// and a 310px page. A slot keeps its x/y/w/h (SplitHandles and encodeLayout read
+// those) and carries the spaced box as `css`.
+const SP_DEFAULT = 0.3;
+const SP_BLEED_X = 5.47, SP_BLEED_Y = 6.1;
+const SP_INSET_X = 12.7, SP_INSET_Y = 14.2;
+const SP_GAP = 10;
+
+function spacingFor(sp, slot) {
+  const v = sp && (sp[slot] != null ? sp[slot] : sp['*']);
+  return typeof v === 'number' ? v : SP_DEFAULT;
+}
+function readSpacings() {
+  try {
+    const o = JSON.parse(sessionStorage.getItem('pb_spacing') || '{}');
+    return o && typeof o === 'object' && !Array.isArray(o) ? o : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function withSpacing(slots, t) {
+  if (!slots || Math.abs(t - SP_DEFAULT) < 1e-6) return slots;
+  const seam = (s, k, dir) => slots.some(o => {
+    if (o === s) return false;
+    const [p, l, q, m] = k === 'x' ? ['x', 'w', 'y', 'h'] : ['y', 'h', 'x', 'w'];
+    const gap = dir === 'lo' ? s[p] - (o[p] + o[l]) : o[p] - (s[p] + s[l]);
+    const ov = Math.min(s[q] + s[m], o[q] + o[m]) - Math.max(s[q], o[q]);
+    return gap >= 0.5 && gap <= 8 && ov > 0.5;
+  });
+  const edge = (s, k, hi) => {
+    const p = hi ? s[k] + s[k === 'x' ? 'w' : 'h'] : s[k];
+    if (seam(s, k, hi ? 'hi' : 'lo')) {
+      const sh = (t - SP_DEFAULT) * SP_GAP / 2;
+      return { p, w: hi ? -sh : sh, h: 0 };
+    }
+    const bleed = k === 'x' ? SP_BLEED_X : SP_BLEED_Y;
+    const inset = k === 'x' ? SP_INSET_X : SP_INSET_Y;
+    const u = (SP_DEFAULT - t) / SP_DEFAULT;
+    let pct = p, c = 0;
+    if (t < SP_DEFAULT) {
+      pct = hi ? p + (100 - p) * u : p * (1 - u);
+      c = (hi ? 1 : -1) * bleed * u;
+    } else {
+      c = (hi ? -1 : 1) * (t - SP_DEFAULT) / (1 - SP_DEFAULT) * inset;
+    }
+    return k === 'x' ? { p: pct, w: c, h: 0 } : { p: pct, w: 0, h: c };
+  };
+  const f = n => Math.round(n * 1000) / 1000;
+  const calc = (a, b) => `calc(${f(a.p - (b ? b.p : 0))}% + ${f(a.w - (b ? b.w : 0))}cqw + ${f(a.h - (b ? b.h : 0))}cqh)`;
+  return slots.map(s => {
+    const x0 = edge(s, 'x', false), x1 = edge(s, 'x', true);
+    const y0 = edge(s, 'y', false), y1 = edge(s, 'y', true);
+    return Object.assign({}, s, {
+      css: { left: calc(x0), top: calc(y0), width: calc(x1, x0), height: calc(y1, y0) },
+    });
+  });
+}
+// The layout a page renders with: its template (or the single full-page well), spaced.
+function layoutAt(id, t) {
+  const base = layoutById(id);
+  return Math.abs(t - SP_DEFAULT) < 1e-6 ? base : withSpacing(base || FULL_PAGE, t);
+}
+
+// The first template with exactly `k` slots, else the smallest that holds `k` (the
+// "5+" set jumps 6 → 9). null when none is big enough.
+function layoutIdFor(k) {
+  // 2-0 is the node's inset pair, which shrinks both photos; halves read as "added".
+  if (k === 2) return '2-1';
+  let best = null;
+  Object.keys(LAYOUTS).forEach(c => LAYOUTS[c].forEach((l, j) => {
+    if (l.length >= k && (!best || l.length < best.len)) best = { id: `${c}-${j}`, len: l.length };
+  }));
+  return best && best.id;
+}
+const layoutBase = id => String(id || '').split('|')[0];
+const encodeLayout = (id, slots) => `${layoutBase(id)}|` + slots.map(s =>
+  [s.x, s.y, s.w, s.h].map(n => Math.round(n * 100) / 100).join(',')).join(';');
+
+// ── Themes — the book view's Themes tool. Not in the Figma; every theme is mocked.
+//
+// A theme dresses the book: page and text colours, the cover title's face, a frame
+// shape on every photo, a sticker every few pages — and it brings its own page
+// layouts. Applying one keeps every photo on the page it is on but replaces the
+// layouts, hand-picked ones included ("last change wins": a later Style or a page's
+// own Layout overrides it in turn).
+//
+// The dressing reaches every view through `BookTheme` rather than props, because a
+// leaf is drawn in five places (book view, page view, arrange, the layout cards, the
+// theme cards). With no theme the context is null and `useTheme()` hands back
+// CLASSIC, whose values are exactly the colours the editor drew before themes existed.
+//
+// Faces are the ones styles.css already self-hosts, plus the system serif, so the PWA
+// still renders them offline.
+const BookTheme = React.createContext(null);
+const SERIF = 'ui-serif, "New York", Georgia, serif';
+
+// Layout families, as "<count>-<option>" ids per photo count (6 is the 2×3 grid). A
+// family lists several options per count and pages cycle through them, so a themed
+// book does not repeat one template on every page.
+const THEME_LAYOUTS = {
+  classic: { 1: ['1-0'], 2: ['2-3', '2-1'], 3: ['3-1', '3-0'], 4: ['4-0', '4-1'],
+             5: ['5-0'], 6: ['5-3'] },
+  // The designer's inset frames (2438–2446): generous margins, a little off-axis.
+  airy:    { 1: ['1-1', '1-6', '1-7'], 2: ['2-0', '2-9', '2-8'], 3: ['3-7', '3-9'],
+             4: ['4-0'], 5: ['5-1'], 6: ['5-3'] },
+  bold:    { 1: ['1-2', '1-0', '1-3'], 2: ['2-6', '2-4'], 3: ['3-0', '3-5'],
+             4: ['4-4', '4-1'], 5: ['5-2'], 6: ['5-5'] },
+};
+
+// One theme: `page`/`alt` the right/left leaf, `well` an empty slot, `ink` the text,
+// `font`/`weight`/`italic`/`upper`/`size` the cover title, `frame` the photo shape.
+const mkTheme = (id, name, meta, o) => Object.assign({ id, name, meta, alt: o.page,
+  well: 'rgba(0,0,0,0.12)', weight: 700, size: 1, family: 'classic' }, o);
+// Also the "Default" card at the head of every category: picking it removes the theme.
+const CLASSIC = mkTheme('classic', 'Default', 'No theme', {
+  page: '#FFFFFF', alt: '#F5F5F5', well: '#D9D9D9', ink: '#000000', font: TEXT,
+  title: 'Add text', frame: 'none', sticker: null,
+});
+const THEME_CATEGORIES = [
+  { id: 'travel', label: 'Travel', themes: [
+    mkTheme('passport', 'Passport', 'Stamps · kraft', { page: '#EBDFCB', alt: '#E4D6BE',
+      ink: '#7A3E1D', font: '"Big Shoulders Display"', weight: 800, upper: true, size: 1.2,
+      title: 'Canada', frame: 'stamp', sticker: { g: '✈', c: '#7A3E1D' }, family: 'classic' }),
+    mkTheme('fieldnotes', 'Field Notes', 'Handwritten · tape', { page: '#F7F5EF', alt: '#F0EDE4',
+      ink: '#2D4A6B', font: 'Caveat', size: 1.35, title: 'Road trip', frame: 'polaroid',
+      sticker: { g: '📍' }, family: 'airy' }),
+    mkTheme('bluecoast', 'Blue Coast', 'Ocean · airy', { page: '#E1EEF4', alt: '#D6E7EF',
+      ink: '#1D5C7A', font: SERIF, weight: 600, title: 'Summer', frame: 'round',
+      sticker: { g: '☀', c: '#F2A33A' }, family: 'bold' }),
+  ] },
+  { id: 'wedding', label: 'Wedding', themes: [
+    mkTheme('ivory', 'Ivory Script', 'Serif · cream · gold', { page: '#F6F1E7', alt: '#EFE8DA',
+      ink: '#8A6A2F', font: SERIF, weight: 500, italic: true, size: 1.1,
+      title: 'Our Wedding', frame: 'thin', sticker: { g: '❦', c: '#B8954A' }, family: 'airy' }),
+    mkTheme('garden', 'Garden Vows', 'Botanical · sage', { page: '#E6ECE1', alt: '#DCE4D6',
+      ink: '#4F6347', font: SERIF, title: 'Always & Forever', frame: 'arch',
+      sticker: { g: '🌿' }, family: 'airy' }),
+    mkTheme('golden', 'Golden Hour', 'Navy · gold foil', { page: '#1F2A44', alt: '#1A2439',
+      well: 'rgba(255,255,255,0.12)', ink: '#E2C27B', font: SERIF, weight: 600,
+      title: 'June 14', frame: 'oval', sticker: { g: '✦', c: '#E2C27B' }, family: 'classic' }),
+    mkTheme('modernlove', 'Modern Love', 'Bold · minimal', { page: '#FFFFFF', alt: '#F6F6F6',
+      ink: '#111111', font: '"Bricolage Grotesque"', weight: 800, upper: true,
+      title: 'I do.', frame: 'polaroid', sticker: { g: '♥', c: '#E5484D' }, family: 'bold' }),
+  ] },
+  { id: 'family', label: 'Family', themes: [
+    mkTheme('sunday', 'Sunday Lunch', 'Warm · rounded', { page: '#FFF6EA', alt: '#FBEEDC',
+      ink: '#C0532D', font: '"Rethink Sans"', title: 'The Bakers', frame: 'round',
+      sticker: { g: '☺', c: '#E0874F' }, family: 'classic' }),
+    mkTheme('scrapbook', 'Scrapbook', 'Kraft · snapshots', { page: '#F3EDE2', alt: '#ECE4D6',
+      ink: '#3E5C76', font: 'Caveat', size: 1.35, title: 'Family time', frame: 'polaroid',
+      sticker: { g: '📎' }, family: 'airy' }),
+    mkTheme('heirloom', 'Heirloom', 'Slab serif · linen', { page: '#EDE7DD', alt: '#E5DED2',
+      ink: '#5A4632', font: 'Coustard', weight: 400, title: 'Our Story', frame: 'thin',
+      sticker: { g: '❀', c: '#A88A68' }, family: 'classic' }),
+  ] },
+  { id: 'kids', label: 'Kids', themes: [
+    mkTheme('crayon', 'Crayon Box', 'Sunny · playful', { page: '#FFF6D6', alt: '#FCEFC4',
+      ink: '#E2552D', font: '"Darumadrop One"', weight: 400, size: 1.15, title: 'Little me',
+      frame: 'round', sticker: { g: '★', c: '#F6B500' }, family: 'bold' }),
+    mkTheme('dino', 'Dino Club', 'Green · chunky', { page: '#E4F4EA', alt: '#D8EEE0',
+      ink: '#2F7D4F', font: '"Changa One"', weight: 400, title: 'First steps',
+      frame: 'arch', sticker: { g: '🦖' }, family: 'classic' }),
+    mkTheme('bubble', 'Bubbles', 'Soft blue · script', { page: '#EAF0FF', alt: '#DFE7FD',
+      ink: '#4A5BD6', font: 'Borel', weight: 400, size: 0.85, title: 'Milo', frame: 'oval',
+      sticker: { g: '☁', c: '#9AB0FF' }, family: 'airy' }),
+  ] },
+  { id: 'birthday', label: 'Birthday', themes: [
+    mkTheme('confetti', 'Confetti', 'Pink · party', { page: '#FFF0F3', alt: '#FDE4EA',
+      ink: '#D6336C', font: '"Changa One"', weight: 400, title: 'Happy 30th',
+      frame: 'polaroid', sticker: { g: '🎉' }, family: 'bold' }),
+    mkTheme('balloon', 'Balloons', 'Sky · bold', { page: '#EAF7FF', alt: '#DDF0FC',
+      ink: '#1C7ED6', font: '"Bricolage Grotesque"', weight: 800, title: 'Party!',
+      frame: 'round', sticker: { g: '🎈' }, family: 'classic' }),
+    mkTheme('cheers', 'Cheers', 'Black · gold', { page: '#171717', alt: '#121212',
+      well: 'rgba(255,255,255,0.12)', ink: '#E2C27B', font: SERIF, italic: true,
+      title: 'Cheers', frame: 'thin', sticker: { g: '✦', c: '#E2C27B' }, family: 'airy' }),
+  ] },
+  { id: 'year', label: 'Year in review', themes: [
+    mkTheme('almanac', 'Almanac', 'Numbers · ink', { page: '#F4F1EA', alt: '#ECE8DE',
+      ink: '#222222', font: '"Big Shoulders Display"', weight: 800, size: 1.3,
+      title: '2026', frame: 'thin', sticker: { g: '●', c: '#E5484D' }, family: 'classic' }),
+    mkTheme('seasons', 'Four Seasons', 'Leafy · calm', { page: '#EEF3EC', alt: '#E4ECE1',
+      ink: '#3D6B4F', font: '"DM Sans"', title: 'Our year', frame: 'round',
+      sticker: { g: '❋', c: '#7FA36A' }, family: 'airy' }),
+    mkTheme('nightsky', 'Night Sky', 'Navy · amber', { page: '#14213D', alt: '#101B33',
+      well: 'rgba(255,255,255,0.12)', ink: '#FCA311', font: '"Alumni Sans"', weight: 800,
+      upper: true, size: 1.2, title: 'Twenty six', frame: 'oval',
+      sticker: { g: '✦', c: '#FCA311' }, family: 'bold' }),
+  ] },
+  { id: 'minimal', label: 'Minimal', themes: [
+    mkTheme('gallery', 'Gallery', 'White · wide margins', { page: '#FAFAFA', alt: '#F3F3F3',
+      ink: '#111111', font: '"DM Sans"', weight: 400, upper: true, size: 0.85,
+      title: 'Portfolio', frame: 'none', sticker: null, family: 'airy' }),
+    mkTheme('mono', 'Mono', 'Black pages', { page: '#151515', alt: '#101010',
+      well: 'rgba(255,255,255,0.12)', ink: '#EEEEEE', font: 'Basic', weight: 400,
+      title: 'Moments', frame: 'none', sticker: null, family: 'bold' }),
+  ] },
+];
+const THEMES = {};
+THEME_CATEGORIES.forEach(c => c.themes.forEach(t => { THEMES[t.id] = Object.assign({ cat: c.id }, t); }));
+
+function readTheme() {
+  try { return THEMES[sessionStorage.getItem('pb_theme')] ? sessionStorage.getItem('pb_theme') : null; }
+  catch (e) { return null; }
+}
+function useTheme() { return React.useContext(BookTheme) || CLASSIC; }
+
+// A photo's frame, in container units of the LayoutWell it sits in, so a frame reads
+// the same on a 114px card and a 310px page. `i` alternates the polaroid tilt.
+function frameStyle(t, i) {
+  switch (t.frame) {
+    case 'thin':     return { boxShadow: `0 0 0 1.2cqmin ${t.page}, 0 0 0 1.7cqmin ${t.ink}` };
+    case 'round':    return { borderRadius: '5cqmin' };
+    case 'oval':     return { borderRadius: '50%' };
+    case 'arch':     return { borderRadius: '999px 999px 1.5cqmin 1.5cqmin' };
+    case 'stamp':    return { outline: `0.7cqmin dashed ${t.ink}`, outlineOffset: '1.2cqmin' };
+    case 'polaroid': return {
+      boxShadow: '0 0 0 2.4cqmin #FFFFFF, 0 1cqmin 3cqmin 2.4cqmin rgba(0,0,0,0.22)',
+      transform: `rotate(${(i || 0) % 2 ? 2 : -2}deg)`,
+    };
+    default: return null;
+  }
+}
+
+// The cover title's face, as a style object (size is the caller's).
+function titleStyle(t) {
+  return {
+    fontFamily: t.font, fontWeight: t.weight, color: t.ink,
+    fontStyle: t.italic ? 'italic' : 'normal',
+    textTransform: t.upper ? 'uppercase' : 'none',
+    letterSpacing: t.upper ? '0.04em' : 'normal',
+    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+  };
+}
+
+// A sticker on the cover and on every fourth page, in alternating corners. Sized in
+// container units, so its parent must be a size container.
+function ThemeSticker({ n }) {
+  const t = useTheme();
+  if (!t.sticker || (n != null && n % 4 !== 1)) return null;
+  const low = n != null && n % 8 === 1;
+  return (
+    <span aria-hidden style={{
+      position: 'absolute', zIndex: 2, pointerEvents: 'none',
+      [low ? 'left' : 'right']: '-2cqmin', [low ? 'bottom' : 'top']: '-2cqmin',
+      fontSize: '16cqmin', lineHeight: 1, color: t.sticker.c || t.ink,
+      transform: `rotate(${low ? -12 : 10}deg)`,
+      filter: 'drop-shadow(0 0.6cqmin 0.8cqmin rgba(0,0,0,0.18))',
+    }}>{t.sticker.g}</span>
+  );
+}
+
+// ── Page colours and cover designs — the page view's Color and Covers tools. Neither
+// is in the Figma.
+//
+// `BookPaint` carries both to every renderer, the same way BookTheme carries the theme,
+// so a drawer's draft can be previewed by wrapping the view in a provider.
+//   colors — keyed by slot like pb_layouts (0 the cover, n + 1 page n), plus '*' for
+//            "all pages", which never includes the cover. A missing key falls back to
+//            '*' and then to the theme's own paper.
+//   cover  — a COVER_DESIGNS id.
+const BookPaint = React.createContext({ colors: {}, cover: 'classic' });
+function slotColor(colors, slot) {
+  if (!colors || slot == null) return null;
+  if (slot === 0) return colors[0] || null;
+  return colors[slot] || colors['*'] || null;
+}
+function isDark(c) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(c || ''));
+  if (!m) return false;
+  const v = parseInt(m[1], 16);
+  return (0.299 * (v >> 16) + 0.587 * ((v >> 8) & 255) + 0.114 * (v & 255)) / 255 < 0.5;
+}
+// The theme's ink, unless a chosen paper flips light/dark against it.
+function inkOn(t, bg) {
+  if (!bg || isDark(bg) === isDark(t.page)) return t.ink;
+  return isDark(bg) ? '#FFFFFF' : '#111111';
+}
+
+// Swatches for the Color tool. `null` is "Theme" — the page goes back to its theme's
+// own paper (white with no theme).
+const PAGE_COLORS = [
+  null, '#FFFFFF', '#F6F1E7', '#EBDFCB', '#F9E1E0', '#FBE3CF', '#FFF3C4', '#E3EADF',
+  '#DDF1EA', '#DDEBF2', '#E6E1F5', '#E5E5E5', '#2B2B2B', '#1F2A44', '#111111',
+];
+
+// Cover designs. Each places the cover's photo area and its title differently; the
+// title's face, ink and paper come from the theme, so the same set reads as "this
+// theme's covers" under a theme and as plain photo-and-text covers with none.
+const COVER_DESIGNS = [
+  { id: 'classic', name: 'Classic',        meta: 'Title above' },
+  { id: 'bleed',   name: 'Full photo',     meta: 'Title on the photo', bleed: true },
+  { id: 'centre',  name: 'Centred title',  meta: 'Big title over photo', bleed: true },
+  { id: 'under',   name: 'Photo & title',  meta: 'Title underneath' },
+  { id: 'framed',  name: 'Framed',         meta: 'Inset photo' },
+  { id: 'band',    name: 'Color band',    meta: 'Title on paper' },
+  { id: 'round',   name: 'Round',          meta: 'Circle photo' },
+];
+const coverDesign = id => COVER_DESIGNS.find(d => d.id === id) || COVER_DESIGNS[0];
+
+// The front cover, drawn into a size container (its leaf). `pad` is the margin the
+// plain designs keep from the leaf edge — the book view's front box is already inset,
+// the page view's leaf is not. Full-bleed designs ignore it and drop the theme's frame:
+// a polaroid border on an edge-to-edge photo would read as a mistake.
+// `onSelect` / `selected` make its photos selectable, exactly as on a page in page view.
+function CoverFront({ design, photos, layout, onEmpty, adjust, iconSize, pad, bg,
+                      onSelect, selected }) {
+  const t = useTheme();
+  const d = coverDesign(design);
+  const ink = inkOn(t, bg);
+  const p = pad || { left: '0%', right: '0%', top: '0%', bottom: '0%' };
+  const well = (box, frame) => {
+    const inner = (
+      <div style={Object.assign({ position: 'absolute' }, box)}>
+        <LayoutWell layout={layout} photos={photos || []} onEmpty={onEmpty}
+                    adjust={adjust} iconSize={iconSize}
+                    onSelect={onSelect} selected={selected} />
+      </div>
+    );
+    return frame === undefined ? inner : (
+      <BookTheme.Provider value={Object.assign({}, t, { frame })}>{inner}</BookTheme.Provider>
+    );
+  };
+  const title = (style, color) => (
+    <span style={Object.assign(titleStyle(t), {
+      position: 'absolute', zIndex: 1, lineHeight: 1.2, color: color || ink,
+      fontSize: `${10.5 * t.size}cqi`, pointerEvents: 'none',
+    }, style)}>{t.title}</span>
+  );
+  const centred = { left: '8%', right: '8%', textAlign: 'center' };
+  const onPhoto = { color: '#FFFFFF', textShadow: '0 0.4cqi 2cqi rgba(0,0,0,0.45)' };
+  switch (d.id) {
+    case 'bleed': return (
+      <React.Fragment>
+        {well({ inset: 0 }, 'none')}
+        <span aria-hidden style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '40%',
+          pointerEvents: 'none', background: 'linear-gradient(rgba(0,0,0,0), rgba(0,0,0,0.45))' }} />
+        {title(Object.assign({ left: '7%', right: '7%', bottom: '6%' }, onPhoto), '#FFFFFF')}
+      </React.Fragment>
+    );
+    case 'centre': return (
+      <React.Fragment>
+        {well({ inset: 0 }, 'none')}
+        <span aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none',
+          background: 'rgba(0,0,0,0.22)' }} />
+        {title(Object.assign({}, centred, onPhoto, { top: '50%', transform: 'translateY(-50%)',
+          fontSize: `${14 * t.size}cqi`, whiteSpace: 'normal' }), '#FFFFFF')}
+      </React.Fragment>
+    );
+    case 'under': return (
+      <React.Fragment>
+        {well({ left: p.left, right: p.right, top: p.top, height: '70%' })}
+        {title(Object.assign({}, centred, { top: '80%' }))}
+      </React.Fragment>
+    );
+    case 'framed': return (
+      <React.Fragment>
+        {well({ left: '17%', right: '17%', top: '15%', height: '50%' })}
+        {title(Object.assign({}, centred, { top: '72%' }))}
+      </React.Fragment>
+    );
+    case 'band': return (
+      <React.Fragment>
+        {well({ left: 0, right: 0, top: 0, height: '70%' }, 'none')}
+        {title(Object.assign({}, centred, { top: '79%' }))}
+      </React.Fragment>
+    );
+    case 'round': return (
+      <React.Fragment>
+        {/* Square in the leaf's own width, so the oval frame comes out a circle. */}
+        {well({ left: '19%', width: '62%', top: '24%', aspectRatio: '1', height: 'auto' }, 'oval')}
+        {title(Object.assign({}, centred, { top: '9%' }))}
+      </React.Fragment>
+    );
+    default: return (
+      // Classic — the node's own cover: title on top, the photo below it.
+      <div style={{ position: 'absolute', left: p.left, right: p.right, top: p.top, bottom: p.bottom,
+                    display: 'flex', flexDirection: 'column', gap: '3cqi' }}>
+        <span style={Object.assign(titleStyle(t), {
+          flex: '0 0 auto', color: ink, fontSize: `${10.5 * t.size}cqi`, lineHeight: 1.25,
+          paddingLeft: '1cqi',
+        })}>{t.title}</span>
+        <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+          <LayoutWell layout={layout} photos={photos || []} onEmpty={onEmpty}
+                      adjust={adjust} iconSize={iconSize}
+                      onSelect={onSelect} selected={selected} />
+        </div>
+      </div>
+    );
+  }
+}
+
+// Theme layouts for a whole book: each page gets its family's template for however
+// many photos it holds, so every photo stays on its page. Arrays are compacted first
+// (a null in the middle would land a photo on a slot the new template does not have).
+// Slot index is n + 1 for page n — 0 is the cover and 1 the inside front cover.
+function pickLayout(fam, c, n) {
+  if (c > 6) return layoutIdFor(c);
+  const opts = fam[Math.max(1, c)];
+  return opts[n % opts.length];
+}
+function applyTheme(theme, placed, pages) {
+  const fam = THEME_LAYOUTS[theme.family] || THEME_LAYOUTS.classic;
+  const out = placed.map(e => {
+    if (!Array.isArray(e)) return e;
+    const f = e.filter(Boolean);
+    return f.length > 1 ? f : (f[0] || null);
+  });
+  const layouts = { 0: fam[1][0] };
+  for (let n = 1; n <= pages; n++) {
+    const e = out[n - 1];
+    layouts[n + 1] = pickLayout(fam, Array.isArray(e) ? e.length : 1, n);
+  }
+  return { placed: out, layouts };
+}
+
+// ── Style — the book view's Style tool. Sets up the whole book in one go: how many
+// photos a page holds, the order auto-fill walks them in, and the look of the layouts.
+// Also not in the Figma. Applying it re-flows every photo and every page layout and
+// sets the book-wide spacing; the theme's colours, faces and stickers are untouched.
+const STYLE_PER = [
+  { id: 'one',     label: 'One',     sub: '1 per page',   pattern: [1] },
+  { id: 'few',     label: 'A few',   sub: '2–3 per page', pattern: [2, 3] },
+  { id: 'collage', label: 'Collage', sub: '4–6 per page', pattern: [4, 5, 6, 4] },
+];
+const STYLE_ORDER = [
+  { id: 'oldest', label: 'Oldest first' },
+  { id: 'newest', label: 'Newest first' },
+  { id: 'name',   label: 'By name' },
+];
+// Grid keeps white margins (a wider spacing), full-bleed closes the gutters and runs
+// the photos to the page edge (spacing 0), mixed walks the designer's off-axis frames.
+const STYLE_LOOK = [
+  { id: 'grid',  label: 'Grid',          spacing: 0.6,
+    layouts: { 1: ['1-0'], 2: ['2-3'], 3: ['3-2'], 4: ['4-0'], 5: ['5-1'], 6: ['5-3'] } },
+  { id: 'bleed', label: 'Full-bleed',    spacing: 0,
+    layouts: { 1: ['1-0'], 2: ['2-1'], 3: ['3-0'], 4: ['4-1'], 5: ['5-0'], 6: ['5-3'] } },
+  { id: 'mixed', label: 'Mixed collage', spacing: SP_DEFAULT,
+    layouts: { 1: ['1-6', '1-7', '1-2', '1-4'], 2: ['2-8', '2-9', '2-4', '2-6'],
+               3: ['3-7', '3-9', '3-1', '3-5'], 4: ['4-1', '4-4', '4-3'],
+               5: ['5-0', '5-2'], 6: ['5-5'] } },
+];
+const STYLE_DEFAULT = { per: 'one', order: 'oldest', look: 'grid' };
+function readStyle() {
+  try { return Object.assign({}, STYLE_DEFAULT, JSON.parse(sessionStorage.getItem('pb_style') || '{}')); }
+  catch (e) { return STYLE_DEFAULT; }
+}
+
+// "Oldest first" is the upload's own order: the picker hands photos over date-ascending.
+function sortPhotos(list, order) {
+  const out = list.slice();
+  if (order === 'newest') out.reverse();
+  if (order === 'name') {
+    const name = p => String(p).split('/').pop();
+    out.sort((a, b) => name(a).localeCompare(name(b), undefined, { numeric: true }));
+  }
+  return out;
+}
+
+// The whole book for a Style choice. The first photo is the cover's, the rest go onto
+// pages in runs of the density's pattern. A book is never shorter than the format's
+// own page count: if the runs would leave pages over, the photos are spread across
+// the pages instead (each page at least one), so "Collage" on a small upload does not
+// leave a stack of blank pages at the back. Extra pages come in whole spreads.
+function planBook(photos, style, basePages) {
+  const per = STYLE_PER.find(p => p.id === style.per) || STYLE_PER[0];
+  const look = STYLE_LOOK.find(l => l.id === style.look) || STYLE_LOOK[0];
+  const list = sortPhotos(photos, style.order);
+  const rest = list.slice(1);
+  let counts = [];
+  for (let left = rest.length, k = 0; left > 0; k++) {
+    const c = Math.min(per.pattern[k % per.pattern.length], left);
+    counts.push(c); left -= c;
+  }
+  if (counts.length < basePages && rest.length) {
+    const p = Math.min(basePages, rest.length);
+    counts = [];
+    for (let i = 0; i < p; i++) {
+      counts.push(Math.floor(rest.length * (i + 1) / p) - Math.floor(rest.length * i / p));
+    }
+  }
+  const added = Math.max(0, Math.ceil((counts.length - basePages) / 2));
+  const placed = [], layouts = {};
+  let at = 0;
+  counts.forEach((c, i) => {
+    const run = rest.slice(at, at + c);
+    at += c;
+    placed.push(c === 1 ? run[0] : run);
+    const opts = look.layouts[Math.min(6, c)];
+    layouts[i + 2] = opts[(i + 1) % opts.length];
+  });
+  return { placed, cover: list[0] || null, layouts, spacing: look.spacing,
+           added, pages: basePages + added * 2 };
+}
+
+// ── Draggable seams between slots. A seam is a gutter shared by a run of slots: the
+// slots ending at one edge (`a`) and the slots starting at the next (`b`). Dragging
+// it moves both edges together, so the gutter keeps its width and one photo grows
+// at its neighbour's expense. Slots on the seam's own line move as a group — a 2×2
+// grid has one vertical and one horizontal seam, not four.
+const SPLIT_MIN = 14; // % of the well — the smallest a slot may be dragged down to
+function splitLines(slots) {
+  const found = {};
+  slots.forEach((A, i) => slots.forEach((B, j) => {
+    [['v', 'x', 'w', 'y', 'h'], ['h', 'y', 'h', 'x', 'w']].forEach(([dir, p, l, q, m]) => {
+      const gap = B[p] - (A[p] + A[l]);
+      const overlap = Math.min(A[q] + A[m], B[q] + B[m]) - Math.max(A[q], B[q]);
+      if (gap < 0.5 || gap > 8 || overlap <= 0.5) return;
+      const key = `${dir}${Math.round((A[p] + A[l]) * 10)}_${Math.round(B[p] * 10)}`;
+      const L = found[key] || (found[key] = { dir, a: new Set(), b: new Set(), gap });
+      L.a.add(i); L.b.add(j);
+    });
+  }));
+  return Object.values(found).map(L => {
+    const a = [...L.a], b = [...L.b], all = a.concat(b);
+    const [p, l, q, m] = L.dir === 'v' ? ['x', 'w', 'y', 'h'] : ['y', 'h', 'x', 'w'];
+    const lo = Math.min(...all.map(k => slots[k][q]));
+    const hi = Math.max(...all.map(k => slots[k][q] + slots[k][m]));
+    return Object.assign(L, { a, b, lo, hi, pos: slots[a[0]][p] + slots[a[0]][l] + L.gap / 2 });
+  });
+}
+function moveSplit(slots, L, delta) {
+  const [p, l] = L.dir === 'v' ? ['x', 'w'] : ['y', 'h'];
+  let lo = -Infinity, hi = Infinity;
+  L.a.forEach(k => { lo = Math.max(lo, SPLIT_MIN - slots[k][l]); });
+  L.b.forEach(k => { hi = Math.min(hi, slots[k][l] - SPLIT_MIN); });
+  const d = Math.max(lo, Math.min(hi, delta));
+  return slots.map((s, k) => {
+    if (L.a.includes(k)) return Object.assign({}, s, { [l]: s[l] + d });
+    if (L.b.includes(k)) return Object.assign({}, s, { [p]: s[p] + d, [l]: s[l] - d });
+    return s;
+  });
+}
+
+function SplitHandles({ slots, onChange, flash }) {
+  const { useRef, useState } = React;
+  const root = useRef(null);
+  const drag = useRef(null);
+  const [live, setLive] = useState(null);
+  const lines = splitLines(slots);
+  const arrows = dir => (
+    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden
+         style={{ transform: dir === 'v' ? 'none' : 'rotate(90deg)' }}>
+      <path d="M2.5 10 7 6.2v7.6zM17.5 10 13 6.2v7.6z" fill="#fff" />
+    </svg>
+  );
+  return (
+    <div ref={root} style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+      {lines.map((L, n) => {
+        const v = L.dir === 'v';
+        const active = live === n;
+        return (
+          <div key={`${L.dir}${n}`} aria-label="Drag to resize photos" role="slider"
+               onPointerDown={e => {
+                 const r = root.current.getBoundingClientRect();
+                 e.currentTarget.setPointerCapture(e.pointerId);
+                 drag.current = { n, start: v ? e.clientX : e.clientY,
+                                  size: v ? r.width : r.height, base: slots, L };
+                 setLive(n);
+               }}
+               onPointerMove={e => {
+                 const d = drag.current;
+                 if (!d || d.n !== n) return;
+                 const delta = ((v ? e.clientX : e.clientY) - d.start) / d.size * 100;
+                 onChange(moveSplit(d.base, d.L, delta));
+               }}
+               onPointerUp={() => { drag.current = null; setLive(null); }}
+               onPointerCancel={() => { drag.current = null; setLive(null); }}
+               onClick={e => e.stopPropagation()}
+               style={{
+                 position: 'absolute', pointerEvents: 'auto', touchAction: 'none',
+                 cursor: v ? 'col-resize' : 'row-resize',
+                 // The seam itself is invisible; this is just a 36px-wide hit strip
+                 // centred on the gutter and as long as the run of slots it divides.
+                 [v ? 'left' : 'top']: `calc(${L.pos}% - 18px)`,
+                 [v ? 'width' : 'height']: 36,
+                 [v ? 'top' : 'left']: `${L.lo}%`,
+                 [v ? 'height' : 'width']: `${L.hi - L.lo}%`,
+                 display: 'flex', alignItems: 'center', justifyContent: 'center',
+               }}>
+            <span key={active ? 'drag' : `f${flash}`} aria-hidden style={{
+              width: 36, height: 36, borderRadius: 18, background: '#4592FF',
+              boxShadow: '0 0 0 2px #fff, 0 4px 10px rgba(0,0,0,0.35)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              opacity: active ? 1 : 0, pointerEvents: 'none',
+              animation: active ? 'none' : 'pbSplitHint 1900ms ease both',
+            }}>{arrows(L.dir)}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 // Slot 0 of a page's layout holds the photo auto-fill placed there; the remaining
@@ -319,7 +999,27 @@ function pagePhotos(placed, n, slots, pool) {
     return out;
   }
   if (!entry) return [];
-  return slotPhotos(entry, pool).slice(0, count);
+  // The page's own photo takes the first slot; the rest are empty placeholders to be
+  // filled by hand (tap one), not previewed from the upload pool.
+  const out = [entry];
+  while (out.length < count) out.push(null);
+  return out.slice(0, count);
+}
+
+// The cover is not a page, so its photos live apart from pb_placed: `pb_cover` is one
+// photo per slot of the cover's layout.
+function readCover() {
+  try {
+    const o = JSON.parse(sessionStorage.getItem('pb_cover') || '[]');
+    return Array.isArray(o) ? o : [];
+  } catch (e) {
+    return [];
+  }
+}
+function coverPhotos(cover, count) {
+  const out = (cover || []).slice(0, count);
+  while (out.length < count) out.push(null);
+  return out;
 }
 
 // The one photo that stands for a page — a navigator thumbnail, a caption, a clone.
@@ -332,27 +1032,42 @@ function pageThumb(placed, n) {
 // A well subdivided by a layout. It positions itself absolutely inside its parent,
 // so the parent only has to be `position: relative` — which is what lets the same
 // component serve a leaf in the book view, a page in the strip and a drawer card.
-function LayoutWell({ layout, photos, iconSize = 24, style, onSelect, selected }) {
+function LayoutWell({ layout, photos, iconSize = 24, style, onSelect, selected, adjust, onEmpty }) {
   const slots = layout && layout.length ? layout : FULL_PAGE;
   const pickable = !!onSelect;
   return (
     // aria-hidden only while the slots are decorative; with onSelect they are real
     // controls and hiding them would take them off assistive tech too.
     <div aria-hidden={pickable ? undefined : true}
-         style={Object.assign({ position: 'absolute', inset: 0 }, style)}>
+         style={Object.assign({ position: 'absolute', inset: 0, containerType: 'size' }, style)}>
       {slots.map((s, i) => {
         const photo = photos && photos[i];
         // Scale the empty-state glyph with the slot: 24px swamps a 22%-tall track,
         // and PhotoWell's overflow:hidden would simply clip it.
         const icon = Math.max(10, Math.round(iconSize * Math.min(s.w, s.h) / 100));
-        const box = {
-          position: 'absolute',
+        const box = Object.assign({ position: 'absolute' }, s.css || {
           left: `${s.x}%`, top: `${s.y}%`, width: `${s.w}%`, height: `${s.h}%`,
-        };
+        });
         // Only a slot with a photo in it can be selected — an empty well has nothing
         // to select, and the node only ever shows a filled photo ringed.
+        if (onEmpty && !photo) {
+          return (
+            <div key={i} role="button" tabIndex={0} aria-label="Add a photo"
+                 onClick={e => { e.stopPropagation(); onEmpty(i); }}
+                 onKeyDown={e => {
+                   if (e.key === 'Enter' || e.key === ' ') {
+                     e.preventDefault(); e.stopPropagation(); onEmpty(i);
+                   }
+                 }}
+                 style={Object.assign({ cursor: 'pointer',
+                   WebkitTapHighlightColor: 'transparent' }, box)}>
+              <PhotoWell photo={null} iconSize={icon} index={i}
+                         style={{ position: 'absolute', inset: 0, flex: 'none' }} />
+            </div>
+          );
+        }
         if (!pickable || !photo) {
-          return <PhotoWell key={i} photo={photo} iconSize={icon}
+          return <PhotoWell key={i} photo={photo} iconSize={icon} index={i}
                             style={Object.assign({ flex: 'none' }, box)} />;
         }
         return (
@@ -370,7 +1085,7 @@ function LayoutWell({ layout, photos, iconSize = 24, style, onSelect, selected }
                style={Object.assign({
                  cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
                }, box)}>
-            <PhotoWell photo={photo} iconSize={icon}
+            <PhotoWell photo={photo} iconSize={icon} index={i}
                        style={{ position: 'absolute', inset: 0, flex: 'none' }} />
             {selected === i && (
               // node 451:14635 — a 1px #1500FF ring on the photo. It has to paint
@@ -386,6 +1101,9 @@ function LayoutWell({ layout, photos, iconSize = 24, style, onSelect, selected }
           </div>
         );
       })}
+      {adjust && slots.length > 1 && (
+        <SplitHandles slots={slots} onChange={adjust.onChange} flash={adjust.flash} />
+      )}
     </div>
   );
 }
@@ -435,12 +1153,19 @@ function AddSpreadButton({ onClick }) {
 // 50% ±(11,3) reproduce the node's overlapping pair.
 // The cover's own interior, shared with arrange mode so the two views draw the same
 // cover. `onOpen` is optional: arrange shows the cover but does not open it.
-function CoverInterior({ onOpen, layout }) {
+function CoverInterior({ onOpen, layout, photos, onEmpty }) {
+  const t = useTheme();
+  const paint = React.useContext(BookPaint);
+  const color = slotColor(paint.colors, 0);
   return (
-        <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+        // Unthemed, the cover is the bare sheet; a theme papers it in its own colour,
+        // and the Color tool overrides both.
+        <div style={{ position: 'relative', width: '100%', height: '100%',
+                      background: color || (t === CLASSIC ? 'transparent' : t.page),
+                      transition: 'background 240ms ease' }}>
           <div aria-hidden style={{
             position: 'absolute', left: 6, bottom: 5, width: 50, height: 18,
-            background: '#D9D9D9',
+            background: t.well,
           }} />
           <div
             role={onOpen ? 'button' : undefined}
@@ -453,29 +1178,24 @@ function CoverInterior({ onOpen, layout }) {
             {...(onOpen ? press(0.97) : {})}
             style={{
             position: 'absolute', left: 'calc(50% + 10px)', right: 3, top: 2, bottom: 2,
-            display: 'flex', flexDirection: 'column',
+            containerType: 'size', overflow: 'hidden',
             cursor: onOpen ? 'pointer' : 'default',
             transformOrigin: 'left center',
             transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
           }}>
-            {/* node 451:15628/15629 — SF Pro Text Bold 16/20, bottom-aligned in a 31px block */}
-            <div style={{ height: 31, padding: 4, boxSizing: 'border-box',
-                          display: 'flex', alignItems: 'flex-end' }}>
-              <span style={{ fontFamily: TEXT, fontWeight: 700, fontSize: 16,
-                             lineHeight: '20px', color: '#000000' }}>Add text</span>
-            </div>
-            <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
-              <LayoutWell layout={layout} photos={[]} />
-            </div>
+            {/* node 451:15628/15629 is the Classic design: the title above the photo. */}
+            <CoverFront design={paint.cover} layout={layout} photos={photos} onEmpty={onEmpty}
+                        bg={color || t.page} />
+            <ThemeSticker n={null} />
           </div>
         </div>
   );
 }
 
-function CoverBlock({ aspect, onOpen, layout }) {
+function CoverBlock({ aspect, onOpen, layout, photos, onEmpty }) {
   return (
     <div style={{ position: 'relative', width: '100%' }}>
-      <Sheet aspect={aspect} interior={<CoverInterior onOpen={onOpen} layout={layout} />}>
+      <Sheet aspect={aspect} interior={<CoverInterior onOpen={onOpen} layout={layout} photos={photos} onEmpty={onEmpty} />}>
         <GutterArt file="pb-editor-hinge.png" offsets={[-11, -3]} width={14} opacity={0.5} />
       </Sheet>
       <Caption right="Cover" />
@@ -487,7 +1207,7 @@ function CoverBlock({ aspect, onOpen, layout }) {
 // `photos` is the placed list, indexed by page number — page n holds photos[n-1].
 // The inside-front and inside-back leaves carry no page number, so they stay empty.
 function SpreadBlock({ aspect, left, right, showPlus, onAdd, photos, onOpen,
-                      layoutFor, pool }) {
+                      layoutFor, pool, onEmpty }) {
   const name = n => (n ? `page ${n}` : 'the inside cover');
   const at = (n, side) => {
     const layout = layoutFor && layoutFor(side);
@@ -497,12 +1217,14 @@ function SpreadBlock({ aspect, left, right, showPlus, onAdd, photos, onOpen,
     <div style={{ position: 'relative', width: '100%' }}>
       <Sheet aspect={aspect} interior={
         <React.Fragment>
-          <Leaf side="left" photos={at(left, 'left')} label={name(left)}
+          <Leaf side="left" n={left} photos={at(left, 'left')} label={name(left)}
                 layout={layoutFor && layoutFor('left')}
-                onOpen={onOpen && (() => onOpen('left'))} />
-          <Leaf side="right" photos={at(right, 'right')} label={name(right)}
+                onEmpty={onEmpty && left ? i => onEmpty(left, (layoutFor('left') || FULL_PAGE).length, i) : undefined}
+                blank={!left} onOpen={onOpen && left ? (() => onOpen('left')) : undefined} />
+          <Leaf side="right" n={right} photos={at(right, 'right')} label={name(right)}
                 layout={layoutFor && layoutFor('right')}
-                onOpen={onOpen && (() => onOpen('right'))} />
+                onEmpty={onEmpty && right ? i => onEmpty(right, (layoutFor('right') || FULL_PAGE).length, i) : undefined}
+                blank={!right} onOpen={onOpen && right ? (() => onOpen('right')) : undefined} />
         </React.Fragment>
       }>
         <GutterArt file="pb-editor-spine.png" offsets={[-4]} width={8} />
@@ -669,6 +1391,9 @@ const PV_TOOLS = [
   { id: 'addphoto', label: 'Add photo',    icon: 'pb-editor-tool-addphoto.svg' },
   { id: 'addtext',  label: 'Add text',     icon: 'pb-editor-tool-addtext.svg' },
   { id: 'layout',   label: 'Layout',       icon: 'pb-editor-tool-layout.svg' },
+  { id: 'spacing',  label: 'Spacing',      icon: 'pb-editor-tool-spacing.svg' },
+  // Not in the node. The palette glyph is the book view's Style icon, reused.
+  { id: 'color',    label: 'Color',        icon: 'pb-editor-tool-style.svg' },
   { id: 'stickers', label: 'Stickers',     icon: 'pb-editor-tool-stickers.svg' },
   { id: 'smart',    label: 'Smart Design', icon: 'pb-editor-tool-smartdesign.svg' },
   // The node's "Ask AI" glyph (icon / Magic tool) exports byte-identical to the book
@@ -685,8 +1410,8 @@ const PV_TOOLS = [
 // "icon / Delete" exports are byte-identical to pb-editor-tool-ai.svg and
 // pb-editor-tool-delete.svg. Checked with cmp, not by eye.
 //
-// Only "Back" is live (it deselects, which is what the node's leading position and
-// back arrow mean). Replace, Edit, Move, Delete and Ask AI are inert, on the same
+// "Back" deselects (what the node's leading position and back arrow mean) and
+// "Replace" opens the photo tray for the selected slot. Edit, Move, Delete and Ask AI are inert, on the same
 // footing as every other tool in this editor — Delete deliberately so: the undo pill
 // is inert too, so a working delete would drop a photo out of pb_placed with no way
 // back. Wire it to a setPlaced() splice when that is wanted.
@@ -834,10 +1559,11 @@ function Toolbar({ photos, tools = TOOLS, gap = 10, padX = 8, onTool }) {
 // on the sheet's own top edge. Upload: matrix(0 11.1 -36.918 0.22841 188 0) at r=10 →
 // 369.18 × 111 on a 375×362 sheet. Auto-fill: matrix(0 10.18 -36.918 0.20948 188 0) →
 // 369.18 × 101.8 on a 375×332 sheet. Both land on the same percentages, so one string
-// serves both. The centre stop is deliberately translucent — the blurred editor reads
-// faintly through the top of the sheet, so do not flatten it to a solid fill.
-const SHEET_FILL =
-  'radial-gradient(98.45% 30.66% at 50.13% 0%, rgba(0,0,0,0.2) 0%, #111111 100%)';
+// serves both.
+// ⚠️ Flattened to solid on request. The node's centre stop was translucent, so the
+// blurred editor showed through the top of the sheet and its edge washed out. The
+// node's gradient was: radial-gradient(98.45% 30.66% at 50.13% 0%, rgba(0,0,0,0.2) 0%, #111111 100%)
+const SHEET_FILL = '#111111';
 
 // Node 451:16017/16018 and 451:15885/15886. The two sheets style their buttons
 // slightly differently — the upload sheet's carry a rim and an inset shadow, the
@@ -853,6 +1579,11 @@ function SheetButton({ label, onClick, style }) {
     }, style)}>{label}</button>
   );
 }
+
+// A 1px 5% white rim on every bottom sheet. The sheets are near-black on a near-black
+// page, so without it the top edge disappears. An inset shadow rather than a border, so
+// the sheet's size does not change. Raise the alpha here if it needs to read stronger.
+const SHEET_RIM = 'inset 0 0 0 1px rgba(255,255,255,0.05)';
 
 function ActionSheet({ closing, minHeight, onDismiss, labelledBy, children }) {
   return (
@@ -872,7 +1603,7 @@ function ActionSheet({ closing, minHeight, onDismiss, labelledBy, children }) {
         style={{
           position: 'absolute', left: 0, right: 0, bottom: 0,
           minHeight, boxSizing: 'border-box',
-          borderRadius: '24px 24px 0 0',
+          borderRadius: '24px 24px 0 0', boxShadow: SHEET_RIM,
           background: SHEET_FILL,
           filter: 'drop-shadow(0px -12px 9.3px rgba(0,0,0,0.65))',
           display: 'flex', flexDirection: 'column',
@@ -1087,14 +1818,19 @@ function BookUnit({ w, h, children }) {
 // is the node's own: white until 96.188%, darkening to #EEE / #DFDFDF at the spine.
 // A leaf with `slotRef` set is a scroll-snap target; the back cover has none, so the
 // strip can never come to rest on it.
-function BigLeaf({ side, slotRef, children }) {
+function BigLeaf({ side, slotRef, children, slot }) {
   const left = side === 'left';
+  const t = useTheme();
+  const { colors } = React.useContext(BookPaint);
+  const paper = slotColor(colors, slot) || t.page;
+  // A theme or a chosen colour keeps the node's spine shading by darkening its paper.
+  const spine = pct => (paper === '#FFFFFF' ? null : `color-mix(in srgb, ${paper} ${pct}%, #000)`);
   return (
     <div ref={slotRef} style={{
-      position: 'relative', width: '50%', height: '100%',
+      position: 'relative', width: '50%', height: '100%', containerType: 'size',
       background: left
-        ? 'linear-gradient(to right, #FFFFFF 96.188%, #EEEEEE 100.29%)'
-        : 'linear-gradient(to left, #FFFFFF 96.188%, #DFDFDF 100.05%)',
+        ? `linear-gradient(to right, ${paper} 96.188%, ${spine(93) || '#EEEEEE'} 100.29%)`
+        : `linear-gradient(to left, ${paper} 96.188%, ${spine(87) || '#DFDFDF'} 100.05%)`,
       scrollSnapAlign: slotRef ? 'center' : 'none',
       scrollSnapStop: slotRef ? 'always' : 'normal',
     }}>
@@ -1106,7 +1842,7 @@ function BigLeaf({ side, slotRef, children }) {
 // The well, positioned on the node's own insets. `iconSize` scales the empty-state
 // glyph with the page: 24px is right on a 164px leaf in the book view and lost on a
 // 310px one here.
-function BigWell({ photos, layout, pageW, onSelect, selected }) {
+function BigWell({ photos, layout, pageW, onSelect, selected, adjust, onEmpty }) {
   return (
     <div style={{
       position: 'absolute',
@@ -1115,7 +1851,7 @@ function BigWell({ photos, layout, pageW, onSelect, selected }) {
     }}>
       <LayoutWell layout={layout} photos={photos}
                   iconSize={Math.round(pageW * 0.13)}
-                  onSelect={onSelect} selected={selected} />
+                  onSelect={onSelect} selected={selected} adjust={adjust} onEmpty={onEmpty} />
     </div>
   );
 }
@@ -1124,31 +1860,25 @@ function BigWell({ photos, layout, pageW, onSelect, selected }) {
 // follows CoverBlock in the book view: the back cover carries the placeholder block
 // bottom-left, the front carries "Add text" over a well. Both are expressed as
 // fractions of the page so the cover reads the same zoomed in as it does zoomed out.
-function CoverUnit({ w, h, pageW, frontRef, layout }) {
+function CoverUnit({ w, h, pageW, frontRef, layout, adjust, photos, onEmpty, onSelect, selected }) {
+  const t = useTheme();
+  const paint = React.useContext(BookPaint);
   return (
     <BookUnit w={w} h={h}>
-      <BigLeaf side="left">
+      <BigLeaf side="left" slot={0}>
         <span aria-hidden style={{
           position: 'absolute', left: PV_WELL.left, bottom: PV_WELL.bottom,
-          width: '30%', height: '11%', background: '#D9D9D9',
+          width: '30%', height: '11%', background: t.well,
         }} />
       </BigLeaf>
-      <BigLeaf side="right" slotRef={frontRef}>
-        <div style={{
-          position: 'absolute',
-          left: PV_WELL.left, right: PV_WELL.right,
-          top: PV_WELL.top, bottom: PV_WELL.bottom,
-          display: 'flex', flexDirection: 'column', gap: Math.round(pageW * 0.03),
-        }}>
-          <span style={{
-            fontFamily: TEXT, fontWeight: 700, color: '#000000',
-            fontSize: Math.round(pageW * 0.098), lineHeight: 1.25,
-          }}>Add text</span>
-          <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
-            <LayoutWell layout={layout} photos={[]}
-                        iconSize={Math.round(pageW * 0.13)} />
-          </div>
+      <BigLeaf side="right" slotRef={frontRef} slot={0}>
+        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
+          <CoverFront design={paint.cover} layout={layout} photos={photos} adjust={adjust}
+                      onEmpty={onEmpty} iconSize={Math.round(pageW * 0.13)} pad={PV_WELL}
+                      onSelect={onSelect} selected={selected}
+                      bg={slotColor(paint.colors, 0) || t.page} />
         </div>
+        <ThemeSticker n={null} />
       </BigLeaf>
     </BookUnit>
   );
@@ -1349,13 +2079,11 @@ const PV_DRAWER_H = 'calc(min(406px, 50%) + env(safe-area-inset-bottom, 0px))';
 // (188, -22.5) with semi-axes 636.74 × 247.5 → 169.8% × 60.96% at 50.13% / -5.54%
 // of the 375×406 drawer.
 //
-// The top 13% of the linear layer is fully transparent and the radial's centre stop
-// is only 20% black, so the page preview reads faintly through the drawer's top
-// edge. That is deliberate — do not flatten it to a solid fill.
-const DRAWER_FILL =
-  'linear-gradient(180deg, rgba(0,0,0,0) 13.3%, rgba(39,39,39,0.8) 35.961%),' +
-  ' radial-gradient(169.8% 60.96% at 50.13% -5.54%,' +
-  ' rgba(0,0,0,0.2) 0%, rgba(18,18,18,0.6) 50%, #232323 100%)';
+// In the node the top 13% of the linear layer is fully transparent and the radial's
+// centre stop only 20% black, so the page preview read through the drawer's top edge.
+// ⚠️ Flattened to solid on request, like SHEET_FILL — the edge washed out against the
+// page. It stays a gradient only because the drawers apply it as `backgroundImage`.
+const DRAWER_FILL = 'linear-gradient(#1C1C1C, #1C1C1C)';
 
 // node 451:14988 (unselected) / 451:14990 (selected). The selected chip is a fixed
 // 80×34 in the node; kept auto-width here so a chip does not resize as the
@@ -1396,6 +2124,7 @@ const LAYOUT_CARD_W = 114;
 const LAYOUT_RING_H = 9.58;
 
 function LayoutCard({ layout, photos, pageAspect, width, selected, onClick, index }) {
+  const t = useTheme();
   return (
     <button type="button" onClick={onClick} {...press(0.97)}
       aria-pressed={selected} aria-label={`Layout option ${index + 1}`}
@@ -1408,7 +2137,7 @@ function LayoutCard({ layout, photos, pageAspect, width, selected, onClick, inde
       <span style={{
         display: 'block', position: 'relative',
         width, aspectRatio: String(pageAspect),
-        background: '#FFFFFF', borderRadius: 4,
+        background: t.page, borderRadius: 4,
       }}>
         {/* The same PV_WELL insets the page uses, so the card is the page in little. */}
         <LayoutWell layout={layout} photos={photos} iconSize={14} style={{
@@ -1455,7 +2184,7 @@ function LayoutDrawer({ closing, count, selected, options, photos, pageAspect,
     <div ref={root} role="dialog" aria-labelledby="pb-layout-title" style={{
       position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 20,
       height: PV_DRAWER_H, boxSizing: 'border-box', overflow: 'hidden',
-      borderRadius: '24px 24px 0 0', backgroundImage: DRAWER_FILL,
+      borderRadius: '24px 24px 0 0', boxShadow: SHEET_RIM, backgroundImage: DRAWER_FILL,
       animation: closing
         ? 'pbSheetOut 320ms cubic-bezier(0.4,0,0.2,1) both'
         : 'pbSheetIn 380ms cubic-bezier(0.34,1.05,0.64,1) both',
@@ -1511,9 +2240,581 @@ function LayoutDrawer({ closing, count, selected, options, photos, pageAspect,
         {options.map((layout, i) => (
           <LayoutCard key={i} index={i} layout={layout} photos={photos}
                       pageAspect={pageAspect} width={cardW}
-                      selected={selected === `${count}-${i}`}
+                      selected={layoutBase(selected) === `${count}-${i}`}
                       onClick={() => onPick(i)} />
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Spacing sheet. Same dark sheet as the layout drawer, shorter: a title, one slider
+// and a Save button. The page above previews the value live; "Apply to all pages"
+// previews it on every page too and writes it as the book-wide default on Save.
+const PV_SPACING_H = 'calc(292px + env(safe-area-inset-bottom, 0px))';
+function SpacingDrawer({ closing, value, all, onChange, onAll, onClose, onSave }) {
+  return (
+    <div role="dialog" aria-labelledby="pb-spacing-title" style={{
+      position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 20,
+      height: PV_SPACING_H, boxSizing: 'border-box', overflow: 'hidden',
+      borderRadius: '24px 24px 0 0', boxShadow: SHEET_RIM, backgroundImage: DRAWER_FILL,
+      animation: closing
+        ? 'pbSheetOut 320ms cubic-bezier(0.4,0,0.2,1) both'
+        : 'pbSheetIn 380ms cubic-bezier(0.34,1.05,0.64,1) both',
+    }}>
+      <div style={{
+        position: 'absolute', left: 0, right: 0, top: 16, height: 40,
+        padding: '0 16px', boxSizing: 'border-box',
+        display: 'flex', alignItems: 'center',
+      }}>
+        <GlassIconButton label="Close spacing" tint="rgba(0,0,0,0.25)" gloss onClick={onClose}>
+          <img src={`${A}/pb-editor-close.svg`} alt="" width={24} height={24}
+               style={{ display: 'block' }} />
+        </GlassIconButton>
+        <p id="pb-spacing-title" style={{
+          position: 'absolute', left: 0, right: 0, top: 12, margin: 0,
+          textAlign: 'center', pointerEvents: 'none',
+          fontFamily: DISPLAY, fontWeight: 700, fontSize: 14, lineHeight: '20px',
+          color: '#FFFFFF',
+        }}>Spacing</p>
+      </div>
+      <div style={{ position: 'absolute', left: 0, right: 0, top: 84, padding: '0 24px' }}>
+        <input type="range" className="pb-range" min={0} max={100} step={1}
+               aria-label="Spacing" value={Math.round(value * 100)}
+               onChange={e => onChange(Number(e.target.value) / 100)}
+               style={{ '--v': `${value * 100}%` }} />
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', marginTop: 8,
+          fontFamily: TEXT, fontSize: 12, lineHeight: '16px', color: '#999',
+        }}><span>None</span><span>Wide</span></div>
+        <label style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          marginTop: 18, fontFamily: TEXT, fontSize: 16, lineHeight: '24px', color: '#FFFFFF',
+        }}>
+          Apply to all pages
+          <button type="button" role="switch" aria-checked={all} onClick={() => onAll(!all)}
+                  style={{
+                    width: 51, height: 31, borderRadius: 16, border: 0, padding: 2,
+                    background: all ? '#00A8AE' : 'rgba(255,255,255,0.16)',
+                    transition: 'background 160ms ease', cursor: 'pointer',
+                    WebkitTapHighlightColor: 'transparent',
+                  }}>
+            <span style={{
+              display: 'block', width: 27, height: 27, borderRadius: 14, background: '#FFF',
+              transform: `translateX(${all ? 20 : 0}px)`, transition: 'transform 160ms ease',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+            }} />
+          </button>
+        </label>
+      </div>
+      <div style={{
+        position: 'absolute', left: 0, right: 0,
+        bottom: 'max(24px, calc(env(safe-area-inset-bottom, 0px) + 8px))',
+        padding: '0 19px', boxSizing: 'border-box',
+      }}>
+        <button type="button" onClick={onSave} {...press(0.97)} style={{
+          width: '100%', height: 52, borderRadius: 55, border: '1px solid #00B3B9',
+          background: '#007377', color: '#FFFFFF', cursor: 'pointer',
+          fontFamily: DISPLAY, fontWeight: 700, fontSize: 16, lineHeight: '20px',
+          transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
+        }}>Save</button>
+      </div>
+    </div>
+  );
+}
+
+// ── Themes drawer — the book view's Themes tool. The same dark half-sheet as the
+// layout drawer: close / title / confirm, a chip row (here, the style categories) and
+// a scrolling card row. Each card is a miniature open spread of one theme — title page
+// on the left, a framed photo on the right — drawn by the real leaf parts under that
+// theme's own BookTheme provider. A tap previews the theme on the whole book above;
+// ✓ keeps it, ✕ puts the previous one back.
+const THEME_DRAWER_H = 'calc(min(340px, 60%) + env(safe-area-inset-bottom, 0px))';
+const THEME_LEAF_W = 76;
+
+function DrawerHead({ title, titleId, closeLabel, onClose, confirmLabel, onConfirm }) {
+  const icon = file => (
+    <img src={`${A}/${file}`} alt="" width={24} height={24} style={{ display: 'block' }} />
+  );
+  return (
+    <div style={{
+      position: 'absolute', left: 0, right: 0, top: 16, height: 40,
+      padding: '0 16px', boxSizing: 'border-box',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    }}>
+      <GlassIconButton label={closeLabel} tint="rgba(0,0,0,0.25)" gloss onClick={onClose}>
+        {icon('pb-editor-close.svg')}
+      </GlassIconButton>
+      <p id={titleId} style={{
+        position: 'absolute', left: 0, right: 0, top: 12, margin: 0,
+        textAlign: 'center', pointerEvents: 'none',
+        fontFamily: DISPLAY, fontWeight: 700, fontSize: 14, lineHeight: '20px',
+        color: '#FFFFFF',
+      }}>{title}</p>
+      {onConfirm ? (
+        <GlassIconButton label={confirmLabel} tint="transparent"
+                         accent={CONTINUE_ACCENT} gloss onClick={onConfirm}>
+          {icon('pb-editor-check.svg')}
+        </GlassIconButton>
+      ) : <span aria-hidden style={{ width: 40, height: 40 }} />}
+    </div>
+  );
+}
+
+function ThemeCard({ theme, selected, onClick, pageAspect, photo }) {
+  const h = THEME_LEAF_W / pageAspect;
+  const fam = THEME_LAYOUTS[theme.family] || THEME_LAYOUTS.classic;
+  return (
+    <button type="button" onClick={onClick} {...press(0.97)}
+      aria-pressed={selected} aria-label={`${theme.name} theme`}
+      style={{
+        flex: '0 0 auto', padding: 0, border: 'none', background: 'transparent',
+        cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center',
+        transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
+      }}>
+      <span style={{
+        display: 'block', padding: 3, borderRadius: 8,
+        border: `2px solid ${selected ? '#CCA34C' : 'transparent'}`,
+      }}>
+        <BookTheme.Provider value={theme}>
+          <span style={{
+            display: 'flex', width: THEME_LEAF_W * 2, height: h, padding: 2,
+            boxSizing: 'content-box', background: '#F8F8F8', borderRadius: 2,
+            boxShadow: '0 2px 6px rgba(0,0,0,0.5)',
+          }}>
+            <span style={{
+              position: 'relative', flex: 1, background: theme.alt, overflow: 'hidden',
+              containerType: 'size',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {/* The card is small enough that the title wraps rather than ellipsing. */}
+              <span style={Object.assign(titleStyle(theme), {
+                maxWidth: '84%', fontSize: `${13 * theme.size}cqi`, lineHeight: 1.15,
+                whiteSpace: 'normal', textAlign: 'center',
+              })}>{theme.title}</span>
+              <ThemeSticker n={null} />
+            </span>
+            <span style={{ position: 'relative', flex: 1, background: theme.page, containerType: 'size' }}>
+              <LayoutWell layout={layoutById(fam[1][0])} photos={[photo]} iconSize={14}
+                          style={{ left: '8%', right: '8%', top: '8%', bottom: '8%' }} />
+            </span>
+          </span>
+        </BookTheme.Provider>
+      </span>
+      <span style={{
+        marginTop: 8, fontFamily: TEXT, fontWeight: 600, fontSize: 13, lineHeight: '18px',
+        color: '#FFFFFF', whiteSpace: 'nowrap',
+      }}>{theme.name}</span>
+      <span style={{
+        fontFamily: TEXT, fontSize: 11, lineHeight: '14px', color: '#888888',
+        whiteSpace: 'nowrap',
+      }}>{theme.meta}</span>
+    </button>
+  );
+}
+
+function ThemesDrawer({ closing, cat, onCat, selected, onPick, onClose, onConfirm,
+                        pageAspect, photo }) {
+  const category = THEME_CATEGORIES.find(c => c.id === cat) || THEME_CATEGORIES[0];
+  return (
+    <div role="dialog" aria-labelledby="pb-themes-title" style={{
+      position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 20,
+      height: THEME_DRAWER_H, boxSizing: 'border-box', overflow: 'hidden',
+      borderRadius: '24px 24px 0 0', boxShadow: SHEET_RIM, backgroundImage: DRAWER_FILL,
+      display: 'flex', flexDirection: 'column', paddingTop: 76,
+      animation: closing
+        ? 'pbSheetOut 320ms cubic-bezier(0.4,0,0.2,1) both'
+        : 'pbSheetIn 380ms cubic-bezier(0.34,1.05,0.64,1) both',
+    }}>
+      <DrawerHead title="Themes" titleId="pb-themes-title" closeLabel="Close themes"
+                  onClose={onClose} confirmLabel="Apply theme" onConfirm={onConfirm} />
+      <div style={{
+        flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 8,
+        padding: '0 16px', overflowX: 'auto', overflowY: 'hidden',
+        scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch',
+      }}>
+        {THEME_CATEGORIES.map(c => (
+          <CountChip key={c.id} label={c.label} active={c.id === category.id}
+                     onClick={() => onCat(c.id)} />
+        ))}
+      </div>
+      <div style={{
+        flex: '0 0 auto', marginTop: 16, display: 'flex', alignItems: 'flex-start', gap: 10,
+        padding: '0 19px 8px', overflowX: 'auto', overflowY: 'hidden',
+        scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch',
+      }}>
+        {/* "Default" leads every row, so going back to no theme never means hunting
+            for the right category. It is the null draft. */}
+        <ThemeCard theme={CLASSIC} selected={!selected}
+                   pageAspect={pageAspect} photo={photo} onClick={() => onPick(null)} />
+        {category.themes.map(t => (
+          <ThemeCard key={t.id} theme={t} selected={t.id === selected}
+                     pageAspect={pageAspect} photo={photo} onClick={() => onPick(t.id)} />
+        ))}
+      </div>
+      <p style={{
+        margin: 'auto 24px 0', paddingBottom: 'max(20px, calc(env(safe-area-inset-bottom, 0px) + 4px))',
+        textAlign: 'center', fontFamily: TEXT, fontSize: 12, lineHeight: '17px', color: '#888888',
+      }}>Changes the look and layouts of every page. Your photos stay on their pages.</p>
+    </div>
+  );
+}
+
+// ── Covers drawer — the page view's Covers tool, which takes the Layout tool's place
+// while the cover is the page in view. One row of front-cover miniatures, each the
+// real CoverFront under the current theme and colour with the cover's own photo, so
+// with no theme they are plain photo-and-text suggestions and under a theme they
+// read as that theme's covers. Tap previews on the strip; ✓ keeps it, ✕ reverts.
+const PV_COVERS_H = 'calc(min(312px, 50%) + env(safe-area-inset-bottom, 0px))';
+const COVER_CARD_W = 92;
+
+function CoverCard({ design, selected, onClick, pageAspect, photos, layout }) {
+  const t = useTheme();
+  const paint = React.useContext(BookPaint);
+  const bg = slotColor(paint.colors, 0) || t.page;
+  return (
+    <button type="button" onClick={onClick} {...press(0.97)}
+      aria-pressed={selected} aria-label={`${design.name} cover`}
+      style={{
+        flex: '0 0 auto', padding: 0, border: 'none', background: 'transparent',
+        cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center',
+        transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
+      }}>
+      <span style={{
+        display: 'block', padding: 3, borderRadius: 8,
+        border: `2px solid ${selected ? '#CCA34C' : 'transparent'}`,
+      }}>
+        <span style={{
+          display: 'block', position: 'relative', overflow: 'hidden', containerType: 'size',
+          width: COVER_CARD_W, aspectRatio: String(pageAspect), background: bg,
+          borderRadius: 2, boxShadow: '0 2px 6px rgba(0,0,0,0.5)',
+        }}>
+          <CoverFront design={design.id} photos={photos} layout={layout} iconSize={14}
+                      bg={bg} pad={{ left: '6%', right: '6%', top: '6%', bottom: '6%' }} />
+        </span>
+      </span>
+      <span style={{
+        marginTop: 8, fontFamily: TEXT, fontWeight: 600, fontSize: 13, lineHeight: '18px',
+        color: '#FFFFFF', whiteSpace: 'nowrap',
+      }}>{design.name}</span>
+      <span style={{
+        fontFamily: TEXT, fontSize: 11, lineHeight: '14px', color: '#888888', whiteSpace: 'nowrap',
+      }}>{design.meta}</span>
+    </button>
+  );
+}
+
+function CoversDrawer({ closing, selected, onPick, onClose, onConfirm, pageAspect, photos, layout }) {
+  const t = useTheme();
+  return (
+    <div role="dialog" aria-labelledby="pb-covers-title" style={{
+      position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 20,
+      height: PV_COVERS_H, boxSizing: 'border-box', overflow: 'hidden',
+      borderRadius: '24px 24px 0 0', boxShadow: SHEET_RIM, backgroundImage: DRAWER_FILL,
+      display: 'flex', flexDirection: 'column', paddingTop: 76,
+      animation: closing
+        ? 'pbSheetOut 320ms cubic-bezier(0.4,0,0.2,1) both'
+        : 'pbSheetIn 380ms cubic-bezier(0.34,1.05,0.64,1) both',
+    }}>
+      <DrawerHead title="Covers" titleId="pb-covers-title" closeLabel="Close covers"
+                  onClose={onClose} confirmLabel="Apply cover" onConfirm={onConfirm} />
+      <div style={{
+        flex: '0 0 auto', display: 'flex', alignItems: 'flex-start', gap: 10,
+        padding: '0 19px 8px', overflowX: 'auto', overflowY: 'hidden',
+        scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch',
+      }}>
+        {COVER_DESIGNS.map(d => (
+          <CoverCard key={d.id} design={d} selected={d.id === selected}
+                     pageAspect={pageAspect} photos={photos} layout={layout}
+                     onClick={() => onPick(d.id)} />
+        ))}
+      </div>
+      <p style={{
+        margin: 'auto 24px 0', paddingBottom: 'max(20px, calc(env(safe-area-inset-bottom, 0px) + 4px))',
+        textAlign: 'center', fontFamily: TEXT, fontSize: 12, lineHeight: '17px', color: '#888888',
+      }}>{t === CLASSIC
+        ? 'Suggestions use your cover photo and title.'
+        : `Suggestions in the ${t.name} theme, with your cover photo.`}</p>
+    </div>
+  );
+}
+
+// ── Color drawer — the page view's Color tool, on the cover and on every page. A
+// swatch row ("Theme" first, which puts the page back to its theme's paper), an
+// "Apply to all pages" switch and Save; the page above previews live, like Spacing.
+const PV_COLOR_H = 'calc(260px + env(safe-area-inset-bottom, 0px))';
+
+function ColorDrawer({ closing, value, all, cover, onChange, onAll, onClose, onSave }) {
+  return (
+    <div role="dialog" aria-labelledby="pb-color-title" style={{
+      position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 20,
+      height: PV_COLOR_H, boxSizing: 'border-box', overflow: 'hidden',
+      borderRadius: '24px 24px 0 0', boxShadow: SHEET_RIM, backgroundImage: DRAWER_FILL,
+      display: 'flex', flexDirection: 'column', paddingTop: 76,
+      animation: closing
+        ? 'pbSheetOut 320ms cubic-bezier(0.4,0,0.2,1) both'
+        : 'pbSheetIn 380ms cubic-bezier(0.34,1.05,0.64,1) both',
+    }}>
+      <DrawerHead title={cover ? 'Cover color' : 'Page color'} titleId="pb-color-title"
+                  closeLabel="Close color" onClose={onClose} />
+      <div role="radiogroup" aria-label="Color" style={{
+        flex: '0 0 auto', display: 'flex', gap: 12, padding: '4px 20px 6px',
+        overflowX: 'auto', overflowY: 'hidden',
+        scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch',
+      }}>
+        {PAGE_COLORS.map(c => {
+          const on = (value || null) === c;
+          return (
+            <button key={c || 'theme'} type="button" role="radio" aria-checked={on}
+                    aria-label={c ? `Color ${c}` : 'Theme color'}
+                    onClick={() => onChange(c)} {...press(0.9)} style={{
+              flex: '0 0 auto', width: 44, height: 44, borderRadius: 22, padding: 0,
+              cursor: 'pointer', border: 'none',
+              background: c || 'conic-gradient(#F6F1E7 0 25%, #E3EADF 0 50%, #DDEBF2 0 75%, #F9E1E0 0)',
+              boxShadow: on
+                ? '0 0 0 2px #1C1C1C, 0 0 0 4px #FFFFFF'
+                : 'inset 0 0 0 1px rgba(255,255,255,0.18)',
+              transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
+            }} />
+          );
+        })}
+      </div>
+      <label style={{
+        flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        margin: '14px 24px 0', fontFamily: TEXT, fontSize: 16, lineHeight: '24px', color: '#FFFFFF',
+      }}>
+        {cover ? 'Also apply to all pages' : 'Apply to all pages'}
+        <button type="button" role="switch" aria-checked={all} onClick={() => onAll(!all)}
+                style={{
+                  width: 51, height: 31, borderRadius: 16, border: 0, padding: 2,
+                  background: all ? '#00A8AE' : 'rgba(255,255,255,0.16)',
+                  transition: 'background 160ms ease', cursor: 'pointer',
+                  WebkitTapHighlightColor: 'transparent',
+                }}>
+          <span style={{
+            display: 'block', width: 27, height: 27, borderRadius: 14, background: '#FFF',
+            transform: `translateX(${all ? 20 : 0}px)`, transition: 'transform 160ms ease',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+          }} />
+        </button>
+      </label>
+      <div style={{
+        marginTop: 'auto', padding: '0 19px',
+        paddingBottom: 'max(24px, calc(env(safe-area-inset-bottom, 0px) + 8px))',
+      }}>
+        <button type="button" onClick={onSave} {...press(0.97)} style={{
+          width: '100%', height: 52, borderRadius: 55, border: '1px solid #00B3B9',
+          background: '#007377', color: '#FFFFFF', cursor: 'pointer',
+          fontFamily: DISPLAY, fontWeight: 700, fontSize: 16, lineHeight: '20px',
+          transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
+        }}>Save</button>
+      </div>
+    </div>
+  );
+}
+
+// Colours with a Color-drawer draft folded in. `all` from a page sets the '*' paper
+// and clears the per-page ones (the cover keeps its own); from the cover it sets the
+// cover too. A null colour removes the override, falling back to '*' / the theme.
+function withColor(colors, slot, c, all) {
+  const next = all ? { 0: (colors || {})[0] } : Object.assign({}, colors);
+  if (all) { next['*'] = c; if (slot === 0) next[0] = c; }
+  else next[slot] = c;
+  Object.keys(next).forEach(k => { if (!next[k]) delete next[k]; });
+  return next;
+}
+
+// ── Style drawer — the book view's Style tool. Three segmented controls and an
+// Apply button, laid out top to bottom so nothing can overlap on a short phone (the
+// settings scroll instead). Every change previews on the whole book above; nothing is
+// written until Apply.
+const STYLE_DRAWER_H = 'calc(min(420px, 72%) + env(safe-area-inset-bottom, 0px))';
+
+function Segmented({ label, options, value, onChange }) {
+  return (
+    <div role="radiogroup" aria-label={label} style={{
+      display: 'flex', gap: 2, padding: 3, borderRadius: 14,
+      background: 'rgba(255,255,255,0.07)',
+    }}>
+      {options.map(o => {
+        const on = o.id === value;
+        return (
+          <button key={o.id} type="button" role="radio" aria-checked={on}
+                  onClick={() => onChange(o.id)} {...press(0.97)} style={{
+            flex: '1 1 0', minWidth: 0, minHeight: 44, padding: '4px', border: 'none',
+            borderRadius: 11, cursor: 'pointer',
+            background: on ? '#FFFFFF' : 'transparent',
+            color: on ? '#222222' : '#CCCCCC',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            textAlign: 'center',
+            fontFamily: TEXT, fontWeight: on ? 600 : 500, fontSize: 13, lineHeight: '16px',
+            transition: 'transform 140ms ease, background 160ms ease',
+            WebkitTapHighlightColor: 'transparent',
+          }}>
+            <span>{o.label}</span>
+            {o.sub && (
+              <span style={{ fontSize: 10.5, lineHeight: '13px', fontWeight: 400,
+                             color: on ? '#666666' : '#888888' }}>{o.sub}</span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function StyleDrawer({ closing, value, onChange, summary, onClose, onApply }) {
+  const head = (text, extra) => (
+    // Wraps, so on a narrow phone the summary drops under the label instead of
+    // squeezing both into two ragged lines.
+    <div style={{
+      display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between',
+      alignItems: 'baseline', columnGap: 8, margin: '0 0 8px', whiteSpace: 'nowrap', fontFamily: TEXT, fontWeight: 600, fontSize: 13, lineHeight: '18px',
+      color: '#999999',
+    }}>
+      <span>{text}</span>
+      {extra && <span style={{ fontWeight: 500, color: '#7FD6D9', textAlign: 'right' }}>{extra}</span>}
+    </div>
+  );
+  const set = k => v => onChange(Object.assign({}, value, { [k]: v }));
+  return (
+    <div role="dialog" aria-labelledby="pb-style-title" style={{
+      position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 20,
+      height: STYLE_DRAWER_H, boxSizing: 'border-box', overflow: 'hidden',
+      borderRadius: '24px 24px 0 0', boxShadow: SHEET_RIM, backgroundImage: DRAWER_FILL,
+      display: 'flex', flexDirection: 'column', paddingTop: 68,
+      animation: closing
+        ? 'pbSheetOut 320ms cubic-bezier(0.4,0,0.2,1) both'
+        : 'pbSheetIn 380ms cubic-bezier(0.34,1.05,0.64,1) both',
+    }}>
+      <DrawerHead title="Style" titleId="pb-style-title" closeLabel="Close style"
+                  onClose={onClose} />
+      <div style={{
+        flex: '1 1 auto', minHeight: 0, overflowY: 'auto', padding: '0 16px',
+        scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch',
+        display: 'flex', flexDirection: 'column', gap: 14,
+      }}>
+        <div>
+          {head('Photos per page', summary)}
+          <Segmented label="Photos per page" options={STYLE_PER}
+                     value={value.per} onChange={set('per')} />
+        </div>
+        <div>
+          {head('Photo order')}
+          <Segmented label="Photo order" options={STYLE_ORDER}
+                     value={value.order} onChange={set('order')} />
+        </div>
+        <div>
+          {head('Layout style')}
+          <Segmented label="Layout style" options={STYLE_LOOK}
+                     value={value.look} onChange={set('look')} />
+        </div>
+        <p style={{
+          margin: 0, textAlign: 'center', fontFamily: TEXT, fontSize: 12, lineHeight: '17px',
+          color: '#888888',
+        }}>Applies to every page. You can still change any page’s layout afterwards.</p>
+      </div>
+      <div style={{
+        flex: '0 0 auto', padding: '12px 19px',
+        paddingBottom: 'max(24px, calc(env(safe-area-inset-bottom, 0px) + 8px))',
+      }}>
+        <button type="button" onClick={onApply} {...press(0.97)} style={{
+          width: '100%', height: 52, borderRadius: 55, border: '1px solid #00B3B9',
+          background: '#007377', color: '#FFFFFF', cursor: 'pointer',
+          fontFamily: DISPLAY, fontWeight: 700, fontSize: 16, lineHeight: '20px',
+          transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
+        }}>Apply to whole book</button>
+      </div>
+    </div>
+  );
+}
+
+// ── Photo tray — tapping an empty placeholder on a page offers the uploaded photos.
+// `title` / `subtitle`: opened from the book view's Photos tool the tray is a browser of
+// the whole upload rather than a picker for one placeholder, so it says so.
+function PhotoTray({ closing, photos, used = {}, onPick, onClose, onUpload,
+                     title = 'Add a photo', subtitle }) {
+  return (
+    <div role="dialog" aria-label={title} style={{
+      position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 20,
+      height: 'calc(min(440px, 62%) + env(safe-area-inset-bottom, 0px))',
+      boxSizing: 'border-box', overflow: 'hidden',
+      borderRadius: '24px 24px 0 0', boxShadow: SHEET_RIM, backgroundImage: DRAWER_FILL, backgroundColor: '#1A1A1A',
+      animation: closing
+        ? 'pbSheetOut 320ms cubic-bezier(0.4,0,0.2,1) both'
+        : 'pbSheetIn 380ms cubic-bezier(0.34,1.05,0.64,1) both',
+    }}>
+      <div style={{
+        position: 'absolute', left: 0, right: 0, top: 16, height: 40,
+        padding: '0 16px', boxSizing: 'border-box', display: 'flex', alignItems: 'center',
+      }}>
+        <GlassIconButton label="Close" tint="rgba(0,0,0,0.25)" gloss onClick={onClose}>
+          <img src={`${A}/pb-editor-close.svg`} alt="" width={24} height={24}
+               style={{ display: 'block' }} />
+        </GlassIconButton>
+        <p style={{
+          position: 'absolute', left: 0, right: 0, top: 12, margin: 0,
+          textAlign: 'center', pointerEvents: 'none',
+          fontFamily: DISPLAY, fontWeight: 700, fontSize: 14, lineHeight: '20px',
+          color: '#FFFFFF',
+        }}>{title}</p>
+        {subtitle && (
+          <p style={{
+            position: 'absolute', left: 0, right: 0, top: 32, margin: 0,
+            textAlign: 'center', pointerEvents: 'none',
+            fontFamily: TEXT, fontSize: 12, lineHeight: '16px', color: '#999',
+          }}>{subtitle}</p>
+        )}
+      </div>
+      <div style={{
+        position: 'absolute', left: 0, right: 0, top: subtitle ? 80 : 72, bottom: 0,
+        overflowY: 'auto', padding: '0 16px 24px', boxSizing: 'border-box',
+        scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch',
+      }}>
+        <button type="button" onClick={onUpload} {...press(0.97)} style={{
+          width: '100%', height: 48, marginBottom: 12, borderRadius: 55,
+          border: '1px solid #FFF', background: '#F0F0F0', color: '#222', cursor: 'pointer',
+          fontFamily: DISPLAY, fontWeight: 700, fontSize: 16,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
+        }}>
+          <img src={`${A}/pb-editor-tool-addphoto.svg`} alt="" width={20} height={20}
+               style={{ display: 'block', filter: 'invert(1)' }} />
+          Upload photos
+        </button>
+        {photos.length ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
+            {photos.map((ph, k) => (
+              <button key={k} type="button" onClick={() => onPick(ph)} {...press(0.97)}
+                      aria-label={`Photo ${k + 1}`} style={{
+                        position: 'relative', padding: 0, border: 0, aspectRatio: '1', borderRadius: 4,
+                        overflow: 'hidden', background: '#333', cursor: 'pointer',
+                        transition: 'transform 140ms ease',
+                        WebkitTapHighlightColor: 'transparent',
+                      }}>
+                <img src={ph} alt="" draggable={false} style={{
+                  width: '100%', height: '100%', objectFit: 'cover', display: 'block',
+                  opacity: used[ph] ? 0.55 : 1,
+                }} />
+                {used[ph] && (
+                  // Already on a page of the book. Still pickable — a photo can repeat.
+                  <span aria-label={`Used ${used[ph]} time${used[ph] > 1 ? 's' : ''}`} style={{
+                    position: 'absolute', right: 6, bottom: 6, minWidth: 20, height: 20,
+                    padding: '0 5px', boxSizing: 'border-box', borderRadius: 10,
+                    background: '#00A8AE', boxShadow: '0 0 0 1.5px #fff',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontFamily: TEXT, fontWeight: 700, fontSize: 11, lineHeight: '20px', color: '#fff',
+                  }}>{used[ph] > 1 ? used[ph] : '✓'}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p style={{ margin: '24px 0 0', textAlign: 'center', fontFamily: TEXT,
+                      fontSize: 15, color: '#CCC' }}>
+            You haven't uploaded any photos yet.
+          </p>
+        )}
       </div>
     </div>
   );
@@ -1526,7 +2827,8 @@ function LayoutDrawer({ closing, count, selected, options, photos, pageAspect,
 // toolbar's 139), and the strip fills what is left. Centring the book in that band
 // puts its top edge at 231.3 against the node's 231.
 function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
-                   layouts, onSetLayout, onSwapPages, onBack, onAdd }) {
+                   layouts, onSetLayout, spacings, onSetSpacing, cover, onEmptyTap, onSwapPages, onBack, onAdd,
+                   colors, onSetColor, coverDesignId, onSetCoverDesign }) {
   const { useState, useRef, useEffect, useLayoutEffect, useMemo } = React;
   const slots = useMemo(() => slotsFor(pages), [pages]);
   const [active, setActive] = useState(() => Math.min(startSlot, slots.length - 1));
@@ -1640,6 +2942,19 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
   const [target, setTarget] = useState(0);
   const [count, setCount] = useState(2);
   const [draft, setDraft] = useState(null);
+  // Bumped on every preset applied: restarts the one-shot flash of the seam knobs.
+  const [flash, setFlash] = useState(0);
+  // Which sheet the drawer slot holds, and the spacing sheet's own draft.
+  const [kind, setKind] = useState('layout');
+  const [spDraft, setSpDraft] = useState(SP_DEFAULT);
+  const [spAll, setSpAll] = useState(false);
+  // The Covers and Color drawers' drafts. Both preview through BookPaint below and
+  // only while the drawer is open, so a cancel reverts before it slides away.
+  const [coverDraft, setCoverDraft] = useState('classic');
+  const [colorDraft, setColorDraft] = useState(null);
+  const [colorAll, setColorAll] = useState(false);
+  const adjustFor = i => drawer === 'open' && kind === 'layout' && i === target
+    ? { flash, onChange: slots => setDraft(d => encodeLayout(d, slots)) } : undefined;
 
   const openDrawer = () => {
     // The drawer covers the toolbar the selection would be driven from, and changing
@@ -1647,12 +2962,56 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
     // survive it.
     setSelected(null);
     const cur = layouts[active] || null;
-    // The node opens on the "2 photos" tab with its first card selected.
-    const c = cur ? Number(String(cur).split('-')[0]) : 2;
+    // Open on the tab matching the page: its layout's photo count, or — with no layout
+    // yet — how many photos the page actually holds (at least 1, at most the 5+ chip).
+    const n = slots[active].n;
+    const entry = n ? placed[n - 1] : cover;
+    const held = Array.isArray(entry) ? entry.filter(Boolean).length : entry ? 1 : 0;
+    const c = cur ? Number(layoutBase(cur).split('-')[0])
+                  : Math.max(1, Math.min(5, held));
     setTarget(active);
     setCount(c);
     setDraft(cur || `${c}-0`);
+    setFlash(f => f + 1);
+    setKind('layout');
     setDrawer('open');
+  };
+  const openSpacing = () => {
+    setSelected(null);
+    setTarget(active);
+    setSpDraft(spacingFor(spacings, active));
+    setSpAll(false);
+    setKind('spacing');
+    setDrawer('open');
+  };
+  const dismissDrawer = () => {
+    setDrawer('closing');
+    setTimeout(() => setDrawer(null), 320);
+  };
+  const openCovers = () => {
+    setSelected(null);
+    setTarget(0);
+    setCoverDraft(coverDesignId);
+    setKind('covers');
+    setDrawer('open');
+  };
+  const openColor = () => {
+    setSelected(null);
+    setTarget(active);
+    setColorDraft(active === 0 ? (colors || {})[0] || null : (colors || {})[active] || null);
+    setColorAll(false);
+    setKind('color');
+    setDrawer('open');
+  };
+  const paint = {
+    colors: drawer === 'open' && kind === 'color'
+      ? withColor(colors, target, colorDraft, colorAll) : (colors || {}),
+    cover: drawer === 'open' && kind === 'covers' ? coverDraft : coverDesignId,
+  };
+  const saveSpacing = () => {
+    onSetSpacing(target, spDraft, spAll);
+    setDrawer('closing');
+    setTimeout(() => setDrawer(null), 320);
   };
   const closeDrawer = () => {
     setDraft(layouts[target] || null);
@@ -1664,8 +3023,11 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
     setDrawer('closing');
     setTimeout(() => setDrawer(null), 320);
   };
-  const layoutFor = i =>
-    layoutById(drawer && i === target ? draft : layouts[i]);
+  const layoutFor = i => {
+    const spacing = drawer && kind === 'spacing' && (spAll || i === target)
+      ? spDraft : spacingFor(spacings, i);
+    return layoutAt(drawer && kind === 'layout' && i === target ? draft : layouts[i], spacing);
+  };
 
   // The strip's geometry is all derived from its own width, so it tracks the
   // viewport (390 on a phone, 402 in the desktop IOSDevice frame) and re-derives on
@@ -1754,7 +3116,7 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
     }
   }, [active]);
 
-  const photoFor = s => pageThumb(placed, s.n);
+  const photoFor = s => (s.n ? pageThumb(placed, s.n) : s.unit === 0 ? (cover || []).find(Boolean) || null : null);
   const spreads = spreadsFor(pages);
   const pageAt = (n, layout) =>
     pagePhotos(placed, n, layout ? layout.length : 1, uploaded);
@@ -1763,10 +3125,25 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
   const leafRef = i => el => { leafRefs.current[i] = el; };
   // Tapping a photo selects it; the strip is only pickable while the drawer is down.
   const pick = slot => (drawer ? null : (i => setSelected({ slot, i })));
+  // An empty placeholder opens the photo tray, which lives on EditorScreen so the book
+  // view shares it.
+  const pickEmpty = slot => (drawer ? null : (i => {
+    const lay = layoutFor(slot);
+    setSelected(null);
+    onEmptyTap(slots[slot].n || 0, lay ? lay.length : 1, i);
+  }));
   const selectedIn = slot =>
     (selected && selected.slot === slot ? selected.i : null);
 
+  // On the cover, Covers takes Layout's place: a cover is designed, not laid out.
+  const onCover = slots[active] && slots[active].unit === 0;
+  const pvTools = onCover
+    ? PV_TOOLS.map(t => (t.id === 'layout'
+      ? { id: 'covers', label: 'Covers', icon: 'pb-editor-tool-themes.svg' } : t))
+    : PV_TOOLS;
+
   return (
+    <BookPaint.Provider value={paint}>
     <div ref={rootRef} style={{
       position: 'absolute', inset: 0,
       animation: 'pbFadeIn 220ms ease both',
@@ -1784,7 +3161,9 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
           top: drawer
             ? 'calc(env(safe-area-inset-top, 44px) + 49px)'
             : 'calc(env(safe-area-inset-top, 44px) + 103px)',
-          bottom: drawer ? PV_DRAWER_H : 'calc(235px + env(safe-area-inset-bottom, 0px))',
+          bottom: drawer
+            ? ({ spacing: PV_SPACING_H, covers: PV_COVERS_H, color: PV_COLOR_H }[kind] || PV_DRAWER_H)
+            : 'calc(235px + env(safe-area-inset-bottom, 0px))',
           display: 'flex', alignItems: 'center',
           // A gap of 8% of a page reads as a break between books without stranding
           // the strip on empty canvas. Not in the node, which shows one book.
@@ -1801,18 +3180,26 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
         {box.w > 0 && (
           <React.Fragment>
             <CoverUnit w={bookW} h={bookH} pageW={pageW} frontRef={leafRef(0)}
-                       layout={layoutFor(0)} />
+                       layout={layoutFor(0)} adjust={adjustFor(0)}
+                       photos={coverPhotos(cover, (layoutFor(0) || FULL_PAGE).length)}
+                       onEmpty={pickEmpty(0)}
+                       onSelect={pick(0)} selected={selectedIn(0)} />
             {spreads.map(([l, r], i) => (
               <BookUnit key={i} w={bookW} h={bookH}>
-                <BigLeaf side="left" slotRef={leafRef(1 + 2 * i)}>
-                  <BigWell photos={pageAt(l, layoutFor(1 + 2 * i))}
+                <BigLeaf side="left" slotRef={leafRef(1 + 2 * i)} slot={l ? 1 + 2 * i : null}>
+                  {/* An inside-cover leaf (no page number) is plain paper. */}
+                  {l && <BigWell photos={pageAt(l, layoutFor(1 + 2 * i))}
                            layout={layoutFor(1 + 2 * i)} pageW={pageW}
-                           onSelect={pick(1 + 2 * i)} selected={selectedIn(1 + 2 * i)} />
+                           onSelect={pick(1 + 2 * i)} selected={selectedIn(1 + 2 * i)}
+                           adjust={adjustFor(1 + 2 * i)} onEmpty={pickEmpty(1 + 2 * i)} />}
+                  {l && <ThemeSticker n={l} />}
                 </BigLeaf>
-                <BigLeaf side="right" slotRef={leafRef(2 + 2 * i)}>
-                  <BigWell photos={pageAt(r, layoutFor(2 + 2 * i))}
+                <BigLeaf side="right" slotRef={leafRef(2 + 2 * i)} slot={r ? 2 + 2 * i : null}>
+                  {r && <BigWell photos={pageAt(r, layoutFor(2 + 2 * i))}
                            layout={layoutFor(2 + 2 * i)} pageW={pageW}
-                           onSelect={pick(2 + 2 * i)} selected={selectedIn(2 + 2 * i)} />
+                           onSelect={pick(2 + 2 * i)} selected={selectedIn(2 + 2 * i)}
+                           adjust={adjustFor(2 + 2 * i)} onEmpty={pickEmpty(2 + 2 * i)} />}
+                  {r && <ThemeSticker n={r} />}
                 </BigLeaf>
               </BookUnit>
             ))}
@@ -1875,25 +3262,57 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
           of which Layout is the one live tool. */}
       {!drawer && (
         <Toolbar photos={uploaded}
-                 tools={selected ? SELECTED_TOOLS : PV_TOOLS}
+                 tools={selected ? SELECTED_TOOLS : pvTools}
                  gap={selected ? 4 : 8} padX={selected ? 0 : 16}
                  onTool={id => {
-                   if (selected) { if (id === 'back') setSelected(null); return; }
+                   if (selected) {
+                     if (id === 'back') setSelected(null);
+                     // Replace opens the same tray as an empty placeholder, aimed at the
+                     // selected slot; the selection stays on it, now holding the new photo.
+                     if (id === 'replace') {
+                       const lay = layoutFor(selected.slot);
+                       onEmptyTap(slots[selected.slot].n || 0, lay ? lay.length : 1, selected.i, true);
+                     }
+                     return;
+                   }
                    if (id === 'layout') openDrawer();
+                   if (id === 'covers') openCovers();
+                   if (id === 'spacing') openSpacing();
+                   if (id === 'color') openColor();
                  }} />
       )}
 
-      {drawer && (
+      {drawer && kind === 'spacing' && (
+        <SpacingDrawer closing={drawer === 'closing'} value={spDraft} all={spAll}
+                       onChange={setSpDraft} onAll={setSpAll}
+                       onClose={() => { setDrawer('closing'); setTimeout(() => setDrawer(null), 320); }}
+                       onSave={saveSpacing} />
+      )}
+      {drawer && kind === 'layout' && (
         <LayoutDrawer
           closing={drawer === 'closing'} count={count} selected={draft}
           options={LAYOUTS[count] || []} pageAspect={pageAspect}
-          photos={slotPhotos(photoFor(slots[target]), uploaded)}
-          onCount={c => { setCount(c); setDraft(`${c}-0`); }}
-          onPick={i => setDraft(`${count}-${i}`)}
+          photos={[photoFor(slots[target])]}
+          onCount={c => { setCount(c); setDraft(`${c}-0`); setFlash(f => f + 1); }}
+          onPick={i => { setDraft(`${count}-${i}`); setFlash(f => f + 1); }}
           onClose={closeDrawer} onConfirm={confirmDrawer}
         />
       )}
+      {drawer && kind === 'covers' && (
+        <CoversDrawer closing={drawer === 'closing'} selected={coverDraft} onPick={setCoverDraft}
+                      pageAspect={pageAspect} layout={layoutFor(0)}
+                      photos={coverPhotos(cover, (layoutFor(0) || FULL_PAGE).length)}
+                      onClose={dismissDrawer}
+                      onConfirm={() => { onSetCoverDesign(coverDraft); dismissDrawer(); }} />
+      )}
+      {drawer && kind === 'color' && (
+        <ColorDrawer closing={drawer === 'closing'} value={colorDraft} all={colorAll}
+                     cover={target === 0} onChange={setColorDraft} onAll={setColorAll}
+                     onClose={dismissDrawer}
+                     onSave={() => { onSetColor(target, colorDraft, colorAll); dismissDrawer(); }} />
+      )}
     </div>
+    </BookPaint.Provider>
   );
 }
 
@@ -2013,7 +3432,7 @@ function ArrangeHeader({ tab, onTab }) {
             addition — the node only draws the Photos tab. */}
         {tab === 'photos' ? (
           <React.Fragment>
-            Drag and drop photo to move it,<br />
+            Drag a photo onto a page to add it there,<br />
             or tap 2 photos to swap with each other.
           </React.Fragment>
         ) : (
@@ -2046,10 +3465,12 @@ function ArrangeLeaf({ side, n, photos, layout, holeSlot, ringSlot,
                       slotDown, leafDown, slotRef }) {
   const left = side === 'left';
   const slots = layout && layout.length ? layout : FULL_PAGE;
+  const t = useTheme();
+  const { colors } = React.useContext(BookPaint);
   return (
     <div onDragStart={e => e.preventDefault()}
          onPointerDown={n ? leafDown : undefined}
-         style={Object.assign(leafBox(left), {
+         style={Object.assign(leafBox(left, t, n ? slotColor(colors, n + 1) : null), {
       position: 'relative',
       cursor: n && leafDown ? 'grab' : undefined,
       WebkitTapHighlightColor: 'transparent',
@@ -2058,8 +3479,10 @@ function ArrangeLeaf({ side, n, photos, layout, holeSlot, ringSlot,
       // only claimed once the press-and-hold fires — see the comment on the gesture
       // in ArrangeView. touch-action therefore stays at its default here.
     })}>
-      <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
-        {slots.map((sl, i) => {
+      {/* A size container: the theme's frames are sized in container units. */}
+      <div style={{ position: 'relative', flex: 1, minWidth: 0, containerType: 'size' }}>
+        {/* An inside-cover leaf has no page number and holds no photo. */}
+        {(n ? slots : []).map((sl, i) => {
           const photo = photos[i] || null;
           const hole = holeSlot === i;
           const ring = ringSlot === i;
@@ -2077,7 +3500,7 @@ function ArrangeLeaf({ side, n, photos, layout, holeSlot, ringSlot,
                  }}>
               {/* node 451:15159 — the hole a lifted photo leaves: the empty well at
                   half opacity, keeping its shadow, so the slot still reads as a slot. */}
-              <PhotoWell photo={hole ? null : photo}
+              <PhotoWell photo={hole ? null : photo} index={i}
                          iconSize={Math.max(10, Math.round(24 * Math.min(sl.w, sl.h) / 100))}
                          style={{ position: 'absolute', inset: 0, flex: 'none',
                                   opacity: hole ? 0.5 : 1 }} />
@@ -2143,8 +3566,8 @@ function ArrangeCaption({ left, right, onAdd }) {
 // are filled from the upload pool as a *preview* (see slotPhotos). Unifying the two
 // means making placement per-slot, which is a change to the storage model and not a
 // side effect of this mode.
-function ArrangeView({ aspect, pages, placed, uploaded, layouts,
-                      onSwapSlots, onSwapPages, onMoveSpread, onAdd, onDone }) {
+function ArrangeView({ aspect, pages, placed, uploaded, layouts, spacings, cover,
+                      onSwapSlots, onMovePhoto, onSwapPages, onMoveSpread, onAdd, onDone }) {
   const { useState, useRef, useEffect, useMemo } = React;
   const [tab, setTab] = useState('photos');
   // The first of a tap-tap pair: a page number on the Photos tab, a page number on
@@ -2346,7 +3769,7 @@ function ArrangeView({ aspect, pages, placed, uploaded, layouts,
     if (over == null) return;
     if (tab === 'photos') {
       const from = `${p.page}:${p.slot}`;
-      if (over !== from) onSwapSlots(parseSlot(from), parseSlot(over));
+      if (over !== from) onMovePhoto(parseSlot(from), parseSlot(over));
     } else if (over !== p.spread) {
       onMoveSpread(p.spread, over);
     }
@@ -2429,7 +3852,8 @@ function ArrangeView({ aspect, pages, placed, uploaded, layouts,
               always led with it. It is not a drop target and not draggable: it is not
               a page, and the node's own navigator treats it as a single entry. */}
           <div style={{ position: 'relative' }}>
-            <Sheet aspect={aspect} interior={<CoverInterior layout={layoutById(layouts[0])} />}>
+            <Sheet aspect={aspect} interior={<CoverInterior layout={layoutAt(layouts[0], spacingFor(spacings, 0))}
+                                                   photos={coverPhotos(cover, (layoutAt(layouts[0], spacingFor(spacings, 0)) || FULL_PAGE).length)} />}>
               <GutterArt file="pb-editor-hinge.png" offsets={[-11, -3]} width={14}
                          opacity={0.5} />
             </Sheet>
@@ -2447,8 +3871,9 @@ function ArrangeView({ aspect, pages, placed, uploaded, layouts,
               <Sheet aspect={aspect} interior={leaves(i, pair)}>
                 <GutterArt file="pb-editor-spine.png" offsets={[-4]} width={8} />
               </Sheet>
-              <ArrangeCaption left={pair[0]} right={pair[1]}
-                              onAdd={i < spreads.length - 1 ? () => onAdd() : null} />
+              {/* No add-spread pill here: arrange rearranges what is in the book, and
+                  adding pages belongs to the book and page views. */}
+              <ArrangeCaption left={pair[0]} right={pair[1]} onAdd={null} />
             </div>
           ))}
           {/* Room for the Done band, which is absolutely positioned over the list. */}
@@ -2516,12 +3941,51 @@ function ArrangeView({ aspect, pages, placed, uploaded, layouts,
 }
 
 function EditorScreen() {
-  const { useState, useEffect, useRef } = React;
+  const { useState, useEffect, useRef, useMemo } = React;
   const [book] = useState(readBook);
   const [incoming] = useState(readIncomingPhotos);
   const [uploaded] = useState(() => incoming || readList('pb_uploaded'));
   const [placed, setPlaced] = useState(() => readList('pb_placed'));
   const [layouts, setLayouts] = useState(readLayouts);
+  const [spacings, setSpacings] = useState(readSpacings);
+  const [cover, setCover] = useState(readCover);
+  // pb_theme — the applied theme's id; pb_style — the last Style applied, which is
+  // what the Style drawer reopens on.
+  const [theme, setTheme] = useState(readTheme);
+  const [style, setStyle] = useState(readStyle);
+  // pb_colors — page colours by slot (see BookPaint); pb_cover_design — the cover design.
+  const readObj = key => {
+    try {
+      const o = JSON.parse(sessionStorage.getItem(key) || '{}');
+      return o && typeof o === 'object' && !Array.isArray(o) ? o : {};
+    } catch (e) { return {}; }
+  };
+  const [colors, setColors] = useState(() => readObj('pb_colors'));
+  const [coverDesignId, setCoverDesignId] = useState(() => {
+    try { return coverDesign(sessionStorage.getItem('pb_cover_design')).id; }
+    catch (e) { return 'classic'; }
+  });
+  // The book view's two drawers: { kind: 'themes' | 'style', closing }. Each holds a
+  // draft that previews on the whole book and is only written on confirm.
+  const [panel, setPanel] = useState(null);
+  const [themeCat, setThemeCat] = useState(THEME_CATEGORIES[0].id);
+  const [themeDraft, setThemeDraft] = useState(null);
+  // pb_theme_base — the book's own layouts and spacing from before the first theme,
+  // which is what "Default" puts back. Kept in step with every later change (Style,
+  // a page's Layout or Spacing) so Default restores the book as it now is, unthemed,
+  // rather than as it was the moment the theme went on.
+  const [themeBase, setThemeBase] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('pb_theme_base') || 'null'); }
+    catch (e) { return null; }
+  });
+  const writeBase = b => {
+    try {
+      if (b) sessionStorage.setItem('pb_theme_base', JSON.stringify(b));
+      else sessionStorage.removeItem('pb_theme_base');
+    } catch (e) { /* best-effort */ }
+    return b;
+  };
+  const [styleDraft, setStyleDraft] = useState(STYLE_DEFAULT);
   // null = the book view; otherwise the slot index the page view opened on.
   const [pageView, setPageView] = useState(null);
   // Arrange mode — node 451:15148. A third mode of this screen, alongside page view.
@@ -2584,6 +4048,45 @@ function EditorScreen() {
   // array first: the extra slots of a multi-photo layout were being previewed from the
   // upload pool, and the moment you move one of them that preview has to become real
   // data or the drag could not persist. Single-slot pages stay plain strings.
+  // ── Arrange, Photos tab: drag a photo onto another page to ADD it there (a tap pair
+  // is what swaps). The target takes it in an empty slot if it has one, otherwise its
+  // layout grows by a slot; the source page closes the gap, its layout shrinking to
+  // match. A drop within the same page still swaps — that is reordering, not adding.
+  const movePhoto = (A, B) => {
+    if (A.n === B.n) { swapSlots(A, B); return; }
+    const next = placed.slice();
+    while (next.length < Math.max(A.n, B.n)) next.push(null);
+    const a = pagePhotos(next, A.n, A.slots, []);
+    const b = pagePhotos(next, B.n, B.slots, []);
+    while (a.length < A.slots) a.push(null);
+    while (b.length < B.slots) b.push(null);
+    const photo = a[A.i];
+    if (!photo) return;
+
+    let bLayout;                         // undefined = leave B's layout alone
+    if (!b[B.i]) b[B.i] = photo;
+    else if (b.indexOf(null) >= 0) b[b.indexOf(null)] = photo;
+    else {
+      const id = layoutIdFor(b.length + 1);
+      if (!id) { swapSlots(A, B); return; }  // no template holds that many
+      b.push(photo);
+      bLayout = id;
+    }
+    a[A.i] = null;
+    let aList = a, aLayout;
+    if (A.slots > 1) {
+      aList = a.filter(Boolean);
+      aLayout = aList.length > 1 ? layoutIdFor(aList.length) : null;
+    }
+    const entry = list => (list.length > 1 ? list : (list[0] || null));
+    next[A.n - 1] = entry(aList);
+    next[B.n - 1] = entry(b);
+    setPlaced(writePlaced(next));
+    const slotOf = n => slotsFor(pages).findIndex(sl => sl.n === n);
+    if (bLayout !== undefined) setLayout(slotOf(B.n), bLayout);
+    if (aLayout !== undefined) setLayout(slotOf(A.n), aLayout);
+  };
+
   const swapSlots = (A, B) => {
     setPlaced(prev => {
       const next = prev.slice();
@@ -2652,6 +4155,177 @@ function EditorScreen() {
       sessionStorage.setItem('pb_layouts', JSON.stringify(next));
       return next;
     });
+    setThemeBase(b => {
+      if (!b) return b;
+      const layouts = Object.assign({}, b.layouts);
+      if (id) layouts[slot] = id; else delete layouts[slot];
+      return writeBase(Object.assign({}, b, { layouts }));
+    });
+  };
+
+  // pb_spacing: per-slot values, plus '*' for "apply to all pages", which also wipes
+  // the per-slot overrides so one book-wide value really is the whole book.
+  const setSpacing = (slot, v, all) => {
+    setSpacings(prev => {
+      const next = all ? { '*': v } : Object.assign({}, prev, { [slot]: v });
+      sessionStorage.setItem('pb_spacing', JSON.stringify(next));
+      return next;
+    });
+    setThemeBase(b => (b ? writeBase(Object.assign({}, b, {
+      spacings: all ? { '*': v } : Object.assign({}, b.spacings, { [slot]: v }),
+    })) : b));
+  };
+
+  const setColor = (slot, c, all) => {
+    setColors(prev => {
+      const next = withColor(prev, slot, c, all);
+      sessionStorage.setItem('pb_colors', JSON.stringify(next));
+      return next;
+    });
+    setThemeBase(b => (b ? writeBase(Object.assign({}, b, {
+      colors: withColor(b.colors || {}, slot, c, all) })) : b));
+  };
+  const setCoverDesign = id => {
+    setCoverDesignId(id);
+    try { sessionStorage.setItem('pb_cover_design', id); } catch (e) { /* best-effort */ }
+  };
+
+  // The photo tray, shared by the book view and the page view: { n, count, i } — which
+  // page, how many slots its layout has, and which placeholder was tapped.
+  const [tray, setTray] = useState(null);
+  const [trayClosing, setTrayClosing] = useState(false);
+  const openTray = (n, count, i, replace) => setTray({ n, count, i, replace: !!replace });
+  const closeTray = () => {
+    setTrayClosing(true);
+    setTimeout(() => { setTray(null); setTrayClosing(false); }, 320);
+  };
+  // Every photo already on a page, so the tray can mark it.
+  const usedPhotos = useMemo(() => {
+    const m = {};
+    placed.concat(cover).forEach(e => (Array.isArray(e) ? e : [e]).forEach(ph => {
+      if (ph) m[ph] = (m[ph] || 0) + 1;
+    }));
+    return m;
+  }, [placed, cover]);
+
+  // Tap an empty placeholder → pick a photo for just that slot of that page.
+  const placePhoto = (n, count, i, photo) => {
+    if (n === 0) {
+      setCover(prev => {
+        const arr = coverPhotos(prev, count);
+        arr[i] = photo;
+        sessionStorage.setItem('pb_cover', JSON.stringify(arr));
+        return arr;
+      });
+      return;
+    }
+    setPlaced(prev => {
+      const next = prev.slice();
+      while (next.length < n) next.push(null);
+      const arr = pagePhotos(prev, n, count, []);
+      while (arr.length < count) arr.push(null);
+      arr[i] = photo;
+      next[n - 1] = count === 1 ? photo : arr;
+      return writePlaced(next);
+    });
+  };
+
+  // ── Themes and Style. Both rewrite every page layout ("last change wins"), so a
+  // page's hand-picked layout survives only until the next one of the two is applied.
+  const openPanel = kind => {
+    if (kind === 'themes') {
+      setThemeCat(THEMES[theme] ? THEMES[theme].cat : THEME_CATEGORIES[0].id);
+      setThemeDraft(theme);
+    } else {
+      setStyleDraft(style);
+    }
+    setPanel({ kind, closing: false });
+  };
+  // Marking it closing drops the preview at once, so a cancelled draft visibly
+  // reverts before the drawer slides away rather than snapping after it.
+  const closePanel = () => {
+    setPanel(p => (p ? Object.assign({}, p, { closing: true }) : p));
+    setTimeout(() => setPanel(null), 320);
+  };
+  const persist = (key, value) => {
+    try { sessionStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value)); }
+    catch (e) { /* storage is best-effort */ }
+  };
+  const commitTheme = () => {
+    const t = THEMES[themeDraft];
+    if (themeDraft === theme) {
+      // Confirming the theme the book already has changes nothing.
+    } else if (!t) {
+      // "Default": take the theme off and put the book's own layouts back.
+      const b = themeBase || { layouts: {}, spacings: {} };
+      setLayouts(b.layouts); persist('pb_layouts', b.layouts);
+      setSpacings(b.spacings); persist('pb_spacing', b.spacings);
+      setColors(b.colors || {}); persist('pb_colors', b.colors || {});
+      setThemeBase(writeBase(null));
+      setTheme(null);
+      try { sessionStorage.removeItem('pb_theme'); } catch (e) { /* best-effort */ }
+    } else {
+      if (!theme) setThemeBase(writeBase({ layouts, spacings, colors }));
+      const r = applyTheme(t, placed, pages);
+      setPlaced(writePlaced(r.placed));
+      setLayouts(r.layouts); persist('pb_layouts', r.layouts);
+      // The theme's layouts are drawn at the default spacing; a full-bleed spacing
+      // left over from Style would run its framed photos off the page.
+      setSpacings({}); persist('pb_spacing', {});
+      // The theme brings its own paper, so chosen page colours give way to it.
+      setColors({}); persist('pb_colors', {});
+      setTheme(t.id); persist('pb_theme', t.id);
+    }
+    closePanel();
+  };
+  const commitStyle = () => {
+    if (stylePlan) {
+      setPlaced(writePlaced(stylePlan.placed));
+      setCover(prev => {
+        const arr = coverPhotos(prev, Math.max(1, prev.length));
+        arr[0] = stylePlan.cover;
+        persist('pb_cover', arr);
+        return arr;
+      });
+      setLayouts(stylePlan.layouts); persist('pb_layouts', stylePlan.layouts);
+      setSpacings(stylePlan.spacings); persist('pb_spacing', stylePlan.spacings);
+      setAdded(stylePlan.added);
+      setStyle(styleDraft); persist('pb_style', styleDraft);
+      // Under a theme, this is now the look Default would return to.
+      if (theme) setThemeBase(b => writeBase(Object.assign({}, b,
+        { layouts: stylePlan.layouts, spacings: stylePlan.spacings })));
+    }
+    closePanel();
+  };
+
+  // ── The Photos tool opens the tray as a browser of the whole upload. A photo
+  // already in the book opens the page holding it; one that is not yet goes onto the
+  // first empty placeholder (a new spread if there is none) and opens that page.
+  const slotOfPhoto = ph => {
+    if ((cover || []).includes(ph)) return 0;
+    for (let n = 1; n <= pages; n++) {
+      const e = placed[n - 1];
+      if (e === ph || (Array.isArray(e) && e.includes(ph))) return n + 1;
+    }
+    return -1;
+  };
+  const browsePick = ph => {
+    let slot = slotOfPhoto(ph);
+    if (slot < 0) {
+      let at = null;
+      for (let n = 1; n <= pages && !at; n++) {
+        const lay = layoutAt(layouts[n + 1], spacingFor(spacings, n + 1));
+        const count = lay ? lay.length : 1;
+        const arr = pagePhotos(placed, n, count, []);
+        while (arr.length < count) arr.push(null);
+        if (arr.indexOf(null) >= 0) at = { n, count, i: arr.indexOf(null) };
+      }
+      if (!at) { at = { n: pages + 1, count: 1, i: 0 }; setAdded(a => a + 1); }
+      placePhoto(at.n, at.count, at.i, ph);
+      slot = at.n + 1;
+    }
+    closeTray();
+    openPage(slot);
   };
 
   const dismissSheet = () => {
@@ -2660,21 +4334,65 @@ function EditorScreen() {
   };
 
   // "Yes, auto-fill" — one photo per page, in the order the picker handed them over
-  // (chronological, which is what the prompt promises). The cover is left alone: it
-  // is not a page, and spending photo 1 on it would leave the last page empty.
-  // A selection longer than the book grows it by whole spreads, priced like any other
-  // added spread.
+  // (chronological, which is what the prompt promises). The first photo goes on the
+  // cover and the rest one per page, so page n holds photo n + 1. A selection longer
+  // than the book grows it by whole spreads, priced like any other added spread.
   const autoFill = () => {
-    setPlaced(incoming);
-    sessionStorage.setItem('pb_placed', JSON.stringify(incoming));
-    const needed = Math.ceil((incoming.length - book.pages) / 2);
+    const rest = incoming.slice(1);
+    setPlaced(rest);
+    sessionStorage.setItem('pb_placed', JSON.stringify(rest));
+    setCover(prev => {
+      const arr = coverPhotos(prev, Math.max(1, prev.length));
+      arr[0] = incoming[0];
+      sessionStorage.setItem('pb_cover', JSON.stringify(arr));
+      return arr;
+    });
+    const needed = Math.ceil((rest.length - book.pages) / 2);
     if (needed > 0) setAdded(a => Math.max(a, needed));
     dismissSheet();
   };
 
   const pages = book.pages + added * 2;
   const total = (parseFloat(book.total) + added * EXTRA_SPREAD_PRICE).toFixed(2);
-  const spreads = spreadsFor(pages);
+
+  // The Style drawer's draft as a whole book. The cover keeps its own layout.
+  const styleOpen = !!panel && !panel.closing && panel.kind === 'style';
+  const themesOpen = !!panel && !panel.closing && panel.kind === 'themes';
+  const stylePlan = useMemo(() => {
+    if (!styleOpen || !uploaded.length) return null;
+    const plan = planBook(uploaded, styleDraft, book.pages);
+    const lay = Object.assign({}, plan.layouts);
+    if (layouts[0]) lay[0] = layouts[0];
+    const cov = coverPhotos(cover, Math.max(1, cover.length));
+    cov[0] = plan.cover;
+    return Object.assign(plan, { layouts: lay, cover: cov, spacings: { '*': plan.spacing } });
+  }, [styleOpen, styleDraft, uploaded, layouts, cover, book.pages]);
+  const themePlan = useMemo(() => {
+    if (!themesOpen || themeDraft === theme) return null;
+    const t = THEMES[themeDraft];
+    if (t) return Object.assign(applyTheme(t, placed, pages), { spacings: {}, colors: {} });
+    const b = themeBase || { layouts: {}, spacings: {} };
+    return { placed, layouts: b.layouts, spacings: b.spacings, colors: b.colors || {} };
+  }, [themesOpen, themeDraft, theme, themeBase, placed, pages]);
+
+  // What the book view draws: the open drawer's draft, else the book itself.
+  const v = stylePlan
+    ? Object.assign({ colors }, stylePlan)
+    : themePlan
+      ? { placed: themePlan.placed, cover, layouts: themePlan.layouts,
+          spacings: themePlan.spacings, colors: themePlan.colors, added }
+      : { placed, cover, layouts, spacings, colors, added };
+  const vPages = book.pages + v.added * 2;
+  const vTotal = (parseFloat(book.total) + v.added * EXTRA_SPREAD_PRICE).toFixed(2);
+  const spreads = spreadsFor(vPages);
+  const bookTheme = THEMES[themesOpen ? themeDraft : theme] || null;
+  // When the format's own page count is what decided the length (too few photos to
+  // fill it at this density), say so — otherwise "Collage" on a small upload reads as
+  // broken, since planBook spreads the photos out across the minimum instead.
+  const styleSummary = !uploaded.length ? 'No photos uploaded yet' : stylePlan
+    ? `${uploaded.length} photos → ${stylePlan.pages} pages${stylePlan.added ? '' : ' (min.)'} · €${
+        (parseFloat(book.total) + stylePlan.added * EXTRA_SPREAD_PRICE).toFixed(2)}`
+    : '';
 
   // A full spread is two leaves wide, so its box is 2·(pageW/pageH). The node's own
   // leaves are square (164×164) while its card reads "Large Portrait" — the WIP
@@ -2698,13 +4416,29 @@ function EditorScreen() {
         @keyframes pbScrimIn  { from { opacity: 0; } to { opacity: 1; } }
         @keyframes pbScrimOut { from { opacity: 1; } to { opacity: 0; } }
         @keyframes pbFadeIn   { from { opacity: 0; } to { opacity: 1; } }
+        .pb-range { -webkit-appearance: none; appearance: none; width: 100%; height: 28px;
+          margin: 0; background: transparent; touch-action: pan-y; }
+        .pb-range::-webkit-slider-runnable-track { height: 16px; border-radius: 8px;
+          background: linear-gradient(to right, #00A8AE var(--v), rgba(255,255,255,0.16) var(--v)); }
+        .pb-range::-moz-range-track { height: 16px; border-radius: 8px;
+          background: linear-gradient(to right, #00A8AE var(--v), rgba(255,255,255,0.16) var(--v)); }
+        .pb-range::-webkit-slider-thumb { -webkit-appearance: none; width: 28px; height: 28px;
+          margin-top: -6px; border-radius: 14px; background: #fff; border: 0;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.4); }
+        .pb-range::-moz-range-thumb { width: 28px; height: 28px; border-radius: 14px;
+          background: #fff; border: 0; box-shadow: 0 2px 6px rgba(0,0,0,0.4); }
+        @keyframes pbSplitHint { 0% { opacity: 0; transform: scale(0.6); }
+          18% { opacity: 1; transform: scale(1.1); } 30% { transform: scale(1); }
+          75% { opacity: 1; } 100% { opacity: 0; transform: scale(1); } }
       `}</style>
 
+      <BookTheme.Provider value={bookTheme}>
+      <BookPaint.Provider value={{ colors: v.colors, cover: coverDesignId }}>
       {arrange ? (
         <ArrangeView
           aspect={aspect} pages={pages} placed={placed}
-          uploaded={uploaded} layouts={layouts}
-          onSwapSlots={swapSlots} onSwapPages={swapPhotos} onMoveSpread={moveSpread}
+          uploaded={uploaded} layouts={layouts} spacings={spacings} cover={cover}
+          onSwapSlots={swapSlots} onMovePhoto={movePhoto} onSwapPages={swapPhotos} onMoveSpread={moveSpread}
           onAdd={() => setAdded(n => n + 1)}
           onDone={() => setArrange(false)}
         />
@@ -2713,7 +4447,10 @@ function EditorScreen() {
           aspect={aspect} pageAspect={pageAspect} pages={pages}
           placed={placed} uploaded={uploaded}
           layouts={layouts} onSetLayout={setLayout} onSwapPages={swapPhotos}
+          spacings={spacings} onSetSpacing={setSpacing} cover={cover} onEmptyTap={openTray}
           startSlot={pageView} onBack={() => setPageView(null)}
+          colors={colors} onSetColor={setColor}
+          coverDesignId={coverDesignId} onSetCoverDesign={setCoverDesign}
           onAdd={() => setAdded(n => n + 1)}
         />
       ) : (
@@ -2733,7 +4470,7 @@ function EditorScreen() {
           backgroundSize: '18px 18px', backgroundPosition: '4px 4px',
           backgroundOrigin: 'border-box',
         }}>
-          <DetailsCard title={book.title} pages={pages} total={total} />
+          <DetailsCard title={book.title} pages={vPages} total={vTotal} />
 
           {/* 23px from the card to the cover, per the node (card ends 202, cover 225) */}
           <div style={{ height: 23 }} />
@@ -2746,16 +4483,21 @@ function EditorScreen() {
             padding: `0 ${GUTTER}px`, boxSizing: 'border-box',
           }}>
             <CoverBlock aspect={aspect} onOpen={() => openPage(0)}
-                        layout={layoutById(layouts[0])} />
+                        layout={layoutAt(v.layouts[0], spacingFor(v.spacings, 0))}
+                        photos={coverPhotos(v.cover, (layoutAt(v.layouts[0], spacingFor(v.spacings, 0)) || FULL_PAGE).length)}
+                        /* No onEmpty in the book view: a tap anywhere on a page opens
+                           it in page view, and placeholders are filled from there. */ />
             {spreads.map(([l, r], i) => (
-              <SpreadBlock key={i} aspect={aspect} left={l} right={r} photos={placed}
+              <SpreadBlock key={i} aspect={aspect} left={l} right={r} photos={v.placed}
                            showPlus={i < spreads.length - 1}
                            onAdd={() => setAdded(n => n + 1)}
                            pool={uploaded}
                            /* Slot 0 is the cover, then two per spread — the same
                               indices the page view and pb_layouts use. */
-                           layoutFor={side => layoutById(
-                             layouts[1 + 2 * i + (side === 'right' ? 1 : 0)])}
+                           layoutFor={side => {
+                             const k = 1 + 2 * i + (side === 'right' ? 1 : 0);
+                             return layoutAt(v.layouts[k], spacingFor(v.spacings, k));
+                           }}
                            onOpen={side => openPage(1 + 2 * i + (side === 'right' ? 1 : 0))} />
             ))}
           </div>
@@ -2763,14 +4505,49 @@ function EditorScreen() {
           {/* The toolbar is absolutely positioned over the scroller, so the content
               needs matching room at the end or the last spread is trapped under it
               with no scroll left. */}
-          <div aria-hidden style={{ height: 'calc(139px + env(safe-area-inset-bottom, 0px))' }} />
+          <div aria-hidden style={{
+            height: panel
+              ? (panel.kind === 'style' ? STYLE_DRAWER_H : THEME_DRAWER_H)
+              : 'calc(139px + env(safe-area-inset-bottom, 0px))',
+          }} />
         </div>
       </div>
 
-      <Header onClose={() => window.navigation.pop()} />
-      {/* Arrange is the book view's one live tool; the other five are inert. */}
-      <Toolbar photos={uploaded}
-               onTool={id => { if (id === 'arrange') openArrange(); }} />
+      {/* Close always lands on home, whatever the history holds (picker, sources…). `replace`
+          rather than `href` so the editor is not left in the stack; the flag makes it a pop. */}
+      <Header onClose={() => {
+        // Leaving the editor starts the next visit from an empty book. (Going to the
+        // photo picker is not leaving: only this button resets.) pb_book stays — it is
+        // the product page's choice, not the editor's content.
+        try {
+          ['pb_placed', 'pb_uploaded', 'pb_photos', 'pb_layouts', 'pb_spacing', 'pb_cover',
+           'pb_theme', 'pb_theme_base', 'pb_style', 'pb_colors', 'pb_cover_design']
+            .forEach(k => sessionStorage.removeItem(k));
+          sessionStorage.setItem('pb_nav', 'pop');
+        } catch (e) {}
+        window.location.replace('home.html');
+      }} />
+      {/* Photos, Arrange, Themes and Style are live; AI help and Options are inert.
+          The drawers cover the toolbar, so it is unmounted while one is up. */}
+      {!panel && (
+        <Toolbar photos={uploaded}
+                 onTool={id => {
+                   if (id === 'arrange') openArrange();
+                   if (id === 'photos') setTray({ browse: true });
+                   if (id === 'themes' || id === 'style') openPanel(id);
+                 }} />
+      )}
+      {panel && panel.kind === 'themes' && (
+        <ThemesDrawer closing={panel.closing} cat={themeCat} onCat={setThemeCat}
+                      selected={themeDraft} onPick={setThemeDraft}
+                      onClose={closePanel} onConfirm={commitTheme}
+                      pageAspect={pageAspect}
+                      photo={(cover || []).find(Boolean) || pageThumb(placed, 1) || uploaded[0] || null} />
+      )}
+      {panel && panel.kind === 'style' && (
+        <StyleDrawer closing={panel.closing} value={styleDraft} onChange={setStyleDraft}
+                     summary={styleSummary} onClose={closePanel} onApply={commitStyle} />
+      )}
 
       {(sheet === 'open' || sheet === 'closing') && (
         incoming ? (
@@ -2788,6 +4565,23 @@ function EditorScreen() {
       )}
       </React.Fragment>
       )}
+
+      {tray && (
+        <PhotoTray closing={trayClosing} photos={uploaded} used={usedPhotos}
+                   onClose={closeTray}
+                   title={tray.browse ? 'Your photos' : tray.replace ? 'Replace photo' : undefined}
+                   subtitle={tray.browse && uploaded.length
+                     ? `${uploaded.length} uploaded · ${uploaded.filter(ph => usedPhotos[ph]).length} in your book`
+                     : undefined}
+                   onUpload={() => window.navigation.push('photo-sources.html')}
+                   onPick={ph => {
+                     if (tray.browse) { browsePick(ph); return; }
+                     placePhoto(tray.n, tray.count, tray.i, ph);
+                     closeTray();
+                   }} />
+      )}
+      </BookPaint.Provider>
+      </BookTheme.Provider>
     </div>
   );
 }

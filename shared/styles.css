@@ -12,6 +12,13 @@
   --colour-foreground-fg-grey: #CCCCCC;
   --extended-brand-colours-secondary-300: #62B5B8;
 
+  /* Start + onboarding redesign (Figma 683:3565): the primary went green. Scoped to
+     those four screens for now — the rest of the app still carries the teal above. */
+  --pb-green: #007F70;
+  --pb-green-rim: #00A389;
+  --pb-ink: #023C42;
+  --pb-paper: #F1F6F6;
+
   /* Brand wash — one shared stop list; each screen supplies its own geometry.
      Splash (451:13758): radial-gradient(661.83% 92.48% at 50% 50%, …)
      Onboarding (451:13808): radial-gradient(815.74% 113.98% at 50% 88.68%, …)
@@ -71,6 +78,25 @@
   font-weight: 400 800;
   font-display: block;
   src: url('assets/teachers-variable-latin.woff2') format('woff2');
+}
+
+/* Start + onboarding faces (Figma 683:3565) — Google Fonts (OFL), latin subsets,
+   self-hosted so the PWA still renders them offline. Bricolage Grotesque is a
+   three-axis variable face (the design pins opsz 14 / wdth 100 on its headings). */
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-style: normal;
+  font-weight: 200 800;
+  font-stretch: 75% 100%;
+  font-display: block;
+  src: url('assets/pb-font-bricolage.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Rethink Sans';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: block;
+  src: url('assets/pb-font-rethinksans.woff2') format('woff2');
 }
 
 /* Onboarding display face. Figma specifies "Google Sans Flex", which Google does
