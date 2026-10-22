@@ -257,9 +257,8 @@ const STATUS_CARDS = [
     book: { left: 7, top: 0, width: 46.765, height: 59.827 },
     line1: 'Photo book “Our travel”',
     line2: 'Arriving Thursday 13 June',
-    // Not in the node — the order list on the account screen is the nearest thing
-    // this prototype has to an order-tracking destination.
-    href: 'account.html',
+    // Not in the node — goes to the order tracking screen (M-App Foundations 2114:11296).
+    href: 'order-tracking.html',
     steps: true,
   },
   {

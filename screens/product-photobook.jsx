@@ -345,6 +345,9 @@ function bookConfig(sel) {
     pages: 24,
     total: summarise(sel).total,
     pageW: Number(dim[1]), pageH: Number(dim[2]),
+    // Read by the upgrade page, so a layflat chosen here arrives already selected.
+    layflat: !!sel.layflat,
+    cover: (COVERS.find(c => c.id === sel.cover) || {}).title,
   };
 }
 

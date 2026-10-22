@@ -2296,6 +2296,73 @@ pages 2 and 5. Book view still renders 43 images with 4 wells on page 3, page vi
 layout drawer still shows 3 cards with 12 photos. No page overflow, no failing request,
 no JS error.
 
+### Book preview (3D) — `screens/book-preview.html` + `.jsx`
+Not a Figma node. The editor's Continue arrow now goes **editor → book-preview → editor-review**.
+A CSS-3D book (no WebGL, no dependency), dark like the editor (`BP_BG`). Each leaf is a `preserve-3d`
+div hinged on its left edge with front/back faces; `BpBlock` adds the page-block edges so it has real
+thickness from the side. **Drag orbits** (pitch clamped ±80°, inertia), **pinch / wheel zooms**, a tap
+on the left/right half (or the arrows) turns a page, "Reset view" eases back. Header: Close (→
+`editor-review.html`; →`home.html` when opened from a shared link) and Share (`navigator.share`, else
+copies the link). The share link carries the book in its hash (`#b=…`: page size + `pb_placed`), so it
+works on another device — but only on the same deployment, since photos are relative paths.
+Reads `pb_book`, `pb_placed`, falls back to `pb_uploaded` / sample photos. `pb_layouts` is not drawn.
+
+### Upgrade page — `screens/editor-review.html` + `.jsx` ("Your photo book")
+Rebuilt from a design mock (supersedes the old 451:13721 summary). Flow: editor → book-preview →
+**editor-review** → basket. A hero shows the user's own book in CSS 3D with one scene per upgrade —
+binding (standard pages dip into the spine and swallow the middle of a panorama; layflat lies flat),
+paper (light sweeping across the spread: none on matte, soft on satin, a streak on gloss), gift box
+(book drops in, lid closes; looped keyframes, **no opacity** since it flattens preserve-3d). Scenes auto-cycle until the user touches anything. Rows open
+an option sheet (binding, paper) or toggle (gift); the hero updates live. Choices persist in
+`sessionStorage.pb_upgrades`; prices are invented (`ER_*_ADD`). `product-photobook` now also writes
+`layflat` and `cover` to `pb_book`, so a layflat picked there arrives selected. Loads `brand.jsx` (for
+`PB_DISPLAY`) and `book-preview.jsx` (for `bpBook`). The basket is still hardcoded and ignores upgrades.
+
+### Order placed — `screens/order-success.html` + `.jsx` (handoff option 6a)
+Rebuilt from the "Order confirmation" design handoff, option 6a (supersedes Figma 519:26366), then
+reworked on review: **no beige and no photo cards flying out**. The hero is a deep teal spotlight
+(rotating conic light rays, twinkling sparkles); the customer's book (`bpBook` cover, Moraine Lake
+spread) drops in spinning, lands, turns to face you and opens onto a layflat spread, with a gold halo
+and confetti thrown out of the book (`osThrow`, per-piece `--x/--y`), then a softer confetti rain.
+Below: order details (from `MOCK.order`), share card (`navigator.share`), factory-video card (no video
+yet — the play button only runs the progress bar), support row, and a fixed Track order / Back to home
+bar. Plays **once per order** (`sessionStorage.pb_confirm_played_<number>`): coming back, every
+`.os-once` animation jumps to its end via `[data-os-still]`; reduce-motion also stops the loops and the
+confetti. ⚠️ The handoff's BrandonTextA is **not shipped** — it is commercial and this repo is public —
+so `PB_DISPLAY` stands in; Material Symbols are inline SVGs.
+
+### Order tracking — `screens/order-tracking.html` + `.jsx` (Figma M-App Foundations `2114:11296`)
+Reached from order-placed's "Track your order" (carrying `?items=3`) and home's tracking banner. Teal
+hero (back, order number, arrival date) → status stepper (`2150:16853`; one `current` step, rails
+teal up to it) → "Your order" items, shipping and price accordions → Get help (inert) / Reorder
+(→ product page). The book thumbnail is the customer's cover; the calendar keeps the node's image
+(`ot-thumb-calendar.png`). Names, dates and euros follow `MOCK`, not the node's £ / Emma Carter.
+
+### Home, first-time customer — `screens/home.html` + `home-new.jsx` (handoff "Home New Customer" 3a)
+`home.html` now shows the **new-customer** home; the previous Figma-verified home (order tracker,
+continue editing, memories) is kept as `home-returning.html`, still rendered by `home.jsx`.
+Second pass ("more inspiring, more app-native"), 3a's section order kept:
+- **Immersive hero** — full bleed under the status bar (560 tall), three story slides with progress bars
+  above the copy, 6 s each, tap right/left to skip/back, hold to pause, Ken Burns drift, 36 pt headlines.
+  Hero photos are full-resolution exports (`hn-hero-pool/book/gift.jpg`, ~2400 px wide).
+- **Native chrome** — header floats over the photo (white wordmark, frosted round buttons) and turns into
+  a blurred white bar once scrolled past the hero; content sits on a rounded sheet overlapping the hero.
+- **Live book** (`HnLiveBook`) replaces the photo-access card: a CSS-3D spread that turns a page every
+  ~2.6 s (leaf remounted per spread, `key=idx`, so each turn starts flat); "My photos" grants access
+  (`sessionStorage.pb_photo_access`) and swaps in "your" pages plus suggestion chips.
+- **Collections** are 400-tall swipeable story cards (`scroll-snap`), gifts grid, calendar card, AI field.
+Photos are real Photobox photography from photobox.co.uk, self-hosted as `shared/assets/hn-*.jpg`.
+
+### Home, playful version — `screens/home-playful.html` + `.jsx`
+Second alternative new-customer home (open directly; not linked from the tab bar). A sunny scrapbook: colour-blob
+sky, four **draggable polaroids** with Caveat captions (pointer capture; the entrance animation owns the
+outer transform, so the tilt/scale live on the inner card — an animation with fill `both` would
+otherwise override the drag), bobbing stickers, "shuffle!", jelly CTA → blob product shortcuts →
+**"What's your vibe?"** chips that restyle `HnLiveBook` (pages, cover tint, handwritten title) → taped
+scrapbook collections → tilted product ticker → "Who's it for?" emoji gift picker → speech-bubble AI
+prompt. Type: Teachers + Caveat. Photos mix `hn-*`, `ed-*` (Unsplash, free under the Unsplash License, self-hosted) and the mock
+pool. Loads `home-new.jsx`.
+
 ### Testing a mobile layout in headless Chrome
 `--window-size=375,1366` does **not** give a 375px layout: headless Chrome clamps the
 viewport to a 500px minimum, so the page lays out at 500 and the screenshot merely

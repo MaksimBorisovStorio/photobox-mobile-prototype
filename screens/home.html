@@ -10,7 +10,7 @@
   <link rel="manifest" href="../manifest.json">
   <link rel="stylesheet" href="../shared/styles.css">
   <style>
-    html, body { margin:0; padding:0; background: #F1F6F6; }
+    html, body { margin:0; padding:0; background: #FFFFFF; }
     ::-webkit-scrollbar { display: none; }
   </style>
   <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
@@ -22,9 +22,8 @@
   <script src="../shared/navigation.js"></script>
   <script type="text/babel" src="../shared/ios-frame.jsx"></script>
   <script type="text/babel" src="../shared/brand.jsx"></script>
-  <script type="text/babel" src="../shared/collections.jsx"></script>
   <script type="text/babel" src="../shared/tab-bar.jsx"></script>
-  <script type="text/babel" src="home.jsx"></script>
+  <script type="text/babel" src="home-new.jsx"></script>
   <script type="text/babel">
     function useIsMobile() {
       const [m, setM] = React.useState(() => window.matchMedia('(max-width:519px)').matches);
@@ -39,14 +38,14 @@
     function App() {
       const mobile = useIsMobile();
       if (mobile) return (
-        <div style={{position:'fixed', inset:0, background:'#F1F6F6', overflow:'hidden'}}>
-          <HomeScreen />
+        <div style={{position:'fixed', inset:0, background:'#FFFFFF', overflow:'hidden'}}>
+          <HomeNewScreen />
         </div>
       );
       return (
         <div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',background:'#1C1C1E'}}>
           <IOSDevice width={402} height={874}>
-            <HomeScreen />
+            <HomeNewScreen />
           </IOSDevice>
         </div>
       );

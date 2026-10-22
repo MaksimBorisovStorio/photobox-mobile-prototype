@@ -623,7 +623,7 @@ function Header({ onClose }) {
         </GlassIconButton>
 
         <GlassIconButton label="Continue" tint="transparent" accent={CONTINUE_ACCENT} gloss
-          onClick={() => window.navigation.push('editor-review.html')}>
+          onClick={() => window.navigation.push('book-preview.html')}>
           {icon('pb-editor-next.svg')}
         </GlassIconButton>
       </div>
