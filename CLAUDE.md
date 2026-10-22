@@ -22,10 +22,10 @@ All 13 implementation tasks are done. Branch `feature/prototype-build` is demo-r
 
 | Screen | File | Build Status |
 |--------|------|-------------|
-| Splash | `screens/splash.html` + `splash.jsx` | ✅ Done — **Figma-verified** (node `451:13758`) |
-| Onboarding 1 | `screens/onboarding-1.html` + `.jsx` | ✅ Done, illustration landed — **Figma-verified** (node `451:13808`) |
-| Onboarding 2 | `screens/onboarding-2.html` + `.jsx` | ✅ Done, illustration landed — **Figma-verified** (node `451:13841`) |
-| Onboarding 3 | `screens/onboarding-3.html` + `.jsx` | ✅ Done, illustration landed — **Figma-verified** (node `451:13823`) |
+| Splash | `screens/splash.html` + `splash.jsx` | ✅ Redesigned — **Figma-verified** (node `683:3431`) |
+| Onboarding 1 (welcome) | `screens/onboarding-1.html` + `.jsx` | ✅ Redesigned — full-screen video, **Figma-verified** (node `683:3422`) |
+| Onboarding 2 (photo access) | `screens/onboarding-2.html` + `.jsx` | ✅ Redesigned + animated covers — node `683:3395` |
+| Onboarding 3 (notifications) | `screens/onboarding-3.html` + `.jsx` | ✅ Redesigned + animated notifications — node `683:3412` |
 | Home | `screens/home.html` + `home.jsx` | ✅ Rebuilt end to end — **Figma-verified** against `509:19053`; every section lands on the node's y to <0.1px |
 | Product — Photo Book | `screens/product-photobook.html` + `.jsx` | ✅ Rebuilt — **Figma-verified** (node `406:7183`) |
 | Editor | `screens/editor.html` + `editor.jsx` | ✅ Built — **Figma-verified** (node `451:15574`) |
@@ -45,7 +45,7 @@ All 13 implementation tasks are done. Branch `feature/prototype-build` is demo-r
 
 - **Figma fidelity pass** — query Figma node IDs (see table below) to tighten colors, spacing, typography to exact Figma spec. Screens built from verbal descriptions rather than direct Figma calls due to MCP availability.
 - **Transition polish** — add push/pop slide animations between screens (navigation.js stubs are in place; CSS transitions not yet wired to the iframe-swap mechanism).
-- **Editor tools** — the book view's six are inert except **Arrange**, which opens arrange mode (`451:15148`); page view's eight are inert except **Layout**, which opens the choose-layout drawer (`451:14921`); and the selected-photo row (`451:14611`) is inert except **Back**, which deselects. The card's settings icon and the header's Continue arrow are inert for the same reason.
+- **Editor tools** — the book view's six are inert except **Photos**, **Arrange**, **Themes** and **Style** (see **Book-view tools: Photos, Themes, Style**); **Arrange** opens arrange mode (`451:15148`); page view's are inert except **Layout** (**Covers** on the cover), **Spacing** and **Color**, which opens the choose-layout drawer (`451:14921`); and the selected-photo row (`451:14611`) is inert except **Back**, which deselects. The card's settings icon and the header's Continue arrow are inert for the same reason.
 - **My Photos tab** — superseded: the tab bar is now Home / Projects / Memories / Account
   (`509:19230`). The account screen's "My photos" row points at `photo-sources.html`. If a
   standalone grid distinct from the picker is needed, create `screens/my-photos.html`.
@@ -437,6 +437,83 @@ supplies its own geometry so the same wash can be re-centred per screen:
 ```
 Both sit on a `#EBF7F8` base. Stops come from Figma dev-mode CSS (5 stops); the
 Figma canvas paint has 3 extra mid stops, worth ~Δ9/255 in the mid-band.
+
+### Start flow redesign — green primary (Figma section `683:3565`)
+
+Supersedes the old wash-and-white-pill splash/onboarding (nodes `451:13758`,
+`451:13808`, `451:13841`, `451:13823`). Four 430×883 frames: START SCREEN `683:3431`,
+1st step `683:3422`, 2ND SCREEN `683:3395`, 3RD SCREEN `683:3412`.
+
+**Scope of the green.** `--pb-green #007F70` / `--pb-green-rim #00A389` /
+`--pb-ink #023C42` / `--pb-paper #F1F6F6` are new tokens in `styles.css`, used **only**
+by these four screens. The rest of the app (home, account, editor…) is still on the
+old teal `#007377`; moving it is a separate pass.
+
+**Faces.** Headlines are Bricolage Grotesque (variable, pinned `opsz 14 / wdth 100`),
+buttons Rethink Sans Bold — both Google Fonts, self-hosted latin subsets
+(`pb-font-bricolage.woff2`, `pb-font-rethinksans.woff2`). `OB_HEAD` / `OB_UI` in
+`onboarding-shell.jsx`.
+
+**`shared/onboarding-shell.jsx` was rewritten.** `OnboardingShell`, `GalleryIndicator`
+(the white pill CTA and the dots) are gone. It now exports `ObButton` (primary / light /
+ghost), `OnboardingPrompt` (the light page shared by screens 2 and 3) and
+`obReducedMotion`. ⚠️ Names are `Ob…`/`OB_…` — top-level classic-script declarations
+share one global lexical scope.
+
+**Layout of the light prompt.** Art area is `flex: 1` and the art box (430 wide) is
+centred in it with a per-screen `artBias`; headline is 62px above the buttons; buttons
+are 24px gutters / 8px gap / 32px bottom (or the safe-area inset). ⚠️ The art **scales
+down about its centre** (`artWidth` / `artFit`) on phones too small for it — measured
+with a `ResizeObserver` — so 320×568 doesn't push the notifications off the side or into
+the headline. Scale is 1 at 390×844 and up.
+
+**Welcome (1st step).** Full-bleed media is the node's own 504×1090 box (centred, so the
+crop matches on every phone). `welcome.mp4` plays muted/looping/inline over a poster
+that is the clip's own first frame. The supplied source (2160×4096, 62s, **166MB**) lives
+in the git-ignored `assets/` folder — it is far over GitHub's 100MB limit — and the app
+ships a 720-wide H.264 re-encode (6.4MB): `ffmpeg -an -vf scale=720:-2 -c:v libx264
+-crf 27 -movflags +faststart`. Set `OB1_VIDEO = null` to fall back to the still.
+⚠️ `python3 -m http.server` does not do HTTP Range requests, which Safari needs for
+`<video>` — test video on a real phone against the GitHub Pages URL, not the local server.
+The bottom panel's backdrop blur is two *masked* layers rather than a flat one, so it
+dissolves into the sharp photo instead of leaving a hard top edge.
+
+**Photo access — animated covers.** `OB2_COVERS` is a ring of six covers; three slots
+(`back` / `front` / `next`, taken from the node's numbers) plus `leave` and `wait`.
+Each lap the pills fade, the ring advances (front → back-left, next → front, back-left
+leaves, a parked cover joins), and the pills pop back in with the new cover's place and
+photo count. All three slot boxes share the same aspect, so covers grow/shrink between
+slots without the photo re-cropping. A parked cover has `transition: none` so its jump
+from "just left" to "waiting" is invisible. ⚠️ **Photos and place names are placeholders**
+(existing `pb-src-*` files + Florence) — final covers are coming; edit `OB2_COVERS` only.
+
+**Notifications — animated stack.** Three notifications (the node's delivery one, a
+photo-book-ready and an offer) fill three slots — `front`, `mid` (scale .8475, +49px:
+the node's back card exactly) and `back` — and rotate forever. Each stays in front for
+3s (`OB3_HOLD`). On every lap the front card lifts away (`leave`, 900ms), is parked
+invisibly under the stack (`wait`, `transition: none`, so the jump is unseen) and then
+rises into `back`, while the other two step forward over 1s. With only three cards there
+is no spare to park, which is why the card that just left is also the one that takes the
+back slot — `ob3SlotFor` reads its `stage` (`leaving` → `waiting` → `done`). Measured:
+front card changes every 3.0s, and the back card is visible again ~1s after it left.
+Cards are drawn at the
+node's 387px and scaled by `OB3_FIT` (350/387), so the front card is a visual 350 wide:
+20px of air each side at 390 (the node's own 387 touches both edges on a 390 phone).
+The phone is one 3× WebP (`pb2-phone.webp`) exported from the node;
+it comes out *opaque* with the page colour baked in, which is safe only because that
+colour is the screen's own `#F1F6F6` (sampled at corners and bottom). ⚠️ The node's
+notification type sizes (19.33px Open Sans) don't match its own render — the headline
+measures 232px — so SF Pro is set at 16.7px, which lands on the same widths. The node's
+front card has an unfinished plain-green icon; all cards use the app icon.
+
+**Deliberately inert / simplified:** "Allow Photo access" and "Allow notification" just
+navigate (no real permission prompt in a demo); both "Skip" buttons do the same. Login /
+Sign up and Continue as guest both go to the photo-access screen. Both `prefers-reduced-motion`
+loops hold a composed frame instead of moving.
+
+**Verified** at 390×844, 430×932, 320×568 and the desktop `IOSDevice` frame: render
+compared side by side with the Figma frames, no JS error, full tap-through
+splash → welcome → photo access → notifications → home.
 
 ### Onboarding display font
 Figma specifies **Google Sans Flex**, which Google does not distribute on Google
@@ -1897,6 +1974,73 @@ and stops on release, and the clone is cleared every time. Done returns to the b
 at its former scroll offset. No page overflow on either axis at any width, no failing
 request, and `animation`/`transform` on `<body>` are both still `none`.
 
+#### Book-view tools: Photos, Themes, Style — not in the Figma
+Built from a brainstorm with mocked content; no node exists for any of the three.
+
+- **Photos** opens the existing `PhotoTray` as a browser of the whole upload ("Your
+  photos · N uploaded · M in your book"). A photo already in the book opens page view on
+  the page holding it; one that is not yet goes onto the first empty placeholder (a new
+  spread if there is none) and opens that page.
+- **Themes** — `ThemesDrawer`, the layout drawer's shell with category chips (Travel,
+  Wedding, Family, Kids, Birthday, Year in review, Minimal) and open-spread `ThemeCard`s.
+  A tap previews on the whole book; ✓ commits, ✕ reverts. `THEME_CATEGORIES` holds 21
+  mocked themes: page/left-leaf/well/ink colours, cover title face and copy, a frame
+  shape (`frameStyle`: thin, round, oval, arch, stamp, polaroid) and a sticker on the
+  cover and every fourth page. Faces are only ones `styles.css` already self-hosts, plus
+  the system serif.
+- **Style** — `StyleDrawer`: photos per page (One / A few / Collage), order (Oldest first
+  / Newest first / By name) and look (Grid / Full-bleed / Mixed collage), with an "Apply
+  to whole book" button. `planBook` re-flows every uploaded photo — the first onto the
+  cover — and the whole book previews live above the drawer, page count and price
+  included. A book never drops below the format's page count: too few photos for the
+  density are spread across the minimum, and the summary says "(min.)".
+
+**Last change wins.** Applying a theme keeps every photo on its page (arrays are
+compacted) but rewrites every page layout from its `THEME_LAYOUTS` family and resets
+spacing; applying Style rewrites placement, layouts (cover's kept) and the book-wide
+spacing, and leaves the theme's dressing alone; a page's own Layout overrides either.
+
+⚠️ The dressing reaches every view through the `BookTheme` context, not props —
+`useTheme()` returns `CLASSIC` (exactly the pre-theme colours) when no theme is set.
+Frames and stickers are sized in **container units**, so every parent they render in is
+a `containerType: 'size'` box (Leaf's inner box, `BigLeaf`, `ArrangeLeaf`'s inner box,
+the cover wells). Drop that and they fall back to viewport units and render ~3× too big.
+
+**"Default" removes the theme.** It is the first card in every category row (the
+`CLASSIC` object, drawn as the null draft). Confirming it puts back the book's own
+layouts and spacing from before the first theme, held in `pb_theme_base`. That snapshot
+is taken when a theme goes onto an unthemed book and kept in step with every later
+change made under the theme (Style, a page's Layout or Spacing), so Default returns the
+book as it now is minus the theme. Switching between themes does not re-snapshot.
+
+#### Page view: Covers and Color — not in the Figma
+- **Covers replaces Layout while the cover is in view.** `CoversDrawer` offers the seven
+  `COVER_DESIGNS` (Classic, Full photo, Centred title, Photo & title, Framed, Color band,
+  Round) as miniatures drawn by the real `CoverFront` with the cover's own photo. The
+  title's face, ink and paper come from the theme, so with Default they are plain
+  photo-and-text covers and under a theme they read as that theme's covers. Stored as
+  `pb_cover_design`. `CoverFront` is now the one front-cover renderer for the book view,
+  page view, arrange and the cards; the old "Add text over a well" is the Classic design.
+  In page view the cover's photos are selectable like any page's (`onSelect`/`selected`
+  pass through `CoverUnit` → `CoverFront` → `LayoutWell`), in every design.
+- **Color** is a new page-view tool on every page and the cover (`ColorDrawer`): a swatch
+  row ("Theme" first, which removes the override), "Apply to all pages" and Save, with a
+  live preview. `pb_colors` is keyed by slot plus `'*'`; `'*'` never includes the cover,
+  except that "Also apply to all pages" from the cover sets both. The cover title flips
+  to white/black when a chosen paper's lightness disagrees with the theme's (`inkOn`).
+- Both reach every renderer through a second context, `BookPaint` (`{ colors, cover }`);
+  `PageView` wraps itself in its own provider to preview its drafts.
+- Applying a theme clears `pb_colors` (its paper wins); Default restores them from
+  `pb_theme_base`, which now snapshots colours too.
+
+Storage keys added by these tools, all cleared by the editor's close button: `pb_theme`,
+`pb_theme_base`, `pb_style`, `pb_colors`, `pb_cover_design`.
+
+Verified at 390×844, 320×568 and in the desktop `IOSDevice` frame with 40, 60 and 150
+uploaded photos: theme preview/apply/cancel, Style apply (150 photos → 32 pages as a
+collage, 150 as one per page), tray jump to page view, themed arrange mode; no JS error,
+no horizontal overflow.
+
 #### Header progressive blur — reused from the image picker
 `IOSProgressiveBlur` in `shared/ios-frame.jsx` is the image picker's header effect
 (`image-picker/image-picker.jsx` ~1850) extracted so the editor can share it rather
@@ -2143,6 +2287,17 @@ Two lessons, both now fixed:
   URLs that the worker fetched with normal caching and could not serve offline. The
   prototype only ever looked offline-capable because a warm HTTP cache was doing the
   work.
+
+#### ⚠️ Superseded: the picker now uses a real camera roll
+`image-picker/photos.js` takes its pool from
+github.com/MaksimBorisovStorio/trip-to-canada-photos: 413 photos, the Canada trip
+(5–14 July 2025 by filename, 317) in date order and then the `berlin/` album (96),
+resized with `sips -Z 800 -s formatOptions 40` to `shared/assets/photos/trip/t-001..413.jpg`
+(29MB, ~70KB each). It is walked in order (`(n - 1) % 413`), not by the old stride of
+7, which is not coprime to 413. They are **not** in the SW precache — 29MB on install
+is too much; network-first caches each one as it is viewed. `mock-NN.webp` below is
+still used by `mock-data.js`. ⚠️ The picker's dates still come from its `DATE_PLAN`
+and its title still reads "Trip to Barcelona" (`image-picker.jsx`, frozen).
 
 #### The pool is the design's own photographs
 31 distinct images, all local:
@@ -2575,7 +2730,7 @@ sparkle on its own at any width, with the splash glow layers) and `GlassIconButt
 
 ### service-worker.js
 Precaches every screen HTML + JSX, the shared assets (incl. fonts and splash SVGs),
-manifest.json, the 25 mock photos and the image-picker files. Cache name `photobox-v31`.
+manifest.json, the 25 mock photos and the image-picker files. Cache name `photobox-v47`.
 
 **Strategy: network-first, cache fallback** — and same-origin requests are fetched
 with `cache: 'no-store'`. Both parts are deliberate:
