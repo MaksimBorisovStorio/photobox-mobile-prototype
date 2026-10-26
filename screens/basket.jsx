@@ -8,13 +8,6 @@ function BasketScreen() {
   const [qty, setQty] = React.useState(1);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
 
-  const tealCta = {
-    position: 'relative', height: 72, borderRadius: 32,
-    background: '#007377', border: '1px solid rgba(255,255,255,0.11)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    cursor: 'pointer', transition: 'transform 140ms ease',
-    WebkitTapHighlightColor: 'transparent', boxShadow: 'inset 0 0 20px rgba(255,255,255,0.55)',
-  };
 
   return (
     <div style={{ width: '100%', height: '100%', background: '#F1F6F6', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
@@ -29,9 +22,9 @@ function BasketScreen() {
       {/* Promo savings banner */}
       <div style={{ height: 35, background: '#D9E9EA', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, flexShrink: 0 }}>
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-          <path d="M2 6.5L5.5 10L11 4" stroke="#007377" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M2 6.5L5.5 10L11 4" stroke="#007F70" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
-        <span style={{ fontFamily: BSK_TEXT, fontSize: 12, fontWeight: 700, color: '#007377', whiteSpace: 'nowrap' }}>You&rsquo;re saving €40.00 with SUNSHINE2026</span>
+        <span style={{ fontFamily: BSK_TEXT, fontSize: 12, fontWeight: 700, color: '#007F70', whiteSpace: 'nowrap' }}>You&rsquo;re saving €40.00 with SUNSHINE2026</span>
       </div>
 
       {/* Scrollable content */}
@@ -49,7 +42,7 @@ function BasketScreen() {
               <button
                 onClick={() => setDrawerOpen(true)}
                 {...press(0.9)}
-                style={{ position: 'absolute', top: -5, right: 0, width: 30, height: 30, borderRadius: 15, background: '#F2F2F7', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent' }}
+                style={{ position: 'absolute', top: -5, right: 0, width: 30, height: 30, borderRadius: 15, background: '#F1F6F6', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent' }}
               >
                 <span style={{ fontFamily: BSK_TEXT, fontSize: 14, color: '#8e8e93', letterSpacing: 1, lineHeight: 1 }}>···</span>
               </button>
@@ -69,7 +62,7 @@ function BasketScreen() {
                 <button
                   onClick={() => setQty(q => q + 1)}
                   {...press(0.9)}
-                  style={{ position: 'absolute', left: 61, top: 0, width: 28, height: 28, borderRadius: 14, background: '#007377', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent' }}
+                  style={{ position: 'absolute', left: 61, top: 0, width: 28, height: 28, borderRadius: 14, background: '#007F70', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent' }}
                 >
                   <svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 1v10M1 6h10" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/></svg>
                 </button>
@@ -84,9 +77,9 @@ function BasketScreen() {
         </div>
 
         {/* Promo code box */}
-        <div style={{ margin: '16px 24px 0', height: 90, borderRadius: 12, border: '1px solid #007377', background: '#D9E9EA', position: 'relative', flexShrink: 0 }}>
-          <span style={{ position: 'absolute', left: 13, top: 12, fontFamily: BSK_TEXT, fontSize: 11, fontWeight: 700, color: '#007377' }}>SUNSHINE2026</span>
-          <span style={{ position: 'absolute', right: 13, top: 12, fontFamily: BSK_TEXT, fontSize: 11, fontWeight: 700, color: '#007377' }}>✓ Applied</span>
+        <div style={{ margin: '16px 24px 0', height: 90, borderRadius: 12, border: '1px solid #007F70', background: '#D9E9EA', position: 'relative', flexShrink: 0 }}>
+          <span style={{ position: 'absolute', left: 13, top: 12, fontFamily: BSK_TEXT, fontSize: 11, fontWeight: 700, color: '#007F70' }}>SUNSHINE2026</span>
+          <span style={{ position: 'absolute', right: 13, top: 12, fontFamily: BSK_TEXT, fontSize: 11, fontWeight: 700, color: '#007F70' }}>✓ Applied</span>
           <span style={{ position: 'absolute', left: 13, top: 31, right: 13, fontFamily: BSK_TEXT, fontSize: 12, fontWeight: 600, color: '#333' }}>50% off photo books, wall art and gifts on orders from £25</span>
           <span style={{ position: 'absolute', left: 13, bottom: 12, fontFamily: BSK_TEXT, fontSize: 10, fontWeight: 400, color: '#666' }}>Valid to 00:59, 1 Sep 2026</span>
         </div>
@@ -95,8 +88,8 @@ function BasketScreen() {
         <div style={{ margin: '16px 24px 0', background: '#fff', borderRadius: 24, height: 152, position: 'relative', flexShrink: 0 }}>
           <span style={{ position: 'absolute', left: 16, top: 14, fontFamily: BSK_TEXT, fontSize: 14, fontWeight: 400, color: '#666' }}>Subtotal</span>
           <span style={{ position: 'absolute', right: 16, top: 15, fontFamily: BSK_TEXT, fontSize: 14, fontWeight: 510, color: '#333' }}>€84.99</span>
-          <span style={{ position: 'absolute', left: 16, top: 42, fontFamily: BSK_TEXT, fontSize: 14, fontWeight: 600, color: '#007377' }}>Savings</span>
-          <span style={{ position: 'absolute', right: 16, top: 42, fontFamily: BSK_TEXT, fontSize: 14, fontWeight: 700, color: '#007377' }}>-€40.00</span>
+          <span style={{ position: 'absolute', left: 16, top: 42, fontFamily: BSK_TEXT, fontSize: 14, fontWeight: 600, color: '#007F70' }}>Savings</span>
+          <span style={{ position: 'absolute', right: 16, top: 42, fontFamily: BSK_TEXT, fontSize: 14, fontWeight: 700, color: '#007F70' }}>-€40.00</span>
           <span style={{ position: 'absolute', left: 16, top: 69, fontFamily: BSK_TEXT, fontSize: 14, fontWeight: 400, color: '#666' }}>Delivery</span>
           <span style={{ position: 'absolute', right: 16, top: 69, fontFamily: BSK_TEXT, fontSize: 14, fontWeight: 510, color: '#333' }}>€4.99</span>
           <div style={{ position: 'absolute', left: 16, top: 101, width: 326, height: 1, background: '#ebebeb' }} />
@@ -111,22 +104,13 @@ function BasketScreen() {
         <button
           onClick={() => window.navigation.push('checkout.html')}
           {...press(0.97)}
-          style={{ ...tealCta, width: '100%' }}
+          style={pbButton('primary', { width: '100%' })}
         >
-          <span style={{ fontFamily: BSK_TEACHERS, fontSize: 18, fontWeight: 600, color: '#fff' }}>Go to checkout · €44.99</span>
+          Go to checkout · €44.99
         </button>
       </div>
 
-      {/* Back button */}
-      <button
-        onClick={() => window.navigation.pop()}
-        {...press(0.9)}
-        style={{ position: 'absolute', left: 15, top: 62, padding: 8, borderRadius: 20, background: 'rgba(255,255,255,0.01)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent' }}
-      >
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <path d="M15 19l-7-7 7-7" stroke="#333" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      </button>
+      <PbBackButton style={{ top: `calc(${PB_BACK_TOP} + 6px)` }} />
 
       {/* 3-dots drawer */}
       {drawerOpen && (
@@ -161,9 +145,9 @@ function BasketScreen() {
             <button
               onClick={() => setDrawerOpen(false)}
               {...press(0.97)}
-              style={{ position: 'absolute', top: 346, left: '50%', transform: 'translateX(-50%)', width: 354, height: 72, borderRadius: 32, background: '#EEE', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent' }}
+              style={{ position: 'absolute', top: 346, left: '50%', transform: 'translateX(-50%)', width: 354, ...pbButton('light') }}
             >
-              <span style={{ fontFamily: BSK_TEACHERS, fontSize: 20, fontWeight: 600, color: '#333' }}>Cancel</span>
+              Cancel
             </button>
           </div>
         </div>

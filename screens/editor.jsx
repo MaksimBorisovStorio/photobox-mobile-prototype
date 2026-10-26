@@ -63,6 +63,104 @@ function readIncomingPhotos() {
   }
 }
 
+// pb_groups — `{ cover, groups: [{ title, photos }] }`, written next to pb_photos when an
+// album knows its own chapters (the Trip to Italy flow). Consumed on read like pb_photos.
+// Auto-fill then lays the book out chapter by chapter instead of one photo per page.
+function readIncomingGroups() {
+  try {
+    const raw = sessionStorage.getItem('pb_groups');
+    if (!raw) return null;
+    sessionStorage.removeItem('pb_groups');
+    const o = JSON.parse(raw);
+    return o && Array.isArray(o.groups) && o.groups.length ? o : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Two book-wide settings the Create flow can set:
+//   pb_cover_title — the album's name, shown on the cover wherever the theme's own title is
+//                    the "Add text" placeholder (a theme's own copy still wins).
+//   pb_fit         — "contain": photos keep their own proportions instead of being cropped to
+//                    their slot. The slot then holds the photo at its aspect on plain paper.
+// Read once at load: the editor is always entered by navigation, so the page is fresh.
+const PB_COVER_TITLE = (() => { try { return sessionStorage.getItem('pb_cover_title') || ''; } catch (e) { return ''; } })();
+const PB_FIT = (() => { try { return sessionStorage.getItem('pb_fit') === 'contain'; } catch (e) { return false; } })();
+// How a photo sits in its frame: "cover" fills the frame (cropping), "contain" keeps the photo's own
+// proportions. `mode` is the book-wide default; `over` holds per-photo overrides keyed by the photo's
+// src, set from the page view's Fit control. Persisted as pb_fit / pb_fit_over by EditorScreen.
+const FitContext = React.createContext({ mode: PB_FIT ? 'contain' : 'cover', over: {} });
+const fitOf = (fit, photo) => (photo && fit.over[photo]) || fit.mode;
+const coverTitleOf = t => (t.title === 'Add text' && PB_COVER_TITLE) || t.title;
+
+// A chapter title page is stored in pb_placed as the string "title:<text>", so every
+// place that already treats a page's entry as an opaque value keeps working; only the
+// well that draws it (PhotoWell) and the thumbnail helper need to know.
+const TITLE_PREFIX = 'title:';
+const isTitle = v => typeof v === 'string' && v.startsWith(TITLE_PREFIX);
+
+// Chapter by chapter. Each chapter is a title page followed by its photos spread over
+// two pages (as evenly as it divides: 8 → 4 + 4, 7 → 4 + 3, 2 → 1 + 1), and a blank
+// page (the bare "title:" marker) after it so the next title lands on a right-hand page again — which keeps every
+// chapter's two photo pages together as one spread:
+//   [inside | Title] [A | B] [— | Title] [A | B] …
+// `layouts` is keyed by slot index like pb_layouts (page n is slot n + 1).
+// A page of k photos picks, from the k-photo templates, the one that wastes least paper
+// around the photos' own proportions — two portraits go side by side, a landscape pair
+// stacks — trying every order of the page's photos (k ≤ 4, so at most 24) and preferring
+// the original order on a tie. `wellAspect` is the printable box's width / height.
+function bestLayout(aspects, wellAspect) {
+  const k = aspects.length;
+  const sets = LAYOUTS[Math.min(k, 5)] || LAYOUTS[1];
+  const perms = k <= 4 ? permutations(aspects.map((_, i) => i)) : [aspects.map((_, i) => i)];
+  let best = null;
+  sets.forEach((slots, option) => {
+    if (slots.length !== k) return;
+    perms.forEach((perm, pi) => {
+      let score = 0;
+      slots.forEach((s, i) => {
+        const a = aspects[perm[i]];
+        const sa = (s.w * wellAspect) / s.h;           // the slot's own width / height
+        score += s.w * s.h * Math.min(a / sa, sa / a); // area the photo covers, contained
+      });
+      score -= pi * 1e-3;                              // the original order wins a tie
+      if (!best || score > best.score) best = { score, id: `${Math.min(k, 5)}-${option}`, perm };
+    });
+  });
+  return best || { id: '1-0', perm: aspects.map((_, i) => i) };
+}
+function permutations(a) {
+  if (a.length <= 1) return [a];
+  const out = [];
+  a.forEach((x, i) => permutations(a.slice(0, i).concat(a.slice(i + 1))).forEach(r => out.push([x].concat(r))));
+  return out;
+}
+
+function planGroups(groups, wellAspect) {
+  const placed = [];
+  const layouts = {};
+  const put = (entry, layout) => {
+    placed.push(entry);
+    if (layout) layouts[placed.length + 1] = layout;
+  };
+  groups.forEach((g, k) => {
+    const photos = g.photos.slice();
+    const aspects = (g.aspects || []).slice();
+    while (aspects.length < photos.length) aspects.push(1);
+    const a = Math.ceil(photos.length / 2);
+    put(TITLE_PREFIX + g.title, '1-0');
+    [[photos.slice(0, a), aspects.slice(0, a)], [photos.slice(a), aspects.slice(a)]].forEach(([part, asp]) => {
+      if (!part.length) return;
+      const count = Math.min(part.length, 4);
+      const pick = bestLayout(asp.slice(0, count), wellAspect);
+      const ordered = pick.perm.map(i => part[i]);
+      put(count === 1 ? ordered[0] : ordered, pick.id);
+    });
+    if (k < groups.length - 1) put(TITLE_PREFIX, '1-0');   // the blank page: plain paper, no placeholder
+  });
+  return { placed, layouts };
+}
+
 function readList(key) {
   try {
     const list = JSON.parse(sessionStorage.getItem(key) || '[]');
@@ -201,17 +299,36 @@ function Leaf({ side, photos, onOpen, label, layout, onEmpty, blank, n }) {
 // The theme's frame shape is applied here, so every view that draws a well gets it.
 function PhotoWell({ photo, style, iconSize = 24, index }) {
   const t = useTheme();
+  const fitCtx = React.useContext(FitContext);
+  const contain = fitOf(fitCtx, photo) === 'contain';
+  if (isTitle(photo)) {
+    // A chapter title page: just the paper, with the title set on it. Sized in container
+    // units, so it reads the same on a 164px leaf and a 310px page. With no text it is
+    // the blank page between chapters — plain paper, not an empty photo placeholder.
+    if (photo.length === TITLE_PREFIX.length) return <div aria-hidden style={Object.assign({ flex: 1, minWidth: 0 }, style)} />;
+    return (
+      <div aria-hidden style={Object.assign({
+        position: 'relative', flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center', gap: '5cqw', textAlign: 'center', padding: '0 8cqw',
+        boxSizing: 'border-box', WebkitUserSelect: 'none', userSelect: 'none', color: t.ink || '#2A2A2A',
+      }, style)}>
+        <span style={{ width: '10cqw', height: 2, background: 'currentColor', opacity: .45 }} />
+        <span style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 700, fontSize: '10cqw', lineHeight: 1.1,
+          letterSpacing: '-0.01em' }}>{photo.slice(TITLE_PREFIX.length)}</span>
+      </div>
+    );
+  }
   return (
     <div aria-hidden style={Object.assign({
       position: 'relative', flex: 1, minWidth: 0, overflow: 'hidden',
-      background: t.well,
+      background: photo && contain ? 'transparent' : t.well,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       WebkitUserSelect: 'none', userSelect: 'none',
     }, frameStyle(t, index), style)}>
       {photo ? (
         <img src={photo} alt="" loading="lazy" draggable={false} style={{
           position: 'absolute', inset: 0, width: '100%', height: '100%',
-          objectFit: 'cover', display: 'block', WebkitUserDrag: 'none',
+          objectFit: contain ? 'contain' : 'cover', display: 'block', WebkitUserDrag: 'none',
         }} />
       ) : (
         <img src={`${A}/pb-editor-add-image.svg`} alt="" width={iconSize} height={iconSize}
@@ -705,7 +822,7 @@ function CoverFront({ design, photos, layout, onEmpty, adjust, iconSize, pad, bg
     <span style={Object.assign(titleStyle(t), {
       position: 'absolute', zIndex: 1, lineHeight: 1.2, color: color || ink,
       fontSize: `${10.5 * t.size}cqi`, pointerEvents: 'none',
-    }, style)}>{t.title}</span>
+    }, style)}>{coverTitleOf(t)}</span>
   );
   const centred = { left: '8%', right: '8%', textAlign: 'center' };
   const onPhoto = { color: '#FFFFFF', textShadow: '0 0.4cqi 2cqi rgba(0,0,0,0.45)' };
@@ -759,7 +876,7 @@ function CoverFront({ design, photos, layout, onEmpty, adjust, iconSize, pad, bg
         <span style={Object.assign(titleStyle(t), {
           flex: '0 0 auto', color: ink, fontSize: `${10.5 * t.size}cqi`, lineHeight: 1.25,
           paddingLeft: '1cqi',
-        })}>{t.title}</span>
+        })}>{coverTitleOf(t)}</span>
         <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
           <LayoutWell layout={layout} photos={photos || []} onEmpty={onEmpty}
                       adjust={adjust} iconSize={iconSize}
@@ -1025,8 +1142,8 @@ function coverPhotos(cover, count) {
 // The one photo that stands for a page — a navigator thumbnail, a caption, a clone.
 function pageThumb(placed, n) {
   const entry = n ? placed[n - 1] : null;
-  if (Array.isArray(entry)) return entry.find(Boolean) || null;
-  return entry || null;
+  if (Array.isArray(entry)) return entry.find(v => v && !isTitle(v)) || null;
+  return isTitle(entry) ? null : (entry || null);
 }
 
 // A well subdivided by a layout. It positions itself absolutely inside its parent,
@@ -1363,7 +1480,6 @@ const TOOLS = [
   { id: 'arrange', label: 'Arrange', icon: 'pb-editor-tool-arrange.svg' },
   { id: 'themes',  label: 'Themes',  icon: 'pb-editor-tool-themes.svg' },
   { id: 'style',   label: 'Style',   icon: 'pb-editor-tool-style.svg' },
-  { id: 'ai',      label: 'AI help', icon: 'pb-editor-tool-ai.svg' },
   { id: 'options', label: 'Options', icon: 'pb-editor-options.svg' },
 ];
 
@@ -1396,9 +1512,6 @@ const PV_TOOLS = [
   { id: 'color',    label: 'Color',        icon: 'pb-editor-tool-style.svg' },
   { id: 'stickers', label: 'Stickers',     icon: 'pb-editor-tool-stickers.svg' },
   { id: 'smart',    label: 'Smart Design', icon: 'pb-editor-tool-smartdesign.svg' },
-  // The node's "Ask AI" glyph (icon / Magic tool) exports byte-identical to the book
-  // view's "AI help" icon, so the existing asset is reused rather than duplicated.
-  { id: 'askai',    label: 'Ask AI',       icon: 'pb-editor-tool-ai.svg' },
   { id: 'delete',   label: 'Delete page',  icon: 'pb-editor-tool-delete.svg' },
 ];
 
@@ -1419,10 +1532,10 @@ const SELECTED_TOOLS = [
   { id: 'back',    label: 'Back',    icon: 'pb-editor-sel-back.svg' },
   { divider: true },
   { id: 'replace', label: 'Replace', icon: 'pb-editor-sel-replace.svg' },
+  { id: 'fit',     label: 'Fit',     icon: 'pb-editor-sel-fit.svg' },
   { id: 'edit',    label: 'Edit',    icon: 'pb-editor-sel-edit.svg' },
   { id: 'move',    label: 'Move',    icon: 'pb-editor-sel-move.svg' },
   { id: 'delete',  label: 'Delete',  icon: 'pb-editor-tool-delete.svg' },
-  { id: 'askai',   label: 'Ask AI',  icon: 'pb-editor-tool-ai.svg' },
 ];
 
 function PhotosStackIcon({ photos, count }) {
@@ -1493,6 +1606,33 @@ function Tool({ label, icon, children, onClick }) {
 // drag the strong layers up over the spreads whenever the safe-area inset changes.
 const BLUR_BANDS = [[16, 24, 56], [8, 40, 78], [4, 56, 100], [2, 74, 122], [1, 92, 145]];
 
+// ── The AI button (Figma 410:8563 / 721:2337). "AI help" and "Ask AI" used to be tools in
+// the row; the node floats one 48px glowing button at the right end instead, so it stays put
+// while the tools scroll beneath it. It lives inside Toolbar, so it appears on the book view,
+// the page view and the selected-photo row, and goes with the toolbar when a drawer covers it.
+// Three exported layers, positioned from the node: the 88px glow (the 48px box + 41.67% bleed
+// on every side), the sparkle, and the plus-lighter glint over it. Inert, like the tool it
+// replaces.
+const AI_FAB = 48;
+const AI_FAB_RESERVE = 20 + AI_FAB + 8;   // right margin + button + air — the row's end padding
+const AI_FAB_MASK = 'linear-gradient(to right, #000 0, #000 calc(100% - 180px), rgba(0,0,0,0) calc(100% - 70px))';
+function AiFab({ onClick }) {
+  return (
+    <button type="button" aria-label="AI help" onClick={onClick} {...press(0.92)} style={{
+      position: 'absolute', right: 20, width: AI_FAB, height: AI_FAB, padding: 0, border: 'none', background: 'none',
+      bottom: 'calc(max(37px, calc(env(safe-area-inset-bottom, 0px) + 8px)) + 4px)',
+      cursor: 'pointer', pointerEvents: 'auto', zIndex: 2, transition: 'transform 140ms ease',
+      WebkitTapHighlightColor: 'transparent',
+    }}>
+      <img src={`${A}/pb-editor-fab-glow.svg`} alt="" draggable={false} style={{ position: 'absolute', left: -20, top: -20, width: 88, height: 88, display: 'block', pointerEvents: 'none' }} />
+      <img src={`${A}/pb-editor-fab-star.svg`} alt="" draggable={false} style={{ position: 'absolute', left: '50%', top: 'calc(50% + 0.33px)', width: 32.587, height: 31.334,
+        transform: 'translate(-50%, -50%)', display: 'block', pointerEvents: 'none' }} />
+      <img src={`${A}/pb-editor-fab-glint.svg`} alt="" draggable={false} style={{ position: 'absolute', left: 15.12 - 4.7, top: 6 - 4.7, width: 27.05, height: 44.44,
+        mixBlendMode: 'plus-lighter', display: 'block', pointerEvents: 'none' }} />
+    </button>
+  );
+}
+
 function Toolbar({ photos, tools = TOOLS, gap = 10, padX = 8, onTool }) {
   return (
     <div style={{
@@ -1525,7 +1665,11 @@ function Toolbar({ photos, tools = TOOLS, gap = 10, padX = 8, onTool }) {
         // overflow-y to auto/hidden — it can never be visible — so the row needs
         // matching headroom or the badge is sliced off. Padding-top only: the row is
         // anchored by `bottom`, so the tools do not move.
-        padding: `8px ${padX}px 0`,
+        padding: `8px ${padX + AI_FAB_RESERVE}px 0 ${padX}px`,
+        // The tools dissolve before they reach the AI button. A mask on the row itself, not a
+        // dark overlay: an overlay shows as a black box wherever the toolbar's own background
+        // is still translucent, and the mask leaves the row's edges and badge untouched.
+        maskImage: AI_FAB_MASK, WebkitMaskImage: AI_FAB_MASK,
         overflowX: 'auto', overflowY: 'hidden',
         scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch',
         pointerEvents: 'auto',
@@ -1546,6 +1690,7 @@ function Toolbar({ photos, tools = TOOLS, gap = 10, padX = 8, onTool }) {
           )
         ))}
       </div>
+      <AiFab onClick={onTool && (() => onTool('ai'))} />
     </div>
   );
 }
@@ -2021,6 +2166,183 @@ function PageNavigator({ slots, photoFor, active, onPick, onAdd, itemRefs, botto
 // controls would double up. `controls={false}` renders the scrim alone, and the
 // shorter height is the node's own 93 (its 44 status bar + 49), which is what keeps
 // the blur off the top of the page preview.
+// ── AI assistant sheet — opened by the floating AI button. Half the screen: a chat that greets
+// you, says what it can do and offers starting points as tappable chips, plus an input. It is a
+// scripted mock — replies are canned and keyed off a few words — but two of its suggestions are
+// real: "Fill every frame" and "Keep original proportions" run the same book-wide fit as the
+// page view's Fit control.
+const AI_START = [
+  { id: 'best',   label: 'Pick the best photos' },
+  { id: 'title',  label: 'Suggest a cover title' },
+  { id: 'layout', label: 'Balance my page layouts' },
+  { id: 'fill',   label: 'Fill every frame' },
+  { id: 'fit',    label: 'Keep original proportions' },
+  { id: 'theme',  label: 'Find a theme for this trip' },
+];
+const AI_ANSWERS = {
+  best: { text: 'I looked through your photos. A few of them are near-duplicates — the three splash shots at the beach and the two hotel exteriors — so I would keep the sharpest of each and give the rest less room. Want me to rebalance those chapters?', next: ['layout', 'theme'] },
+  title: { text: 'Here are a few ideas for the cover: “Trip to Italy”, “Two weeks of sun”, or “Our Italian summer”. I like the last one — it sounds like something you would say out loud.', next: ['theme', 'best'] },
+  layout: { text: 'Most pages look balanced. Chapters with two photos could use more air, so I would give those one big photo per page, and keep the grid for the bigger chapters. I can do that for you once layout edits are switched on.', next: ['fill', 'title'] },
+  fill: { text: 'Done — every photo now fills its frame. If one gets cropped in a way you do not like, select it and use Fit to bring its original proportions back.', next: ['fit', 'theme'], action: 'cover' },
+  fit: { text: 'Done — every photo keeps its original proportions, so nothing is cropped. Select a photo and use Fit if you want one to fill its frame instead.', next: ['fill', 'title'], action: 'contain' },
+  theme: { text: 'For a trip like this I would try “Travel” — warm paper, stamps and a little handwriting. Open Themes in the toolbar and I will preview it on your whole book before you commit.', next: ['title', 'best'] },
+  other: { text: 'I can help with photos, layouts, the cover and themes. Try one of the suggestions below, or ask me something like “which photos should I keep?”.', next: ['best', 'title', 'theme'] },
+};
+function aiMatch(text) {
+  const t = text.toLowerCase();
+  if (/title|name|call/.test(t)) return 'title';
+  if (/best|keep|pick|duplicate|select/.test(t)) return 'best';
+  if (/layout|balance|page|space/.test(t)) return 'layout';
+  if (/fill|crop|frame/.test(t)) return 'fill';
+  if (/ratio|original|proportion|fit/.test(t)) return 'fit';
+  if (/theme|style|look|design/.test(t)) return 'theme';
+  return 'other';
+}
+
+function AiSheet({ closing, onClose, photoCount, pageCount, onFitAll }) {
+  const { useState, useRef, useEffect } = React;
+  const [msgs, setMsgs] = useState([]);       // { from: 'ai' | 'me', text, next? }
+  const [typing, setTyping] = useState(false);
+  const [draft, setDraft] = useState('');
+  const endRef = useRef(null);
+  const timers = useRef([]);
+  const later = (fn, ms) => { const t = setTimeout(fn, ms); timers.current.push(t); };
+  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+
+  // The greeting arrives like a reply: a beat of typing, then the message and its starting points.
+  useEffect(() => {
+    setTyping(true);
+    later(() => {
+      setTyping(false);
+      setMsgs([{ from: 'ai', text: `Hi! I’m your photo book assistant ✨ Your book has ${photoCount || 'your'} photos across ${pageCount} pages and it is coming together nicely. Here is what I can help with — tap one to start, or just ask me.`,
+        next: AI_START.map(o => o.id) }]);
+    }, 700);
+  }, []);
+  useEffect(() => { if (endRef.current) endRef.current.scrollIntoView({ block: 'end', behavior: 'smooth' }); }, [msgs, typing]);
+
+  const send = (text, key) => {
+    const clean = text.trim();
+    if (!clean || typing) return;
+    const ans = AI_ANSWERS[key || aiMatch(clean)];
+    // chips are one-shot: answering one takes the chips off the message that offered them
+    setMsgs(m => m.map(x => (x.next ? Object.assign({}, x, { next: null }) : x)).concat({ from: 'me', text: clean }));
+    setDraft('');
+    setTyping(true);
+    later(() => {
+      if (ans.action) onFitAll(ans.action);
+      setTyping(false);
+      setMsgs(m => m.concat({ from: 'ai', text: ans.text, next: ans.next }));
+    }, 1100);
+  };
+
+  const label = id => (AI_START.find(o => o.id === id) || { label: id }).label;
+  const bubble = m => {
+    const mine = m.from === 'me';
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: mine ? 'flex-end' : 'flex-start', gap: 8 }}>
+        <div style={{ maxWidth: '86%', padding: '10px 14px', borderRadius: mine ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+          background: mine ? '#007F70' : '#272727', color: '#fff', fontFamily: TEXT, fontSize: 15, lineHeight: '21px', letterSpacing: '-0.24px' }}>{m.text}</div>
+        {m.next && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, maxWidth: '100%' }}>
+            {m.next.map(id => (
+              <button key={id} type="button" onClick={() => send(label(id), id)} {...press(0.97)} style={{
+                height: 36, padding: '0 14px', borderRadius: 18, border: 'none', cursor: 'pointer', color: '#9BE3DC',
+                background: 'rgba(0,127,112,0.16)', boxShadow: 'inset 0 0 0 1px rgba(155,227,220,0.35)',
+                fontFamily: TEXT, fontSize: 14, fontWeight: 600, letterSpacing: '-0.2px', whiteSpace: 'nowrap',
+                transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent' }}>{label(id)}</button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <ActionSheet closing={closing} minHeight="54%" onDismiss={onClose} labelledBy="pb-ai-title">
+      <div style={{ display: 'flex', flexDirection: 'column', height: '54vh', minHeight: 380, maxHeight: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '16px 16px 10px' }}>
+          <span aria-hidden style={{ width: 32, height: 32, borderRadius: 16, background: '#007F70', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 0 12px rgba(0,163,137,0.55)' }}>
+            <img src={`${A}/pb-editor-fab-star.svg`} alt="" width={18} height={17} style={{ display: 'block' }} />
+          </span>
+          <p id="pb-ai-title" style={{ margin: 0, flex: 1, fontFamily: TEXT, fontSize: 17, fontWeight: 700, color: '#fff', letterSpacing: '-0.3px' }}>AI help</p>
+          <button type="button" aria-label="Close" onClick={onClose} {...press(0.9)} style={{ width: 32, height: 32, borderRadius: 16, border: 'none', cursor: 'pointer',
+            background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, transition: 'transform 140ms ease' }}>
+            <img src={`${A}/pb-editor-close.svg`} alt="" width={20} height={20} style={{ display: 'block' }} />
+          </button>
+        </div>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', scrollbarWidth: 'none', padding: '4px 16px 12px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {msgs.map((m, i) => <React.Fragment key={i}>{bubble(m)}</React.Fragment>)}
+          {typing && (
+            <div aria-label="Assistant is typing" style={{ alignSelf: 'flex-start', padding: '14px 16px', borderRadius: '18px 18px 18px 4px', background: '#272727', display: 'flex', gap: 5 }}>
+              {[0, 1, 2].map(d => <span key={d} style={{ width: 7, height: 7, borderRadius: 4, background: '#9a9a9a', animation: `pbAiDot 1s ${d * 0.15}s infinite ease-in-out` }} />)}
+            </div>
+          )}
+          <div ref={endRef} />
+        </div>
+        <form onSubmit={e => { e.preventDefault(); send(draft); }} style={{ display: 'flex', alignItems: 'center', gap: 8,
+          padding: '8px 16px max(16px, calc(env(safe-area-inset-bottom, 0px) + 8px))' }}>
+          <input value={draft} onChange={e => setDraft(e.target.value)} placeholder="Ask about your book…" aria-label="Message"
+            style={{ flex: 1, height: 44, borderRadius: 22, border: 'none', outline: 'none', padding: '0 16px', boxSizing: 'border-box',
+              background: '#272727', color: '#fff', fontFamily: TEXT, fontSize: 16, letterSpacing: '-0.24px', boxShadow: 'inset 0 0 0 1px #363636' }} />
+          <button type="submit" aria-label="Send" disabled={!draft.trim() || typing} {...press(0.92)} style={{ width: 44, height: 44, borderRadius: 22, border: 'none', cursor: 'pointer',
+            background: '#007F70', opacity: draft.trim() && !typing ? 1 : 0.4, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+            transition: 'transform 140ms ease, opacity 160ms ease' }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5m-6 6 6-6 6 6" /></svg>
+          </button>
+        </form>
+      </div>
+    </ActionSheet>
+  );
+}
+
+// ── Fit control — opens from the selection toolbar's Fit tool. Two choices for the selected
+// photo, "Original ratio" (the whole photo, uncropped) or "Fill frame" (cropped to the slot),
+// and a button that makes the choice the book's default for every page. The segment applies at
+// once — the page behind it shows the result — so there is nothing to confirm.
+function FitPanel({ mode, onMode, onAll, onClose }) {
+  const [done, setDone] = React.useState(false);
+  const seg = (id, label, glyph) => {
+    const on = mode === id;
+    return (
+      <button type="button" onClick={() => { setDone(false); onMode(id); }} aria-pressed={on} {...press(0.97)} style={{
+        flex: 1, height: 44, borderRadius: 12, border: 'none', cursor: 'pointer', padding: '0 8px',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+        background: on ? '#F0F0F0' : 'transparent', color: on ? '#222' : '#DDD',
+        fontFamily: TEXT, fontSize: 15, fontWeight: 600, letterSpacing: '-0.24px', whiteSpace: 'nowrap',
+        transition: 'transform 140ms ease, background 160ms ease', WebkitTapHighlightColor: 'transparent',
+      }}>{glyph}{label}</button>
+    );
+  };
+  // a 1.5 : 1 frame, with the photo either inside it (original) or filling it
+  const frame = filled => (
+    <span aria-hidden style={{ width: 20, height: 14, borderRadius: 2, boxShadow: 'inset 0 0 0 1.5px currentColor',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      <span style={{ width: filled ? 20 : 7, height: filled ? 14 : 10, background: 'currentColor', opacity: .85, borderRadius: 1 }} />
+    </span>
+  );
+  return (
+    <div role="dialog" aria-label="Photo fit" onClick={e => e.stopPropagation()} style={{
+      position: 'absolute', left: 16, right: 16, zIndex: 8,
+      bottom: 'calc(139px + env(safe-area-inset-bottom, 0px) + 6px)',
+      padding: 8, borderRadius: 22, boxSizing: 'border-box',
+      background: 'rgba(32,32,32,0.94)', backdropFilter: 'blur(20px) saturate(140%)', WebkitBackdropFilter: 'blur(20px) saturate(140%)',
+      boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.08), 0 12px 30px rgba(0,0,0,0.5)',
+      display: 'flex', flexDirection: 'column', gap: 8, animation: 'pbFadeIn 160ms ease both',
+    }}>
+      <div style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 16, background: 'rgba(0,0,0,0.45)' }}>
+        {seg('contain', 'Original ratio', frame(false))}
+        {seg('cover', 'Fill frame', frame(true))}
+      </div>
+      <button type="button" {...press(0.97)} onClick={() => { onAll(); setDone(true); }} style={{
+        height: 44, borderRadius: 12, border: 'none', cursor: 'pointer', fontFamily: TEXT, fontSize: 15, fontWeight: 600,
+        letterSpacing: '-0.24px', color: done ? '#9BE3DC' : '#FFFFFF', background: 'rgba(255,255,255,0.1)',
+        transition: 'transform 140ms ease, color 160ms ease', WebkitTapHighlightColor: 'transparent',
+      }}>{done ? '✓ Applied to all pages' : 'Apply to all pages'}</button>
+    </div>
+  );
+}
+
 function PageViewHeader({ onBack, controls = true,
                           height = 'calc(env(safe-area-inset-top, 44px) + 103px)' }) {
   const icon = file => (
@@ -2828,8 +3150,9 @@ function PhotoTray({ closing, photos, used = {}, onPick, onClose, onUpload,
 // puts its top edge at 231.3 against the node's 231.
 function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
                    layouts, onSetLayout, spacings, onSetSpacing, cover, onEmptyTap, onSwapPages, onBack, onAdd,
-                   colors, onSetColor, coverDesignId, onSetCoverDesign }) {
+                   colors, onSetColor, coverDesignId, onSetCoverDesign, fit, onFit, onFitAll, onAi }) {
   const { useState, useRef, useEffect, useLayoutEffect, useMemo } = React;
+  const [fitOpen, setFitOpen] = useState(false);   // the Fit control, open only while a photo is selected
   const slots = useMemo(() => slotsFor(pages), [pages]);
   const [active, setActive] = useState(() => Math.min(startSlot, slots.length - 1));
   // Both dimensions: the strip's band loses its bottom half to the layout drawer, and
@@ -3142,6 +3465,14 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
       ? { id: 'covers', label: 'Covers', icon: 'pb-editor-tool-themes.svg' } : t))
     : PV_TOOLS;
 
+  // The photo under the selection ring, for the Fit control (it keys per-photo overrides).
+  const selSlot = selected ? slots[selected.slot] : null;
+  const selCount = selected ? (layoutFor(selected.slot) || FULL_PAGE).length : 1;
+  const selPhoto = selSlot
+    ? (selSlot.n ? pagePhotos(placed, selSlot.n, selCount, []) : coverPhotos(cover, selCount))[selected.i] || null
+    : null;
+  React.useEffect(() => { if (!selected) setFitOpen(false); }, [selected]);
+
   return (
     <BookPaint.Provider value={paint}>
     <div ref={rootRef} style={{
@@ -3265,8 +3596,10 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
                  tools={selected ? SELECTED_TOOLS : pvTools}
                  gap={selected ? 4 : 8} padX={selected ? 0 : 16}
                  onTool={id => {
+                   if (id === 'ai') { onAi(); return; }
                    if (selected) {
                      if (id === 'back') setSelected(null);
+                     if (id === 'fit') setFitOpen(o => !o);
                      // Replace opens the same tray as an empty placeholder, aimed at the
                      // selected slot; the selection stays on it, now holding the new photo.
                      if (id === 'replace') {
@@ -3280,6 +3613,13 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
                    if (id === 'spacing') openSpacing();
                    if (id === 'color') openColor();
                  }} />
+      )}
+
+      {!drawer && selected && fitOpen && selPhoto && (
+        <FitPanel mode={fitOf(fit, selPhoto)}
+                  onMode={m => onFit(selPhoto, m)}
+                  onAll={() => onFitAll(fitOf(fit, selPhoto))}
+                  onClose={() => setFitOpen(false)} />
       )}
 
       {drawer && kind === 'spacing' && (
@@ -3944,6 +4284,27 @@ function EditorScreen() {
   const { useState, useEffect, useRef, useMemo } = React;
   const [book] = useState(readBook);
   const [incoming] = useState(readIncomingPhotos);
+  const [incomingGroups] = useState(readIncomingGroups);
+  // Photo fit: the book-wide default plus per-photo overrides (see FitContext). "Apply to all
+  // pages" sets the default and drops every override.
+  const [fit, setFit] = useState(() => {
+    let over = {};
+    try { over = JSON.parse(sessionStorage.getItem('pb_fit_over') || '{}') || {}; } catch (e) { /* none */ }
+    return { mode: PB_FIT ? 'contain' : 'cover', over };
+  });
+  // The AI assistant sheet: null / 'open' / 'closing', like the action sheets.
+  const [aiSheet, setAiSheet] = useState(null);
+  const openAi = () => setAiSheet('open');
+  const closeAi = () => { setAiSheet('closing'); setTimeout(() => setAiSheet(null), 320); };
+  const setPhotoFit = (photo, mode) => setFit(f => {
+    const next = { mode: f.mode, over: Object.assign({}, f.over, { [photo]: mode }) };
+    try { sessionStorage.setItem('pb_fit_over', JSON.stringify(next.over)); } catch (e) { /* best-effort */ }
+    return next;
+  });
+  const setAllFit = mode => setFit(() => {
+    try { sessionStorage.setItem('pb_fit', mode); sessionStorage.setItem('pb_fit_over', '{}'); } catch (e) { /* best-effort */ }
+    return { mode, over: {} };
+  });
   const [uploaded] = useState(() => incoming || readList('pb_uploaded'));
   const [placed, setPlaced] = useState(() => readList('pb_placed'));
   const [layouts, setLayouts] = useState(readLayouts);
@@ -4338,6 +4699,7 @@ function EditorScreen() {
   // cover and the rest one per page, so page n holds photo n + 1. A selection longer
   // than the book grows it by whole spreads, priced like any other added spread.
   const autoFill = () => {
+    if (incomingGroups) { autoFillGroups(); return; }
     const rest = incoming.slice(1);
     setPlaced(rest);
     sessionStorage.setItem('pb_placed', JSON.stringify(rest));
@@ -4348,6 +4710,27 @@ function EditorScreen() {
       return arr;
     });
     const needed = Math.ceil((rest.length - book.pages) / 2);
+    if (needed > 0) setAdded(a => Math.max(a, needed));
+    dismissSheet();
+  };
+
+  // The chapter flow: titles, then each chapter's photos two pages at a time. See planGroups.
+  // The cover takes the album's own cover photo; the book grows by whole spreads to fit.
+  const autoFillGroups = () => {
+    // printable box of one page: the book's page proportions, less PV_WELL's margins
+    const wellAspect = (book.pageW / book.pageH) * (1 - 0.04937 - 0.04887) / (1 - 0.05456 - 0.05154);
+    const plan = planGroups(incomingGroups.groups, wellAspect);
+    setPlaced(plan.placed);
+    sessionStorage.setItem('pb_placed', JSON.stringify(plan.placed));
+    setLayouts(plan.layouts);
+    sessionStorage.setItem('pb_layouts', JSON.stringify(plan.layouts));
+    setCover(prev => {
+      const arr = coverPhotos(prev, Math.max(1, prev.length));
+      arr[0] = incomingGroups.cover || incomingGroups.groups[0].photos[0];
+      sessionStorage.setItem('pb_cover', JSON.stringify(arr));
+      return arr;
+    });
+    const needed = Math.ceil((plan.placed.length - book.pages) / 2);
     if (needed > 0) setAdded(a => Math.max(a, needed));
     dismissSheet();
   };
@@ -4416,6 +4799,7 @@ function EditorScreen() {
         @keyframes pbScrimIn  { from { opacity: 0; } to { opacity: 1; } }
         @keyframes pbScrimOut { from { opacity: 1; } to { opacity: 0; } }
         @keyframes pbFadeIn   { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes pbAiDot    { 0%, 80%, 100% { opacity: .3; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
         .pb-range { -webkit-appearance: none; appearance: none; width: 100%; height: 28px;
           margin: 0; background: transparent; touch-action: pan-y; }
         .pb-range::-webkit-slider-runnable-track { height: 16px; border-radius: 8px;
@@ -4433,6 +4817,7 @@ function EditorScreen() {
       `}</style>
 
       <BookTheme.Provider value={bookTheme}>
+      <FitContext.Provider value={fit}>
       <BookPaint.Provider value={{ colors: v.colors, cover: coverDesignId }}>
       {arrange ? (
         <ArrangeView
@@ -4451,6 +4836,7 @@ function EditorScreen() {
           startSlot={pageView} onBack={() => setPageView(null)}
           colors={colors} onSetColor={setColor}
           coverDesignId={coverDesignId} onSetCoverDesign={setCoverDesign}
+          fit={fit} onFit={setPhotoFit} onFitAll={setAllFit} onAi={openAi}
           onAdd={() => setAdded(n => n + 1)}
         />
       ) : (
@@ -4520,7 +4906,7 @@ function EditorScreen() {
         // photo picker is not leaving: only this button resets.) pb_book stays — it is
         // the product page's choice, not the editor's content.
         try {
-          ['pb_placed', 'pb_uploaded', 'pb_photos', 'pb_layouts', 'pb_spacing', 'pb_cover',
+          ['pb_placed', 'pb_uploaded', 'pb_photos', 'pb_groups', 'pb_cover_title', 'pb_fit', 'pb_layouts', 'pb_spacing', 'pb_cover',
            'pb_theme', 'pb_theme_base', 'pb_style', 'pb_colors', 'pb_cover_design']
             .forEach(k => sessionStorage.removeItem(k));
           sessionStorage.setItem('pb_nav', 'pop');
@@ -4532,6 +4918,7 @@ function EditorScreen() {
       {!panel && (
         <Toolbar photos={uploaded}
                  onTool={id => {
+                   if (id === 'ai') openAi();
                    if (id === 'arrange') openArrange();
                    if (id === 'photos') setTray({ browse: true });
                    if (id === 'themes' || id === 'style') openPanel(id);
@@ -4566,6 +4953,11 @@ function EditorScreen() {
       </React.Fragment>
       )}
 
+      {aiSheet && (
+        <AiSheet closing={aiSheet === 'closing'} onClose={closeAi}
+                 photoCount={uploaded.length} pageCount={pages} onFitAll={setAllFit} />
+      )}
+
       {tray && (
         <PhotoTray closing={trayClosing} photos={uploaded} used={usedPhotos}
                    onClose={closeTray}
@@ -4581,6 +4973,7 @@ function EditorScreen() {
                    }} />
       )}
       </BookPaint.Provider>
+      </FitContext.Provider>
       </BookTheme.Provider>
     </div>
   );

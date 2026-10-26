@@ -17,7 +17,7 @@
 const OT_A = '../shared/assets';
 const OT_TEXT = '-apple-system, "SF Pro Text", system-ui, sans-serif';
 const OT_DISPLAY = '-apple-system, "SF Pro Display", system-ui, sans-serif';
-const OT_TEAL = '#007377';
+const OT_TEAL = '#007F70';
 const OT_INK = '#333';
 const OT_GREY = '#777';
 const OT_LINE = '#DDD';
@@ -141,13 +141,10 @@ function OtPriceRow({ label, value, strong }) {
   );
 }
 
-function OtButton({ children, onClick }) {
+function OtButton({ children, onClick, kind = 'light' }) {
   return (
-    <button onClick={onClick} {...press(0.97)} style={{
-      flex: 1, height: 40, borderRadius: 4, border: `2px solid ${OT_TEAL}`, background: '#fff', color: OT_TEAL,
-      fontFamily: OT_TEXT, fontSize: 16, fontWeight: 600, letterSpacing: '-0.32px', cursor: 'pointer',
-      transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
-    }}>{children}</button>
+    <button onClick={onClick} {...press(0.97)} style={pbButton(kind, { flex: 1,
+      ...(kind === 'light' ? { background: '#fff', border: `1px solid ${PB_GREEN}`, color: PB_GREEN } : null) })}>{children}</button>
   );
 }
 
@@ -172,17 +169,13 @@ function OrderTrackingScreen() {
   const delivery = 4.99;
 
   return (
-    <div style={{ width: '100%', height: '100%', background: '#fff', display: 'flex', flexDirection: 'column',
+    <div style={{ width: '100%', height: '100%', background: PB_PAPER, display: 'flex', flexDirection: 'column',
       position: 'relative', overflow: 'hidden' }}>
       {/* Hero — 2114:11297 */}
       <div style={{ background: OT_TEAL, flexShrink: 0 }}>
         <IOSStatusBar dark />
         <div style={{ padding: '8px 16px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <button onClick={() => window.navigation.pop()} aria-label="Back" {...press(0.9)} style={{
-            width: 40, height: 40, borderRadius: 20, border: 'none', background: '#fff', padding: 0, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 140ms ease',
-            WebkitTapHighlightColor: 'transparent',
-          }}><OtChevron dir="left" color={OT_TEAL} /></button>
+          <PbBackButton style={{ position: 'relative', left: 0, top: 0 }} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, color: '#fff' }}>
             <span style={{ fontFamily: OT_TEXT, fontSize: 13, fontWeight: 600, lineHeight: '18px', letterSpacing: '-0.08px', opacity: 0.85 }}>
               Order {order.number}
@@ -235,7 +228,7 @@ function OrderTrackingScreen() {
       <div style={{ flexShrink: 0, display: 'flex', gap: 12, padding: `16px 16px calc(16px + env(safe-area-inset-bottom, 0px))`,
         borderTop: `1px solid ${OT_LINE}`, background: '#fff' }}>
         <OtButton>Get help</OtButton>
-        <OtButton onClick={() => window.navigation.push('product-photobook.html')}>Reorder</OtButton>
+        <OtButton kind="primary" onClick={() => window.navigation.push('product-photobook.html')}>Reorder</OtButton>
       </div>
     </div>
   );

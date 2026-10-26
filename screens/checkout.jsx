@@ -49,7 +49,7 @@ function CheckoutScreen() {
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
       }}>
         <img src={`${CKO_A}/pb-basket-promo-check.svg`} alt="" width={13} height={13} />
-        <span style={{ fontFamily: CKO_TEXT, fontSize: 12, fontWeight: 700, color: '#007377' }}>
+        <span style={{ fontFamily: CKO_TEXT, fontSize: 12, fontWeight: 700, color: '#007F70' }}>
           You're saving €40.00 with SUNSHINE2026
         </span>
       </div>
@@ -118,8 +118,8 @@ function CheckoutScreen() {
             <span style={{ fontFamily: CKO_TEXT, fontSize: 14, fontWeight: 510, color: '#333' }}>€84.99</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14 }}>
-            <span style={{ fontFamily: CKO_TEXT, fontSize: 14, fontWeight: 600, color: '#007377' }}>Savings</span>
-            <span style={{ fontFamily: CKO_TEXT, fontSize: 14, fontWeight: 700, color: '#007377' }}>€40.00</span>
+            <span style={{ fontFamily: CKO_TEXT, fontSize: 14, fontWeight: 600, color: '#007F70' }}>Savings</span>
+            <span style={{ fontFamily: CKO_TEXT, fontSize: 14, fontWeight: 700, color: '#007F70' }}>€40.00</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14 }}>
             <span style={{ fontFamily: CKO_TEXT, fontSize: 14, fontWeight: 400, color: '#666' }}>Delivery</span>
@@ -133,23 +133,7 @@ function CheckoutScreen() {
         </div>
       </div>
 
-      {/* Back button — same position as basket (top:62 = IOSStatusBar height) */}
-      <button
-        onClick={() => window.navigation.pop()}
-        onPointerDown={e => e.currentTarget.style.transform = 'scale(0.9)'}
-        onPointerUp={e => e.currentTarget.style.transform = 'scale(1)'}
-        onPointerLeave={e => e.currentTarget.style.transform = 'scale(1)'}
-        style={{
-          position: 'absolute', left: 15, top: 62,
-          padding: 8, borderRadius: 20,
-          background: 'rgba(255,255,255,0.01)', border: 'none',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'pointer', transition: 'transform 140ms ease',
-          WebkitTapHighlightColor: 'transparent', zIndex: 3,
-        }}
-      >
-        <img src={`${CKO_A}/pb-icon-back-teal.svg`} alt="" width={24} height={24} style={{ display: 'block' }} />
-      </button>
+      <PbBackButton style={{ top: `calc(${PB_BACK_TOP} + 6px)` }} />
 
       {/* Fixed CTA */}
       <div style={{
@@ -162,14 +146,7 @@ function CheckoutScreen() {
           onPointerDown={e => e.currentTarget.style.transform = 'scale(0.97)'}
           onPointerUp={e => e.currentTarget.style.transform = 'scale(1)'}
           onPointerLeave={e => e.currentTarget.style.transform = 'scale(1)'}
-          style={{
-            width: '100%', height: 72, borderRadius: 32,
-            background: '#007377', border: '1px solid rgba(255,255,255,0.11)',
-            color: '#fff', fontFamily: CKO_TEACHERS, fontSize: 18, fontWeight: 600,
-            boxShadow: 'inset 0 0 20px rgba(255,255,255,0.55)',
-            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
-          }}
+          style={pbButton('primary', { width: '100%' })}
         >
           Place order · €44.99
         </button>

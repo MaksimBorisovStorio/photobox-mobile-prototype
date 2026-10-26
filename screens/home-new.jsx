@@ -21,9 +21,9 @@
 
 const HN_A = '../shared/assets';
 const HN_FONT = PB_DISPLAY;
-const HN_TEAL = '#007377';
-const HN_DEEP = '#004B53';
-const HN_MINT = '#EDF5F6';
+const HN_TEAL = '#007F70';
+const HN_DEEP = '#023C42';
+const HN_MINT = '#F1F6F6';   // home's page is clean white, so its cards and fields take the paper tone
 const HN_PEACH = '#FACC98';
 const HN_EASE = 'cubic-bezier(.2,.8,.2,1)';
 const HN_HERO_H = 560;
@@ -33,33 +33,72 @@ const HN_SLIDES = [
   { img: 'hn-hero-pool.jpg', pos: '44% 35%', tag: 'Photo books',
     head: 'Some moments deserve more than a camera roll', sub: 'Turn this summer into a book you can hold.',
     cta: 'Create your photo book', href: 'product-photobook.html' },
-  { img: 'hn-hero-book.jpg', pos: '58% 45%', tag: 'Made together',
-    head: 'The book they’ll ask to read again', sub: 'Your family’s story, page after page.',
-    cta: 'Start a photo book', href: 'product-photobook.html' },
+  // Figma 714:1821 — the month-recap calendar art (opaque 1080×1920 export)
+  { img: 'hn-hero-recap.jpg', pos: '50% 50%', tag: 'Month recap',
+    head: 'Your May, ready to hang on the wall', sub: 'We turned your month into a photo calendar.',
+    cta: 'Make my calendar', href: 'product-photobook.html' },
   { img: 'hn-hero-gift.jpg', pos: '44% 50%', tag: 'Gifts',
     head: 'The gift they’ll keep forever', sub: 'Wrapped in our keepsake gift box.',
     cta: 'Find a gift' },
 ];
 
+// Figma 700:6365 — product cut-outs over 100px circles. `art` is each image's box in
+// px relative to its circle's top-left, lifted from the node: the products break out
+// of the circle on purpose (the mug's handle, the jigsaw piece, the card's corner).
+// `crop` is the node's own fill offset inside that box, in %; `rot`/`iw`/`ih` a rotated
+// layer drawn centred in its bounding box, as Figma lays it out.
+// The circle colours are not the node's (it mixes grey, blue, pink and green); they are
+// soft tints of the page's own teal, peach and mint, alternated so neighbours differ.
 const HN_PRODUCTS = [
-  { name: 'Photo books', img: 'hn-card-1.jpg', pos: '64% 62%', zoom: 1.9, href: 'product-photobook.html' },
-  { name: 'Calendars', img: 'hn-calendar.jpg', pos: '16% 40%', zoom: 1.6 },
-  { name: 'Wall art', img: 'hn-hero-wall.jpg', pos: '47% 30%', zoom: 1.7 },
-  { name: 'Photo prints', img: 'create-prints.png', pos: '50% 50%', zoom: 1.15 },
-  { name: 'Cards', icon: 'card' },
-  { name: 'Mugs', img: 'create-mugs.png', pos: '50% 50%', zoom: 1.2 },
-  { name: 'Photo blocks', img: 'hn-card-2.jpg', pos: '71% 16%', zoom: 2.6 },
-  { name: 'Magnets', icon: 'magnet' },
-  { name: 'Jigsaws', img: 'hn-card-2.jpg', pos: '78% 72%', zoom: 1.9 },
-  { name: 'Cushions', img: 'idea-cushion.png', pos: '50% 50%', zoom: 1.4 },
+  { name: 'Photo books', href: 'product-photobook.html', bg: '#DDF0EC', badge: '50%',
+    art: { src: 'hp-photobook.png', left: 10, top: 8, w: 83, h: 83 } },
+  { name: 'Wall decor', bg: '#F8E3E1',
+    art: { src: 'hp-walldecor.png', left: 16, top: 6, w: 65, h: 89,
+           crop: { left: -6.51, top: -7.37, w: 188.39, h: 146.32 } } },
+  { name: 'Calendars', bg: '#DFEDF4',
+    art: { src: 'hp-calendar.png', left: 18, top: 3, w: 65, h: 90,
+           crop: { left: -16.44, top: -1.14, w: 123.29, h: 118.95 } } },
+  { name: 'Photo prints', bg: '#FCE7CF',
+    art: { src: 'hp-prints.png', left: 5, top: 12, w: 91, h: 82 } },
+  { name: 'Mugs', bg: '#DDF0EC',
+    art: { src: 'hp-mug.png', left: -9, top: -3, w: 112, h: 105,
+           crop: { left: 1.91, top: -8.12, w: 96.17, h: 113.48 } } },
+  { name: 'Cards', bg: '#FAF0CD',
+    art: { src: 'hp-card.png', left: 16.79, top: -3.45, w: 66.428, h: 99.897,
+           rot: 5.24, iw: 58, ih: 95, fill: true } },
+  { name: 'Magnets', bg: '#DFEDF4',
+    art: { src: 'hp-magnet.png', left: 1, top: 0, w: 102, h: 102 } },
+  { name: 'Jigsaw', bg: '#FCE7CF',
+    art: { src: 'hp-jigsaw.png', left: -10.09, top: -11.09, w: 123.745, h: 123.745,
+           rot: -84.1, iw: 112.748, ih: 112.748 } },
+  { name: 'Cushions', bg: '#F8E3E1',
+    art: { src: 'hp-cushion.png', left: 0, top: -3, w: 101, h: 102,
+           crop: { left: -27.87, top: -25.52, w: 155.75, h: 154.14 } } },
+  { name: 'Photo blocks', bg: '#FAF0CD',
+    art: { src: 'hp-photoblock.png', left: 0, top: 11, w: 98, h: 80,
+           crop: { left: -14.92, top: -29.39, w: 129.83, h: 158.78 } } },
 ];
+const HN_CIRCLE = 100;
+// The node's row is drawn at 100px; scaled so three and a half products fit a 390
+// phone. The art keeps the node's own px and the whole circle is scaled as one, so
+// every image stays exactly where the design puts it.
+const HN_PRODUCT_SCALE = 0.84;
 
 const HN_COLLECTIONS = [
-  { name: 'Trip books', line: 'Every journey, bound to last', offer: '50% off', img: 'hn-trip.jpg', pos: '70% 50%', href: 'product-photobook.html' },
+  { name: 'Trip books', line: 'Every journey, bound to last', offer: '50% off', img: 'hn-trip-books.jpg', pos: '50% 50%', href: 'product-photobook.html' },
   { name: 'Christmas', line: 'Gifts that upstage the tree', offer: '50% off', img: 'hn-card-5.jpg', pos: '55% 50%' },
   { name: 'Wedding', line: 'Your big day, kept forever', img: 'hn-card-7.jpg', pos: '78% 40%' },
   { name: "Baby's first year", line: 'Keepsakes for growing families', img: 'hn-christmas.jpg', pos: '50% 50%' },
   { name: 'Year books', line: 'Your year in one book', img: 'hn-yearbook.jpg', pos: '50% 50%', href: 'product-photobook.html' },
+];
+
+// Memories — moments pulled from the camera roll, shown as portrait story cards.
+const HN_MEMORIES = [
+  { name: 'Italy', line: '64 photos · Sep 2026', img: 'mem-tile-italy.jpg', pos: '50% 40%', href: 'memory-detail.html' },
+  { name: 'Canada', line: '42 photos · Jul 2026', img: 'pb-src-canada.jpg', pos: '50% 50%' },
+  { name: 'Düsseldorf', line: '19 photos · Aug 2026', img: 'mem-tile-dusseldorf.jpg', pos: '50% 50%' },
+  { name: 'Germany', line: '31 photos · Jun 2026', img: 'mem-tile-germany.jpg', pos: '50% 50%' },
+  { name: 'Cappadocia', line: '27 photos · May 2026', img: 'pb-src-cappadocia.jpg', pos: '50% 50%' },
 ];
 
 const HN_GIFTS = [
@@ -72,12 +111,20 @@ const HN_GIFTS = [
 // The live book's pages: sample travel photos before access, "yours" after.
 const HN_SAMPLE_PAGES = ['photos/mock-01.webp', 'pb-src-italy.jpg', 'photos/mock-09.webp', 'ob-album-photo.jpg',
   'photos/mock-03.webp', 'pb-src-etna.jpg', 'pb-src-guadalupe.jpg', 'photos/mock-19.webp'];
-const HN_YOUR_PAGES = ['pb-src-canada.jpg', 'ob-album-photo.jpg', 'photos/mock-15.webp', 'photos/mock-08.webp',
-  'photos/mock-12.webp', 'photos/mock-19.webp', 'photos/mock-01.webp', 'pb-src-italy.jpg'];
-const HN_SUGGESTIONS = [
-  { name: 'Trip to Canada', line: '42 photos · trip book', img: 'pb-src-canada.jpg' },
-  { name: 'Summer 2026', line: '28 photos · collage', img: 'photos/mock-09.webp' },
-  { name: 'Your 2026', line: '312 photos · year book', img: 'photos/mock-01.webp' },
+// Recent collections the book can be made from — the first is what's recommended.
+const HN_RECENT = [
+  { id: 'italy', name: 'Trip to Italy', line: '64 photos · 12–19 Sep', img: 'pb-src-italy.jpg',
+    pages: ['pb-src-italy.jpg', 'mem-tile-italy.jpg', 'photos/mock-09.webp', 'mem-tile-italy2.jpg',
+      'pb-src-etna.jpg', 'photos/mock-03.webp', 'photos/mock-01.webp', 'ob-album-photo.jpg'] },
+  { id: 'canada', name: 'Trip to Canada', line: '42 photos · 5–14 Jul', img: 'pb-src-canada.jpg',
+    pages: ['pb-src-canada.jpg', 'photos/mock-15.webp', 'photos/mock-08.webp', 'photos/mock-12.webp',
+      'photos/mock-19.webp', 'photos/mock-01.webp', 'photos/mock-21.webp', 'pb-src-cappadocia.jpg'] },
+  { id: 'berlin', name: 'Berlin weekend', line: '28 photos · Aug', img: 'pb-src-berlin.jpg',
+    pages: ['pb-src-berlin.jpg', 'photos/mock-05.webp', 'photos/mock-11.webp', 'photos/mock-07.webp',
+      'photos/mock-17.webp', 'photos/mock-02.webp', 'photos/mock-14.webp', 'photos/mock-23.webp'] },
+  { id: 'summer', name: 'Summer 2026', line: '312 photos · year book', img: 'photos/mock-09.webp',
+    pages: ['photos/mock-09.webp', 'pb-src-guadalupe.jpg', 'photos/mock-04.webp', 'photos/mock-16.webp',
+      'photos/mock-06.webp', 'pb-src-etna.jpg', 'photos/mock-20.webp', 'photos/mock-10.webp'] },
 ];
 
 const HN_CSS = `
@@ -183,10 +230,8 @@ function HnHero() {
         <span style={{ fontFamily: HN_FONT, fontSize: 16, lineHeight: 1.35, opacity: .9, animation: `hnUp .8s ${HN_EASE} .16s both` }}>{s.sub}</span>
         <button onPointerDown={e => e.stopPropagation()} onPointerUp={e => e.stopPropagation()}
           onClick={hnGo(s.href)} {...press(0.97)} style={{
-          marginTop: 6, alignSelf: 'flex-start', height: 50, padding: '0 22px', borderRadius: 25, border: 'none',
-          background: '#fff', color: HN_DEEP, fontFamily: HN_FONT, fontSize: 16, fontWeight: 700, cursor: 'pointer',
-          display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 10px 24px -8px rgba(0,0,0,.45)',
-          transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent', animation: `hnUp .8s ${HN_EASE} .24s both`,
+          ...pbButton('light', { background: '#fff', border: '1px solid #fff', color: PB_INK, marginTop: 6, alignSelf: 'flex-start',
+            gap: 6, boxShadow: '0 10px 24px -8px rgba(0,0,0,.45)', animation: `hnUp .8s ${HN_EASE} .24s both` }),
         }}>{s.cta}<HnIcon name="right" size={18} /></button>
       </div>
       {/* story bars, above the copy so they never crowd the header */}
@@ -243,7 +288,7 @@ function HnLiveBook({ pages }) {
         <div style={{ position: 'absolute', left: -PW * 1.15, top: -PH * 0.62, width: PW * 2.3, height: PH * 1.3, transform: 'translateZ(-12px)',
           background: 'radial-gradient(closest-side, rgba(0,30,32,.45), rgba(0,30,32,0))' }} />
         <div style={{ position: 'absolute', left: -PW - 5, top: -PH / 2 - 5, width: 2 * PW + 10, height: PH + 10, transform: 'translateZ(-6px)',
-          background: '#00383D', borderRadius: 4 }} />
+          background: '#023C42', borderRadius: 4 }} />
         <div style={{ position: 'absolute', left: -PW - 1, top: -PH / 2 - 1, width: 2 * PW + 2, height: PH + 2, transform: 'translateZ(-3px)',
           background: 'repeating-linear-gradient(0deg, #f6f3ec 0 1px, #dcd7cc 1px 2px)' }} />
         {page(cur.l, 'l', { left: -PW, top: -PH / 2 })}
@@ -262,77 +307,117 @@ function HnLiveBook({ pages }) {
 }
 
 function HnBookMoment() {
-  const [granted, setGranted] = React.useState(() => {
-    try { return sessionStorage.getItem('pb_photo_access') === '1'; } catch (e) { return false; }
-  });
-  const allow = () => { try { sessionStorage.setItem('pb_photo_access', '1'); } catch (e) {} setGranted(true); };
-  const pages = granted ? HN_YOUR_PAGES : HN_SAMPLE_PAGES;
+  const [sel, setSel] = React.useState(0);
+  const col = HN_RECENT[sel];
+  const make = () => {
+    try { sessionStorage.setItem('pb_collection', col.id); } catch (e) {}
+    hnGo('product-photobook.html')();
+  };
   return (
     <div style={{ margin: '28px 16px 0', borderRadius: 28, overflow: 'hidden', position: 'relative',
-      background: 'radial-gradient(140% 90% at 50% 20%, #13A3A0 0%, #007377 42%, #00454C 100%)', color: '#fff',
+      background: 'radial-gradient(140% 90% at 50% 20%, #00A389 0%, #007F70 42%, #02514A 100%)', color: '#fff',
       boxShadow: '0 20px 40px -18px rgba(0,60,62,.6)' }}>
       <div style={{ padding: '22px 20px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: HN_FONT, fontSize: 12, fontWeight: 700,
           letterSpacing: '.14em', color: '#9BE3DC' }}>
-          <HnIcon name="spark" size={14} />{granted ? 'MADE FROM YOUR PHOTOS' : 'IMAGINE IT AS A BOOK'}
+          <HnIcon name="spark" size={14} />{sel === 0 ? 'READY FOR A BOOK' : 'FROM YOUR RECENT COLLECTIONS'}
         </span>
-        <span style={{ fontFamily: HN_FONT, fontSize: 26, fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.4px' }}>
-          {granted ? 'Your trip to Canada, already laid out' : 'Your camera roll, beautifully bound'}
+        <span key={col.id} style={{ fontFamily: HN_FONT, fontSize: 26, fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.4px',
+          animation: `hnPop .45s ${HN_EASE} both` }}>
+          {col.name}, already laid out
         </span>
       </div>
-      <HnLiveBook pages={pages} />
+      <HnLiveBook pages={col.pages} />
       <div style={{ padding: '0 20px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={{ display: 'flex', gap: 14, fontFamily: HN_FONT, fontSize: 13, opacity: .92 }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><HnIcon name="wand" size={16} />We design it for you</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><HnIcon name="wand" size={16} />Ready for your creativity</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><HnIcon name="truck" size={16} />At your door in days</span>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={hnGo('product-photobook.html')} {...press(0.97)} style={{
-            flex: 1, height: 50, borderRadius: 25, border: 'none', background: '#fff', color: HN_DEEP, fontFamily: HN_FONT,
-            fontSize: 16, fontWeight: 700, whiteSpace: 'nowrap', cursor: 'pointer', transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
-          }}>Make this book</button>
-          {!granted && (
-            <button onClick={allow} {...press(0.97)} style={{
-              height: 50, padding: '0 16px', borderRadius: 25, border: 'none', background: 'rgba(255,255,255,.16)', color: '#fff',
-              boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.35)', fontFamily: HN_FONT, fontSize: 15, fontWeight: 700, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: 6, transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
-            whiteSpace: 'nowrap' }}><HnIcon name="photos" size={18} />My photos</button>
-          )}
-        </div>
-        {granted && (
-          <div style={{ display: 'flex', gap: 10, overflowX: 'auto', scrollbarWidth: 'none', margin: '2px -20px 0', padding: '0 20px' }}>
-            {HN_SUGGESTIONS.map((s, k) => (
-              <div key={s.name} onClick={hnGo('product-photobook.html')} {...press(0.97)} style={{ flex: 'none', display: 'flex',
-                alignItems: 'center', gap: 10, padding: 6, paddingRight: 14, borderRadius: 16, background: 'rgba(255,255,255,.14)',
-                cursor: 'pointer', transition: 'transform 140ms ease', animation: `hnPop .5s ${HN_EASE} ${k * 0.08}s both` }}>
-                <img src={`${HN_A}/${s.img}`} alt="" style={{ width: 44, height: 44, borderRadius: 11, objectFit: 'cover' }} />
+        <button onClick={make} {...press(0.97)} style={
+          pbButton('light', { background: '#fff', border: '1px solid #fff', color: PB_INK })
+        }>Make this book</button>
+        <span style={{ fontFamily: HN_FONT, fontSize: 13, fontWeight: 600, opacity: .75, marginTop: 2 }}>Or choose another collection</span>
+        <div style={{ display: 'flex', gap: 10, overflowX: 'auto', scrollbarWidth: 'none', margin: '0 -20px', padding: '0 20px' }}>
+          {HN_RECENT.map((c, k) => {
+            const on = k === sel;
+            return (
+              <div key={c.id} role="button" aria-pressed={on} onClick={() => setSel(k)} {...press(0.97)} style={{ flex: 'none', display: 'flex',
+                alignItems: 'center', gap: 10, padding: 6, paddingRight: 14, borderRadius: 16, cursor: 'pointer',
+                background: on ? 'rgba(255,255,255,.26)' : 'rgba(255,255,255,.12)',
+                boxShadow: on ? 'inset 0 0 0 2px #fff' : 'inset 0 0 0 1px rgba(255,255,255,.18)',
+                transition: 'transform 140ms ease, background 200ms ease, box-shadow 200ms ease' }}>
+                <img src={`${HN_A}/${c.img}`} alt="" style={{ width: 44, height: 44, borderRadius: 11, objectFit: 'cover' }} />
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ fontFamily: HN_FONT, fontSize: 14, fontWeight: 700 }}>{s.name}</span>
-                  <span style={{ fontFamily: HN_FONT, fontSize: 12, opacity: .8 }}>{s.line}</span>
+                  <span style={{ fontFamily: HN_FONT, fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap' }}>{c.name}</span>
+                  <span style={{ fontFamily: HN_FONT, fontSize: 12, opacity: .8, whiteSpace: 'nowrap' }}>{c.line}</span>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+            );
+          })}
+        </div>
       </div>
     </div>
   );
 }
 
-function HnProducts() {
+// One product's cut-out, positioned on its circle as the node has it.
+function HnProductArt({ art }) {
+  const img = { position: 'absolute', display: 'block', maxWidth: 'none', pointerEvents: 'none' };
+  const box = { position: 'absolute', left: art.left, top: art.top, width: art.w, height: art.h };
+  if (art.rot != null) {
+    return (
+      <div style={Object.assign(box, { display: 'flex', alignItems: 'center', justifyContent: 'center' })}>
+        <div style={{ position: 'relative', flex: 'none', width: art.iw, height: art.ih, transform: `rotate(${art.rot}deg)` }}>
+          <img src={`${HN_A}/${art.src}`} alt="" draggable={false}
+               style={Object.assign(img, { inset: 0, width: '100%', height: '100%', objectFit: art.fill ? 'fill' : 'cover' })} />
+        </div>
+      </div>
+    );
+  }
+  if (art.crop) {
+    const c = art.crop;
+    return (
+      <div style={Object.assign(box, { overflow: 'hidden' })}>
+        <img src={`${HN_A}/${art.src}`} alt="" draggable={false} style={Object.assign(img, {
+          left: `${c.left}%`, top: `${c.top}%`, width: `${c.w}%`, height: `${c.h}%` })} />
+      </div>
+    );
+  }
   return (
-    <div style={{ display: 'flex', gap: 14, overflowX: 'auto', scrollbarWidth: 'none', padding: '22px 16px 0' }}>
+    <div style={box}>
+      <img src={`${HN_A}/${art.src}`} alt="" draggable={false}
+           style={Object.assign(img, { inset: 0, width: '100%', height: '100%', objectFit: 'cover' })} />
+    </div>
+  );
+}
+
+// Figma 700:6365: 100px circles on a 125 pitch, the label 11 below in Bold 13/16 #333 —
+// all scaled by HN_PRODUCT_SCALE. The scroller's top padding is room for the art that
+// rises above its circle (the jigsaw piece) — a horizontal scroller clips vertically.
+function HnProducts() {
+  const size = HN_CIRCLE * HN_PRODUCT_SCALE;
+  return (
+    <div style={{ display: 'flex', gap: Math.round(25 * HN_PRODUCT_SCALE), overflowX: 'auto', overflowY: 'hidden',
+      scrollbarWidth: 'none', padding: '24px 20px 4px' }}>
       {HN_PRODUCTS.map(p => (
-        <div key={p.name} onClick={hnGo(p.href)} {...press(0.94)} style={{ flex: 'none', width: 68, display: 'flex',
-          flexDirection: 'column', alignItems: 'center', gap: 6, cursor: 'pointer', transition: 'transform 140ms ease' }}>
-          <div style={{ position: 'relative', width: 64, height: 64, borderRadius: '50%', overflow: 'hidden', background: HN_MINT,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', color: HN_TEAL, boxShadow: 'inset 0 0 0 1px rgba(0,77,74,.06)' }}>
-            {p.img
-              ? <img src={`${HN_A}/${p.img}`} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%',
-                  objectFit: 'cover', objectPosition: p.pos, transform: `scale(${p.zoom})`, transformOrigin: p.pos }} />
-              : <HnIcon name={p.icon} size={28} />}
+        <div key={p.name} onClick={hnGo(p.href)} {...press(0.94)} style={{ flex: 'none', width: size, display: 'flex',
+          flexDirection: 'column', alignItems: 'center', gap: 9, cursor: 'pointer', transition: 'transform 140ms ease',
+          WebkitTapHighlightColor: 'transparent' }}>
+          <div style={{ position: 'relative', width: size, height: size }}>
+          <div style={{ position: 'absolute', left: 0, top: 0, width: HN_CIRCLE, height: HN_CIRCLE,
+                        transform: `scale(${HN_PRODUCT_SCALE})`, transformOrigin: '0 0' }}>
+            <div aria-hidden style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: p.bg }} />
+            <HnProductArt art={p.art} />
+            {p.badge && (
+              // node 700:6424 — a teal r4 tag at the circle's top-right
+              <span style={{ position: 'absolute', left: 75, top: 1, padding: 2, minWidth: 20, borderRadius: 4,
+                background: HN_TEAL, color: '#fff', fontFamily: HN_FONT, fontSize: 11, fontWeight: 800,
+                lineHeight: '10px', letterSpacing: '-0.5px', textAlign: 'center' }}>{p.badge}</span>
+            )}
           </div>
-          <span style={{ fontFamily: HN_FONT, fontSize: 12, fontWeight: 700, color: HN_DEEP, textAlign: 'center', lineHeight: 1.2 }}>{p.name}</span>
+          </div>
+          <span style={{ fontFamily: HN_FONT, fontSize: 13, fontWeight: 700, lineHeight: '16px', color: '#333',
+            textAlign: 'center', whiteSpace: 'nowrap' }}>{p.name}</span>
         </div>
       ))}
     </div>
@@ -363,6 +448,27 @@ function HnCollections() {
             <span style={{ width: 40, height: 40, borderRadius: 20, background: 'rgba(255,255,255,.2)', display: 'flex', alignItems: 'center',
               justifyContent: 'center', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
               boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.35)', flexShrink: 0 }}><HnIcon name="right" size={18} /></span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Smaller portrait cards than Collections: a peek at the next one tells you the row scrolls.
+function HnMemories() {
+  return (
+    <div style={{ display: 'flex', gap: 12, overflowX: 'auto', scrollbarWidth: 'none', padding: '0 20px 8px' }}>
+      {HN_MEMORIES.map(m => (
+        <div key={m.name} onClick={hnGo(m.href || 'photo-sources.html')} {...press(0.97)} style={{ position: 'relative', flex: 'none',
+          width: 160, height: 214, borderRadius: 22, overflow: 'hidden', background: HN_DEEP, cursor: 'pointer',
+          transition: 'transform 140ms ease', boxShadow: '0 12px 24px -14px rgba(0,50,52,.55)' }}>
+          <img src={`${HN_A}/${m.img}`} alt="" draggable={false} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%',
+            objectFit: 'cover', objectPosition: m.pos }} />
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(rgba(0,0,0,0) 48%, rgba(0,18,20,.8))' }} />
+          <div style={{ position: 'absolute', left: 14, right: 14, bottom: 14, display: 'flex', flexDirection: 'column', gap: 2, color: '#fff' }}>
+            <span style={{ fontFamily: HN_FONT, fontSize: 20, fontWeight: 700, letterSpacing: '-0.3px', lineHeight: 1.1 }}>{m.name}</span>
+            <span style={{ fontFamily: HN_FONT, fontSize: 12, opacity: .85 }}>{m.line}</span>
           </div>
         </div>
       ))}
@@ -453,16 +559,23 @@ function HomeNewScreen() {
   const [activeTab, setActiveTab] = useState('home');
   const [solid, setSolid] = useState(false);
   const onScroll = e => {
-    const s = e.currentTarget.scrollTop > HN_HERO_H - 140;
+    // Turn solid early: the hero's headline and button reach the header strip at ~190px
+    // of scroll, and white copy under a transparent bar is what made the header unreadable.
+    const s = e.currentTarget.scrollTop > 120;
     if (s !== solid) setSolid(s);
   };
+  // Drives the page background in home.html, which iOS 26 Safari uses to tint the
+  // status-bar strip: the hero's teal over the photo, white under the solid header.
+  React.useEffect(() => {
+    document.documentElement.style.setProperty('--hn-top', solid ? '#FFFFFF' : '#0b2b2d');
+  }, [solid]);
   return (
-    <div data-hn-calm={calm ? '' : undefined} style={{ width: '100%', height: '100%', background: '#fff', position: 'relative', overflow: 'hidden' }}>
+    <div data-hn-calm={calm ? '' : undefined} style={{ width: '100%', height: '100%', background: 'var(--hn-top, #fff)', position: 'relative', overflow: 'hidden' }}>
       <style>{HN_CSS}</style>
 
       {/* Header: transparent over the hero, a blurred white bar once scrolled past it. */}
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, pointerEvents: 'none',
-        background: solid ? 'rgba(255,255,255,.82)' : 'rgba(255,255,255,0)',
+        background: solid ? 'rgba(255,255,255,.94)' : 'rgba(255,255,255,0)',
         backdropFilter: solid ? 'blur(20px) saturate(180%)' : 'none', WebkitBackdropFilter: solid ? 'blur(20px) saturate(180%)' : 'none',
         boxShadow: solid ? '0 1px 0 rgba(0,0,0,.06)' : 'none', transition: 'background .3s, box-shadow .3s' }}>
         <IOSStatusBar dark={!solid} />
@@ -483,6 +596,11 @@ function HomeNewScreen() {
           <div style={{ width: 36, height: 5, borderRadius: 3, background: '#DCE6E6', margin: '8px auto 0' }} />
           <HnProducts />
           <HnReveal><HnBookMoment /></HnReveal>
+
+          <HnReveal>
+            <HnHeader title="Memories" sub="Moments from your camera roll" action="See all" />
+            <HnMemories />
+          </HnReveal>
 
           <HnReveal>
             <HnHeader title="Collections" sub="Ideas to get you started" action="See all" />

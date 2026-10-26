@@ -100,7 +100,7 @@ function SourcePill() {
       <span style={{
         fontFamily: TEXT, fontWeight: 600, fontSize: 13, lineHeight: '18px',
         letterSpacing: '-0.08px',
-        color: 'var(--colour-foreground-fg-secondary, #007377)',
+        color: 'var(--colour-foreground-fg-secondary, #007F70)',
       }}>Camera Roll</span>
     </button>
   );
@@ -134,13 +134,7 @@ function PhotoSourcesScreen() {
             {/* The node has a bare 24px chevron here; on request this uses the same
                 liquid glass as the editor header. The glass sits at left 16 like the
                 editor's, which nudges the glyph 8px right of the node's position. */}
-            <div style={{ position: 'absolute', left: 16 }}>
-              <GlassIconButton gloss tint="rgba(0,0,0,0.25)" label="Back"
-                               onClick={() => window.navigation.pop()}>
-                <img src={`${A}/pb-src-back.svg`} alt="" width={24} height={24}
-                     style={{ display: 'block' }} />
-              </GlassIconButton>
-            </div>
+            <PbBackButton style={{ top: 0 }} />
             <SourcePill />
           </div>
         </div>

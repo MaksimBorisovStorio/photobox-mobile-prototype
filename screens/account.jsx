@@ -94,8 +94,8 @@ const ACCOUNT_WASH =
   "<rect x='0' y='0' width='100%' height='100%' fill='url(%23g)'/><defs>" +
   "<radialGradient id='g' gradientUnits='userSpaceOnUse' cx='0' cy='0' r='10'" +
   " gradientTransform='matrix(7.3255e-14 63.45 -412.82 0.000013756 6.0004 -1.9994e-7)'>" +
-  "<stop stop-color='rgba(0,115,119,1)' offset='0'/>" +
-  "<stop stop-color='rgba(0,142,147,0.89)' offset='0.15'/>" +
+  "<stop stop-color='rgba(0,127,112,1)' offset='0'/>" +
+  "<stop stop-color='rgba(0,163,137,0.89)' offset='0.15'/>" +
   "<stop stop-color='rgba(18,150,155,0.833)' offset='0.18274'/>" +
   "<stop stop-color='rgba(36,158,162,0.77599)' offset='0.21549'/>" +
   "<stop stop-color='rgba(72,174,178,0.66198)' offset='0.28098'/>" +
@@ -196,7 +196,7 @@ function StatsStrip() {
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center', gap: 2,
             overflow: 'hidden', whiteSpace: 'nowrap',
-            color: 'var(--colour-foreground-fg-secondary, #007377)',
+            color: 'var(--colour-foreground-fg-secondary, #007F70)',
           }}>
             <span style={{ fontFamily: AC_TEXT, fontSize: 16, fontWeight: 600, lineHeight: '19px' }}>
               {stat.value}
@@ -214,7 +214,7 @@ function StatsStrip() {
 // ─────────────────────────────────────────────────────────────
 // Refer a friend — Figma node 451:14057
 // ─────────────────────────────────────────────────────────────
-// Solid `#004B53` (Extended brand / Secondary / 800), r20, `pl 14 / pr 16 / py 14`,
+// Solid `#023C42` (Extended brand / Secondary / 800), r20, `pl 14 / pr 16 / py 14`,
 // `gap: 12`. Height 70 = 14 + the 42 icon tile + 14. The "→" is part of the node's
 // own subtitle string, not an added glyph.
 //
@@ -229,7 +229,7 @@ function ReferCard() {
       style={{
         display: 'flex', alignItems: 'center', gap: 12,
         padding: '14px 16px 14px 14px', borderRadius: 20, overflow: 'hidden',
-        background: '#004B53', cursor: 'pointer', transition: 'transform 140ms ease',
+        background: '#023C42', cursor: 'pointer', transition: 'transform 140ms ease',
         WebkitTapHighlightColor: 'transparent',
       }}
     >
@@ -303,7 +303,7 @@ const ACCOUNT_SECTIONS = [
     title: 'Account actions',
     // No icon and no chevron on either row — the node's own variant.
     rows: [
-      { title: 'Log out', color: '#007377', action: 'logout' },
+      { title: 'Log out', color: '#007F70', action: 'logout' },
       // Inert: destructive, and the design has no confirmation flow for it.
       { title: 'Delete account', color: '#D44333' },
     ],

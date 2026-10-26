@@ -1,8 +1,8 @@
 // screens/memories.jsx — Figma node 509:20419
 
-const MEM_TEACHERS = "'Teachers', var(--font-display)";
-const MEM_SF_DISP  = 'var(--font-display)';
-const MEM_SF_BODY  = 'var(--font)';
+const MEM_TEACHERS = PB_DISPLAY;
+const MEM_SF_DISP  = PB_DISPLAY;
+const MEM_SF_BODY  = PB_DISPLAY;
 
 // Horizontal scroll row — breaks out of the 20px gutter so cards
 // start at 20px but the row itself can scroll edge-to-edge.

@@ -4,9 +4,12 @@
 // Offers product types (Photo books, Wall decor, etc.) in a horizontal scroll
 // row, followed by AI-generated collage suggestions.
 
-const MC_TEACHERS = "'Teachers', var(--font-display)";
-const MC_SF_DISP  = 'var(--font-display)';
-const MC_SF_BODY  = 'var(--font)';
+// The home page's face and card language: DM Sans display type, r26 white cards on the
+// paper page with the soft green shadow, and the white round back button.
+const MC_TEACHERS = PB_DISPLAY;
+const MC_SF_DISP  = PB_DISPLAY;
+const MC_SF_BODY  = PB_DISPLAY;
+const MC_CARD_SHADOW = '0 4px 16px -1px rgba(0,77,74,0.1)';
 
 const MC_PRODUCTS = [
   { name: 'Photo books', price: '€ 14,99', img: '../shared/assets/create-photo-books.png' },
@@ -27,7 +30,7 @@ const mcHRow = {
   display: 'flex', alignItems: 'flex-start',
   overflowX: 'auto', overflowY: 'hidden',
   scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch',
-  padding: '0 20px',
+  padding: '0 20px 20px',
 };
 
 function MemoryCreateScreen() {
@@ -42,42 +45,25 @@ function MemoryCreateScreen() {
         {/* ── Header: back button + "Create" heading ── */}
         <div style={{ position: 'relative' }}>
 
-          {/* Back button — node 512:23599: near-transparent bg, teal icon */}
-          <button
-            onClick={() => window.history.back()}
-            {...press(0.95)}
-            style={{
-              position: 'absolute',
-              top: 'max(72px, calc(env(safe-area-inset-top, 44px) + 28px))',
-              left: 21,
-              width: 40, height: 40, borderRadius: 20,
-              background: 'rgba(255,255,255,0.01)', border: 'none',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', padding: 8,
-              WebkitTapHighlightColor: 'transparent',
-              transition: 'transform 140ms ease',
-            }}
-          >
-            <img src="../shared/assets/mem-icon-back-teal.svg" alt="Back" width={24} height={24} />
-          </button>
+          <PbBackButton onClick={() => window.history.back()} />
 
           {/* "Create" heading — top 144px in Figma (56px status + 88px gap) */}
           <div style={{
-            paddingTop: 'max(144px, calc(env(safe-area-inset-top, 44px) + 100px))',
+            paddingTop: 'max(132px, calc(env(safe-area-inset-top, 44px) + 88px))',
             paddingLeft: 24, paddingRight: 24, paddingBottom: 16,
             display: 'flex', flexDirection: 'column', gap: 8,
           }}>
             <p style={{
               margin: 0,
               fontFamily: MC_TEACHERS, fontWeight: 700,
-              fontSize: 42, lineHeight: '41px', letterSpacing: '-0.63px',
-              color: '#003E47',
+              fontSize: 40, lineHeight: '44px', letterSpacing: '-0.6px',
+              color: '#023C42',
             }}>Create</p>
             <p style={{
               margin: 0,
               fontFamily: MC_SF_BODY, fontWeight: 400,
-              fontSize: 17, lineHeight: '22px', letterSpacing: '-0.41px',
-              color: '#007377',
+              fontSize: 17, lineHeight: '22px', letterSpacing: '-0.2px',
+              color: '#007F70', fontWeight: 600,
             }}>with photos from Trip to Italy</p>
           </div>
         </div>
@@ -85,11 +71,11 @@ function MemoryCreateScreen() {
         {/* ── Product cards — horizontal scroll row ── */}
         <div style={{ ...mcHRow, gap: 8 }}>
           {MC_PRODUCTS.map((p, i) => (
-            <div key={i} {...press(0.97)} style={{
+            <div key={i} onClick={p.name === 'Photo books' ? () => window.navigation.push('book-choose.html') : undefined} {...press(0.97)} style={{
               cursor: 'pointer', transition: 'transform 140ms ease',
               flexShrink: 0, width: 161,
-              borderRadius: 16, overflow: 'hidden',
-              background: '#fff',
+              borderRadius: 26, overflow: 'hidden',
+              background: '#fff', boxShadow: MC_CARD_SHADOW,
               display: 'flex', flexDirection: 'column',
             }}>
               {/* Product image: aspect 171/165 ≈ square-ish top portion */}
@@ -116,7 +102,7 @@ function MemoryCreateScreen() {
                   margin: 0,
                   fontFamily: MC_SF_BODY, fontWeight: 400,
                   fontSize: 13, lineHeight: '28px', letterSpacing: '-0.08px',
-                  color: '#007377',
+                  color: '#007F70',
                 }}>
                   from <strong style={{ fontWeight: 700 }}>{p.price}</strong>
                 </p>
@@ -130,8 +116,8 @@ function MemoryCreateScreen() {
           <p style={{
             margin: 0,
             fontFamily: MC_SF_DISP, fontWeight: 700,
-            fontSize: 22, lineHeight: '28px', letterSpacing: '0.35px',
-            color: '#333',
+            fontSize: 24, lineHeight: '32px', letterSpacing: '-0.3px',
+            color: PB_INK,
           }}>Collages</p>
         </div>
 
@@ -140,9 +126,9 @@ function MemoryCreateScreen() {
             <div key={i} {...press(0.97)} style={{
               cursor: 'pointer', transition: 'transform 140ms ease',
               position: 'relative', flexShrink: 0,
-              width: 245, height: 304, borderRadius: 20,
+              width: 245, height: 304, borderRadius: 26,
               overflow: 'hidden', border: '1px solid #fff',
-              boxShadow: '0 4px 4px -4px rgba(0,0,0,0.25)',
+              boxShadow: MC_CARD_SHADOW,
               background: '#f1f5f6',
             }}>
               <img src={c.img} alt="" style={{

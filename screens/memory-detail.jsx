@@ -4,25 +4,13 @@
 // by chapter with sticky section headers. Opened from the Memories screen
 // when the user taps on a featured album tile (e.g. "Trip to Italy").
 
-const MD_SF_BODY  = 'var(--font)';
-const MD_SF_DISP  = 'var(--font-display)';
+const MD_SF_BODY  = PB_DISPLAY;   // the app's face (home, create, book-choose)
+const MD_SF_DISP  = PB_DISPLAY;
 
-// 25 mock photos, cycled across all chapters.
-const MOCK = Array.from({ length: 25 }, (_, i) =>
-  `../shared/assets/photos/mock-${String(i + 1).padStart(2, '0')}.webp`
-);
-function mocks(start, count) {
-  return Array.from({ length: count }, (_, i) => MOCK[(start + i) % 25]);
-}
-
-// Chapter data matching the Figma design.
-const CHAPTERS = [
-  { title: 'Morning preparing', sub: '1 May · 6 photos',  photos: mocks(0,  6) },
-  { title: 'On the way',        sub: '1 May · 7 photos',  photos: mocks(6,  7) },
-  { title: "Chapter's name",    sub: '1 May · 3 photos',  photos: mocks(13, 3) },
-  { title: '04 Jan 2026',       sub: null,                photos: mocks(16, 12) },
-  { title: '05 Jan 2026',       sub: null,                photos: mocks(3,  9) },
-];
+// The Italy trip, grouped by topic — shared/trip-italy.js (also what the editor auto-fills from).
+const CHAPTERS = window.PB_TRIP_ITALY.groups.map(g => ({
+  title: g.title, sub: `${g.date} · ${g.photos.length} photos`, photos: g.photos,
+}));
 
 // ─── Chapter section header ─────────────────────────────────
 function ChapterHeader({ title, sub }) {
@@ -60,7 +48,7 @@ function ChapterHeader({ title, sub }) {
         <span style={{
           fontFamily: MD_SF_BODY, fontWeight: 600, fontSize: 13,
           lineHeight: '18px', letterSpacing: '-0.08px',
-          color: 'var(--colour-foreground-fg-secondary, #007377)',
+          color: 'var(--colour-foreground-fg-secondary, #007F70)',
           whiteSpace: 'nowrap',
         }}>Select all</span>
       </button>
@@ -107,42 +95,11 @@ function MemoryDetailScreen() {
             maskImage: 'linear-gradient(to bottom, transparent 0%, black 50%)',
           }} />
 
-          {/* Back button — node 511:22519: rgba(0,0,0,0.11) circle, no blur */}
-          <button
-            onClick={() => window.history.back()}
-            {...press(0.95)}
-            style={{
-              position: 'absolute', left: 16, top: 60,
-              width: 40, height: 40, borderRadius: 20,
-              background: 'rgba(0,0,0,0.11)',
-              border: 'none',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', padding: 8,
-              WebkitTapHighlightColor: 'transparent',
-              transition: 'transform 140ms ease',
-              boxSizing: 'border-box',
-            }}
-          >
-            <img src="../shared/assets/mem-icon-back.svg" alt="Back" width={24} height={24} />
-          </button>
+          <PbBackButton onClick={() => window.history.back()} />
 
-          {/* More button — node 512:23709: rgba(0,0,0,0.11) circle, no blur */}
-          <button
-            {...press(0.95)}
-            style={{
-              position: 'absolute', right: 16, top: 60,
-              width: 40, height: 40, borderRadius: 20,
-              background: 'rgba(0,0,0,0.11)',
-              border: 'none',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', padding: 8,
-              WebkitTapHighlightColor: 'transparent',
-              transition: 'transform 140ms ease',
-              boxSizing: 'border-box',
-            }}
-          >
-            <img src="../shared/assets/mem-icon-more.svg" alt="More" width={24} height={24} />
-          </button>
+          <PbGlassButton label="More" style={{ position: 'absolute', right: 16, top: PB_BACK_TOP, zIndex: 5 }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5.5" r="1.9" /><circle cx="12" cy="12" r="1.9" /><circle cx="12" cy="18.5" r="1.9" /></svg>
+          </PbGlassButton>
 
           {/* Title + date — node 511:22001: centered, offset 48px below midpoint */}
           <div style={{
@@ -165,30 +122,19 @@ function MemoryDetailScreen() {
             }}>12–21 July, 2025</p>
           </div>
 
-          {/* Create button — node 511:22523: teal pill, centered, top 390.
+          {/* Create button — node 511:22523, now the app Button, centered, top 390.
               Centred with left/right:0 + margin:auto rather than translateX(-50%)
               because press() assigns style.transform = scale(0.97), wiping a
               translateX and snapping the button to the left edge on tap. */}
           <button
             onClick={() => window.navigation.push('memory-create.html')}
             {...press(0.97)}
-            style={{
-              position: 'absolute', top: 390,
-              left: 0, right: 0, width: 'fit-content', margin: '0 auto',
-              display: 'flex', alignItems: 'center', gap: 8,
-              padding: '16px 24px 16px 16px', borderRadius: 55,
-              background: '#007377', border: 'none',
-              boxShadow: 'inset 0 0 27px rgba(0,0,0,0.25)',
-              cursor: 'pointer', whiteSpace: 'nowrap',
-              WebkitTapHighlightColor: 'transparent',
-              transition: 'transform 140ms ease',
-            }}
+            style={pbButton('primary', {
+              position: 'absolute', top: 390, left: 0, right: 0, width: 'fit-content', margin: '0 auto', padding: '0 24px 0 16px',
+            })}
           >
             <img src="../shared/assets/mem-icon-create-plus.svg" alt="" width={24} height={24} />
-            <span style={{
-              fontFamily: MD_SF_BODY, fontWeight: 600, fontSize: 16,
-              lineHeight: '21px', letterSpacing: '-0.32px', color: '#fff',
-            }}>Create</span>
+            <span>Create</span>
           </button>
 
           {/* Stats bar — node 511:22005: 3-col grid at top 478 */}
@@ -198,9 +144,9 @@ function MemoryDetailScreen() {
             padding: 16,
           }}>
             {[
-              { value: '236', label: 'Photos', info: false },
-              { value: '21',  label: 'Hidden', info: true  },
-              { value: '12',  label: 'Chapters', info: false },
+              { value: '40', label: 'Photos', info: false },
+              { value: '0',  label: 'Hidden', info: true  },
+              { value: '9',  label: 'Chapters', info: false },
             ].map(s => (
               <div key={s.label} style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0,

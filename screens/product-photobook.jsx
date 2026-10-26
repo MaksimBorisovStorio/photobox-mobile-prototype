@@ -47,7 +47,7 @@ const SHAPES = [
 
 // Swatches are the PB3 tokens already in styles.css — nothing invented outside it.
 const COLOURS = [
-  { id: 'teal',     title: 'Deep teal', hex: '#007377' },
+  { id: 'teal',     title: 'Deep teal', hex: '#007F70' },
   { id: 'sage',     title: 'Sage',      hex: '#90CED0' },
   { id: 'offwhite', title: 'Off-white', hex: '#F1F6F6' },
   { id: 'sand',     title: 'Sand',      hex: '#D9C9A8' },
@@ -89,7 +89,7 @@ function SelectDot({ selected }) {
     <div style={{
       position: 'absolute', left: 16, top: 16, width: 32, height: 32,
       borderRadius: '50%', boxSizing: 'border-box',
-      background: selected ? 'var(--colour-foreground-fg-secondary, #007377)' : 'rgba(0,0,0,0.1)',
+      background: selected ? 'var(--colour-foreground-fg-secondary, #007F70)' : 'rgba(0,0,0,0.1)',
       border: '2px solid #FFFFFF',
       backdropFilter: 'blur(2px)', WebkitBackdropFilter: 'blur(2px)',
       boxShadow: '0px 4px 4px rgba(0,0,0,0.25)',
@@ -122,7 +122,7 @@ function OptionCard({ shot, title, dim, price, selected, onSelect, showInfo,
         position: 'relative', flex: '0 0 auto', width: w, height: h,
         borderRadius: 20, overflow: 'hidden', padding: 0,
         border: selected
-          ? '2px solid var(--colour-foreground-fg-secondary, #007377)'
+          ? '2px solid var(--colour-foreground-fg-secondary, #007F70)'
           : '1px solid #FFFFFF',
         boxShadow: '0px 4px 4px -4px rgba(0,0,0,0.25)',
         background: s.bg, cursor: 'pointer',
@@ -213,7 +213,7 @@ function ColourSwatch({ hex, title, selected, onSelect }) {
         boxSizing: 'border-box', display: 'block',
         border: '1px solid rgba(0,0,0,0.06)',
         boxShadow: selected
-          ? '0 0 0 2px #FFFFFF, 0 0 0 4px var(--colour-foreground-fg-secondary, #007377), 0px 4px 4px -4px rgba(0,0,0,0.25)'
+          ? '0 0 0 2px #FFFFFF, 0 0 0 4px var(--colour-foreground-fg-secondary, #007F70), 0px 4px 4px -4px rgba(0,0,0,0.25)'
           : '0px 4px 4px -4px rgba(0,0,0,0.25)',
         transition: 'box-shadow 160ms ease',
       }} />
@@ -242,7 +242,7 @@ function LayFlatCard({ on, onToggle }) {
           width: 55, height: 32, borderRadius: 16, padding: 0, flexShrink: 0,
           position: 'relative', cursor: 'pointer', boxSizing: 'border-box',
           border: '2px solid #FFFFFF',
-          background: on ? 'var(--colour-foreground-fg-secondary, #007377)' : 'rgba(0,0,0,0.1)',
+          background: on ? 'var(--colour-foreground-fg-secondary, #007F70)' : 'rgba(0,0,0,0.1)',
           boxShadow: '0px 4px 4px -4px rgba(0,0,0,0.25)',
           transition: 'background 180ms ease',
           WebkitTapHighlightColor: 'transparent',
@@ -359,7 +359,7 @@ function SummaryBar({ summary }) {
     <div style={{
       position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 5,
       boxSizing: 'border-box',
-      background: 'var(--functional-colours-grey-50, #F4F4F4)',
+      background: '#F1F6F6',
       borderRadius: '24px 24px 0 0',
       boxShadow: '0px -4px 16px -1px rgba(0,77,74,0.10)',
       padding: 24,
@@ -390,7 +390,7 @@ function ReviewSection({ format, cover, size, shape, colour, layflat, onStart, i
   return (
     <div ref={innerRef} style={{
       position: 'relative', width: '100%', height: 542, overflow: 'hidden',
-      borderRadius: '24px 24px 0 0', background: '#F4F4F4',
+      borderRadius: '24px 24px 0 0', background: '#F1F6F6',
       display: 'flex', flexDirection: 'column', alignItems: 'center',
       justifyContent: 'space-between',
     }}>
@@ -478,17 +478,9 @@ function ReviewSection({ format, cover, size, shape, colour, layflat, onStart, i
           onPointerDown={e => { e.currentTarget.style.transform = 'scale(0.97)'; }}
           onPointerUp={e => { e.currentTarget.style.transform = 'scale(1)'; }}
           onPointerLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
-          style={{
-            width: '100%', height: 72, borderRadius: 36, border: 'none',
-            background: 'var(--colour-foreground-fg-white, #FFFFFF)',
-            padding: '0 24px', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
-          }}
+          style={pbButton('light', { width: '100%', background: '#FFFFFF', border: '1px solid #FFFFFF', color: PB_INK })}
         >
-          <span style={{ fontFamily: '"Teachers", -apple-system, system-ui, sans-serif',
-                         fontWeight: 700, fontSize: 18, lineHeight: '24px',
-                         color: 'var(--colour-foreground-fg-black, #333)' }}>Start create</span>
+          <span>Start create</span>
           <img src={`${A}/pb-icon-arrow.svg`} alt="" width={24} height={24} style={{ display: 'block' }} />
         </button>
       </div>
@@ -566,24 +558,9 @@ function ProductPhotobookScreen() {
         WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none',
       }}>
         {/* ── Hero — Figma node 406:7432 ── */}
-        <div style={{ paddingTop: 'max(72px, calc(env(safe-area-inset-top, 44px) + 28px))' }}>
-          <div style={{ padding: '0 21px' }}>
-            <button
-              type="button"
-              onClick={() => window.navigation.pop()}
-              aria-label="Back"
-              onPointerDown={e => { e.currentTarget.style.transform = 'scale(0.9)'; }}
-              onPointerUp={e => { e.currentTarget.style.transform = 'scale(1)'; }}
-              onPointerLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
-              style={{
-                width: 40, height: 40, borderRadius: 20, padding: 8, border: 'none',
-                background: 'rgba(255,255,255,0.01)', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <img src={`${A}/pb-icon-back.svg`} alt="" width={24} height={24} style={{ display: 'block' }} />
-            </button>
+        <div style={{ paddingTop: PB_BACK_TOP }}>
+          <div style={{ padding: '0 16px' }}>
+            <PbBackButton style={{ position: 'relative', left: 0, top: 0 }} />
           </div>
 
           {/* title block — node 406:7444 */}
@@ -593,7 +570,7 @@ function ProductPhotobookScreen() {
                         color: 'var(--colour-foreground-fg-black, #333)' }}>
               Photo books
             </p>
-            <p style={{ margin: 0, fontFamily: TEXT, letterSpacing: '-0.41px', color: '#007377' }}>
+            <p style={{ margin: 0, fontFamily: TEXT, letterSpacing: '-0.41px', color: '#007F70' }}>
               <span style={{ fontSize: 17, lineHeight: '22px' }}>Start from </span>
               <span style={{ fontSize: 17, lineHeight: '22px', fontWeight: 700 }}>€14.99</span>
             </p>

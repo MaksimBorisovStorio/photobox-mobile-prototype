@@ -18,9 +18,9 @@
 
 const ER_A = '../shared/assets';
 const ER_FONT = PB_DISPLAY;
-const ER_INK = '#0F3D3E';
+const ER_INK = '#023C42';
 const ER_MUTED = '#5E7575';
-const ER_TEAL = '#0E6B6E';
+const ER_TEAL = '#007F70';
 const ER_SOFT = '#E6F1F1';
 const ER_LINE = '#DCE8E8';
 const ER_BOARD = '#0b4a4b';
@@ -436,10 +436,7 @@ function ErSheet({ kind, value, onPick, onClose }) {
             );
           })}
         </div>
-        <button onClick={close} {...press(0.97)} style={{
-          marginTop: 18, width: '100%', height: 52, borderRadius: 14, border: 'none', background: ER_TEAL, color: '#fff',
-          fontFamily: ER_FONT, fontSize: 17, fontWeight: 700, cursor: 'pointer', transition: 'transform 140ms ease',
-        }}>Done</button>
+        <button onClick={close} {...press(0.97)} style={pbButton('primary', { marginTop: 18, width: '100%' })}>Done</button>
       </div>
     </div>
   );
@@ -449,35 +446,6 @@ function ErSheet({ kind, value, onPick, onClose }) {
 // is what makes the binding comparison read — the fold lands right on the peak — so the
 // hero always uses Moraine Lake rather than whatever happens to be in the book.
 const ER_PANO = `${ER_A}/photos/mock-01.webp`;
-
-// iOS 26 liquid-glass back button, light variant. Not GlassIconButton's `gloss`, which
-// is tuned for the editor's near-black header (its shadow and normal-blended rim go
-// muddy on white); this is the tab bar's light recipe — a real white tint, soft drop
-// shadow, a bright top bevel and a specular sweep — at the system's 44pt size.
-function ErGlassBack({ onClick }) {
-  return (
-    <button onClick={onClick} aria-label="Back" {...press(0.9)} style={{
-      position: 'absolute', left: 16, width: 44, height: 44, borderRadius: 22, border: 'none', padding: 0,
-      overflow: 'hidden', cursor: 'pointer', transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
-      background: 'rgba(255,255,255,0.55)',
-      backdropFilter: 'blur(12px) saturate(130%)', WebkitBackdropFilter: 'blur(12px) saturate(130%)',
-      boxShadow: [
-        '0 8px 20px -6px rgba(0,40,40,0.28)', '0 1px 3px rgba(0,0,0,0.10)',
-        'inset 0 1px 1px rgba(255,255,255,0.95)', 'inset 0 -1px 2px rgba(0,0,0,0.06)',
-        'inset 0 0 0 0.5px rgba(0,0,0,0.08)', 'inset 0 0 12px rgba(255,255,255,0.6)',
-      ].join(', '),
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }}>
-      {/* specular sweep, brightest top-left like the rest of the app's glass */}
-      <span style={{ position: 'absolute', inset: 0, borderRadius: 'inherit', pointerEvents: 'none',
-        background: 'linear-gradient(150deg, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0) 45%, rgba(255,255,255,0) 70%, rgba(255,255,255,0.35) 100%)' }} />
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={ER_INK} strokeWidth="2.4"
-        strokeLinecap="round" strokeLinejoin="round" style={{ position: 'relative', marginLeft: -2 }}>
-        <path d="M15 4.5 7.5 12l7.5 7.5" />
-      </svg>
-    </button>
-  );
-}
 
 // Price that counts to its new value instead of jumping.
 function useErTween(target) {
@@ -547,7 +515,7 @@ function EditorReviewScreen() {
   const pano = ER_PANO;
 
   return (
-    <div style={{ width: '100%', height: '100%', background: '#fff', display: 'flex', flexDirection: 'column',
+    <div style={{ width: '100%', height: '100%', background: PB_PAPER, display: 'flex', flexDirection: 'column',
       position: 'relative', overflow: 'hidden' }}>
       <style>{`
         @keyframes erSway { 0%,100% { transform: rotateZ(-3deg) } 50% { transform: rotateZ(3deg) } }
@@ -561,7 +529,7 @@ function EditorReviewScreen() {
       <IOSStatusBar dark={false} />
 
       <div style={{ position: 'relative', height: 56, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <ErGlassBack onClick={() => window.navigation.pop()} />
+        <PbBackButton style={{ top: 6 }} />
         <span style={{ fontFamily: ER_FONT, fontSize: 17, fontWeight: 700, color: ER_INK }}>Your photo book</span>
       </div>
 
@@ -639,11 +607,7 @@ function EditorReviewScreen() {
         <button
           onClick={() => window.navigation.push('basket.html')}
           {...press(0.97)}
-          style={{
-            marginTop: 12, width: '100%', height: 54, borderRadius: 14, border: 'none', background: ER_TEAL, color: '#fff',
-            fontFamily: ER_FONT, fontSize: 17, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center',
-            justifyContent: 'center', gap: 8, transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
-          }}>
+          style={pbButton('primary', { marginTop: 12, width: '100%' })}>
           <img src={`${ER_A}/pb-review-basket.svg`} alt="" width={22} height={22} style={{ filter: 'brightness(0) invert(1)', display: 'block' }} />
           Add to basket
         </button>

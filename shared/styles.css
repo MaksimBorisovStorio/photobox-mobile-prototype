@@ -31,12 +31,12 @@
     rgba(255, 255, 255, 0.00) 100%;
 
   /* Brand */
-  --color-primary: #0E9E8E;
-  --color-primary-dark: #0A7A6E;
+  --color-primary: #007F70;
+  --color-primary-dark: #00695C;
   --color-primary-light: #E8F8F6;
 
   /* Light-mode surfaces */
-  --color-bg: #F2F2F7;
+  --color-bg: #F1F6F6;
   --color-surface: #FFFFFF;
   --color-surface-2: #EBEBF0;
 

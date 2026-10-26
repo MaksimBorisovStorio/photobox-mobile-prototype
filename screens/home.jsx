@@ -100,7 +100,7 @@ function HomeScreen() {
 // card's outer edge. Do not "correct" these to the `get_metadata` numbers, which
 // are measured from the frame's outer box and are each 1px larger.
 const BANNER_FONT = '-apple-system, "SF Pro Text", system-ui, sans-serif';
-const BANNER_TEAL = 'var(--colour-foreground-fg-secondary, #007377)';
+const BANNER_TEAL = 'var(--colour-foreground-fg-secondary, #007F70)';
 
 // Figma fills at 90% opacity; folded into the stops so the hairline border stays
 // fully opaque.
@@ -277,10 +277,10 @@ const STATUS_CARDS = [
 // steps, #CCC for Home), and the last rail is the node's own half-done gradient.
 const HB_STEPS = ['hb-step-select.svg', 'hb-step-book.svg', 'hb-step-delivery.svg', 'hb-step-home.svg'];
 const HB_RAILS = [
-  'var(--colour-foreground-fg-secondary, #007377)',
-  'var(--colour-foreground-fg-secondary, #007377)',
+  'var(--colour-foreground-fg-secondary, #007F70)',
+  'var(--colour-foreground-fg-secondary, #007F70)',
   'linear-gradient(to right,' +
-  ' var(--colour-foreground-fg-secondary, #007377) 0%,' +
+  ' var(--colour-foreground-fg-secondary, #007F70) 0%,' +
   ' var(--colour-foreground-fg-grey, #CCC) 49.772%)',
 ];
 
@@ -479,7 +479,7 @@ function CreateCard({ id, title, from, img, inset }) {
           margin: 0, width: '100%',
           fontFamily: '-apple-system, "SF Pro Text", system-ui, sans-serif',
           fontSize: 13, lineHeight: '28px',
-          color: 'var(--colour-foreground-fg-secondary, #007377)',
+          color: 'var(--colour-foreground-fg-secondary, #007F70)',
         }}>
           <span style={{ fontWeight: 510 }}>from </span>
           <span style={{ fontWeight: 700 }}>{from}</span>
@@ -521,7 +521,7 @@ function SectionHeader({ icon, title, seeAll }) {
             border: 'none', background: 'none', padding: 0, flexShrink: 0,
             fontFamily: PB_DISPLAY, fontWeight: 500, fontSize: 16,
             lineHeight: '40px', letterSpacing: '-0.16px',
-            color: 'var(--colour-foreground-fg-secondary, #007377)',
+            color: 'var(--colour-foreground-fg-secondary, #007F70)',
             whiteSpace: 'nowrap', cursor: 'pointer',
             transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
           }}
@@ -648,7 +648,7 @@ function CollectionsSection() {
               transform: 'translateX(-50%)', width: 185, margin: 0,
               fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 28,
               lineHeight: '34px', letterSpacing: '0.36px', textAlign: 'center',
-              color: 'var(--colour-foreground-fg-secondary, #007377)',
+              color: 'var(--colour-foreground-fg-secondary, #007F70)',
             }}>{c.title}</p>
           </button>
         ))}
@@ -669,8 +669,8 @@ function CollectionsSection() {
 // The last stop is transparent, so whatever is behind shows through at the edges.
 // That is deliberate: on the node the page colour reads through the card's corners.
 const PB_WASH_STOPS_SVG =
-  "<stop stop-color='rgba(0,115,119,1)' offset='0'/>" +
-  "<stop stop-color='rgba(0,142,147,0.89)' offset='0.12042'/>" +
+  "<stop stop-color='rgba(0,127,112,1)' offset='0'/>" +
+  "<stop stop-color='rgba(0,163,137,0.89)' offset='0.12042'/>" +
   "<stop stop-color='rgba(18,150,155,0.833)' offset='0.15686'/>" +
   "<stop stop-color='rgba(36,158,162,0.77599)' offset='0.19331'/>" +
   "<stop stop-color='rgba(72,174,178,0.66198)' offset='0.26619'/>" +
@@ -812,7 +812,7 @@ function IdeasSection() {
                 <p style={{
                   margin: 0, width: '100%', flex: '1 0 0',
                   fontFamily: BANNER_FONT, fontSize: 13, lineHeight: '28px',
-                  color: 'var(--colour-foreground-fg-secondary, #007377)',
+                  color: 'var(--colour-foreground-fg-secondary, #007F70)',
                 }}>
                   <span style={{ fontWeight: 510 }}>from </span>
                   <span style={{ fontWeight: 700 }}>{'€ 14,99'}</span>
@@ -822,21 +822,12 @@ function IdeasSection() {
           ))}
         </div>
 
-        {/* "Show all" — node 509:20369. Teachers Bold, the brand wordmark face. */}
+        {/* "Show all" — node 509:20369, now the app's r16 Button (white fill, green label). */}
         <button
           onClick={() => window.navigation.push('product-photobook.html')}
           {...press(0.97)}
-          style={{
-            width: '100%', height: 72, borderRadius: 55,
-            background: 'var(--colour-foreground-fg-white, #FFFFFF)',
-            border: 'none', padding: '0 24px',
-            boxShadow: '0px 4px 16px -1px rgba(0,77,74,0.1)',
-            fontFamily: '"Teachers", -apple-system, system-ui, sans-serif',
-            fontWeight: 700, fontSize: 20, lineHeight: '32px',
-            color: 'var(--colour-foreground-fg-secondary, #007377)',
-            cursor: 'pointer', transition: 'transform 140ms ease',
-            WebkitTapHighlightColor: 'transparent',
-          }}
+          style={pbButton('light', { width: '100%', background: '#FFFFFF', border: '1px solid #FFFFFF', color: PB_GREEN,
+            boxShadow: '0px 4px 16px -1px rgba(0,77,74,0.1)' })}
         >Show all</button>
       </div>
     </div>
@@ -901,7 +892,7 @@ function AskAISection() {
           {ASKAI_SUGGESTIONS.map(s => (
             <button key={s} {...press(0.97)} style={{
               flex: '0 0 auto', padding: '8px 16px', borderRadius: 42,
-              background: 'var(--Extended-brand-colours-Secondary-500, #007377)',
+              background: 'var(--Extended-brand-colours-Secondary-500, #007F70)',
               border: 'none', whiteSpace: 'nowrap',
               fontFamily: BANNER_FONT, fontSize: 13, fontWeight: 400,
               lineHeight: '18px', letterSpacing: '-0.08px', color: '#FFFFFF',

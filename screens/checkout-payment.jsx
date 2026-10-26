@@ -18,25 +18,11 @@ function CheckoutPaymentScreen() {
       <div style={{
         display:'flex', alignItems:'center',
         padding:'8px 16px 16px',
-        paddingTop:'calc(env(safe-area-inset-top, 44px) + 8px)',
+        paddingTop: 8,
       }}>
-        <button
-          onClick={() => window.navigation.pop()}
-          onPointerDown={e => e.currentTarget.style.transform = 'scale(0.9)'}
-          onPointerUp={e => e.currentTarget.style.transform = 'scale(1)'}
-          onPointerLeave={e => e.currentTarget.style.transform = 'scale(1)'}
-          style={{
-            width:36, height:36, borderRadius:18, background:'rgba(0,0,0,0.06)',
-            border:'none', cursor:'pointer', display:'flex', alignItems:'center',
-            justifyContent:'center', transition:'transform 140ms ease',
-          }}
-        >
-          <svg width="12" height="20" viewBox="0 0 12 20" fill="none">
-            <path d="M10 2L2 10l8 8" stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
+        <PbBackButton style={{ position: 'relative', left: 0, top: 0 }} />
         <span style={{ flex:1, textAlign:'center', fontSize:17, fontWeight:600, color:'#000' }}>Payment</span>
-        <div style={{ width:36 }} />
+        <div style={{ width:44 }} />
       </div>
 
       {/* Scrollable content */}
@@ -151,13 +137,7 @@ function CheckoutPaymentScreen() {
           onPointerDown={e => e.currentTarget.style.transform = 'scale(0.97)'}
           onPointerUp={e => e.currentTarget.style.transform = 'scale(1)'}
           onPointerLeave={e => e.currentTarget.style.transform = 'scale(1)'}
-          style={{
-            width:'100%', height:56, borderRadius:28,
-            background:'var(--color-primary)', color:'#fff', border:'none',
-            fontSize:17, fontWeight:700, cursor:'pointer',
-            transition:'transform 140ms ease',
-            boxShadow:'0 4px 14px rgba(14,158,142,0.35)',
-          }}
+          style={pbButton('primary', { width: '100%' })}
         >
           Pay €29.98
         </button>

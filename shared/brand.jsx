@@ -6,6 +6,81 @@
 // enable its @font-face in styles.css and it takes over (it is first in the stack).
 const PB_DISPLAY = '"Google Sans Flex", "DM Sans", -apple-system, "SF Pro Display", system-ui, sans-serif';
 
+// ── The start-flow UI, now the app's UI (Figma 683:3565 — splash / welcome / photo access /
+// notifications). Three things carry over: the page colour, the primary green and the
+// button shape. Values are the ones onboarding-shell.jsx already uses.
+//   PB_PAPER  light page background (replaces #F2F2F7 / #F4F7F7 / white pages)
+//   PB_GREEN  primary — CTAs, links, selected states (replaces teal #007377)
+//   PB_INK    #023C42 — headings on the light page
+//   pbButton  the Figma Button: r16, 56 tall, Rethink Sans Bold 17/20, 1px rim.
+//             kinds: primary (green + lighter rim) · light (#EFEFEF) · ghost (no fill)
+// ⚠️ Top-level names in a classic script share one global lexical scope; everything here is
+// `PB_…` / `pb…`, and onboarding-shell.jsx keeps its own `OB_…` copies.
+const PB_GREEN = '#007F70';
+const PB_GREEN_RIM = '#00A389';
+const PB_INK = '#023C42';
+const PB_PAPER = '#F1F6F6';
+const PB_UI = '"Rethink Sans", "DM Sans", -apple-system, system-ui, sans-serif';
+const PB_BUTTONS = {
+  primary: { background: PB_GREEN, border: `1px solid ${PB_GREEN_RIM}`, color: '#FFFFFF' },
+  light:   { background: '#EFEFEF', border: '1px solid #EBE2D9', color: '#000000' },
+  ghost:   { background: 'transparent', border: '1px solid transparent', color: PB_GREEN },
+};
+function pbButton(kind = 'primary', extra) {
+  return {
+    height: 56, boxSizing: 'border-box', flex: 'none', borderRadius: 16, padding: '0 24px', cursor: 'pointer',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+    transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
+    fontFamily: PB_UI, fontWeight: 700, fontSize: 17, lineHeight: '20px', whiteSpace: 'nowrap',
+    ...PB_BUTTONS[kind], ...extra,
+  };
+}
+
+// ── One header control for the whole app: an iOS-26 liquid-glass circle (44pt), light
+// glass with INK glyphs so it keeps its contrast on paper, on photos and on the green
+// order-tracking hero alike. Replaces the dozen back arrows the screens used to carry
+// (bare chevrons, grey/white/teal circles, the editor's dark glass).
+//   PbGlassButton  the glass circle — pass any glyph as children (back, "more", …)
+//   PbBackButton   the same with the chevron; absolute at left 16 / PB_BACK_TOP unless `style` says otherwise
+// The glass is hand-layered for the reason GlassIconButton's header notes give: WebKit's
+// backdrop-filter takes filter *functions* only, so no refraction — a real white tint over
+// blur, a bright top bevel, a specular sweep and a soft drop shadow carry the look.
+const PB_BACK_TOP = 'max(62px, calc(env(safe-area-inset-top, 0px) + 6px))';
+function PbGlassButton({ label, onClick, children, style }) {
+  return (
+    <button type="button" onClick={onClick} aria-label={label}
+      onPointerDown={e => { e.currentTarget.style.transform = 'scale(0.9)'; }}
+      onPointerUp={e => { e.currentTarget.style.transform = 'scale(1)'; }}
+      onPointerLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
+      style={{
+        width: 44, height: 44, borderRadius: 22, border: 'none', padding: 0, flexShrink: 0, overflow: 'hidden',
+        cursor: 'pointer', transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', color: PB_INK,
+        background: 'rgba(255,255,255,0.74)',
+        backdropFilter: 'blur(14px) saturate(140%)', WebkitBackdropFilter: 'blur(14px) saturate(140%)',
+        boxShadow: [
+          '0 8px 20px -6px rgba(0,40,40,0.32)', '0 1px 3px rgba(0,0,0,0.12)',
+          'inset 0 1px 1px rgba(255,255,255,0.95)', 'inset 0 -1px 2px rgba(0,0,0,0.06)',
+          'inset 0 0 0 0.5px rgba(0,0,0,0.10)', 'inset 0 0 12px rgba(255,255,255,0.6)',
+        ].join(', '),
+        ...style,
+      }}>
+      <span aria-hidden style={{ position: 'absolute', inset: 0, borderRadius: 'inherit', pointerEvents: 'none',
+        background: 'linear-gradient(150deg, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0) 45%, rgba(255,255,255,0) 70%, rgba(255,255,255,0.35) 100%)' }} />
+      <span style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{children}</span>
+    </button>
+  );
+}
+function PbBackButton({ onClick, style }) {
+  return (
+    <PbGlassButton label="Back" onClick={onClick || (() => window.navigation.pop())}
+      style={{ position: 'absolute', left: 16, top: PB_BACK_TOP, zIndex: 5, ...style }}>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"
+        strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: -2 }}><path d="M15 4.5 7.5 12l7.5 7.5" /></svg>
+    </PbGlassButton>
+  );
+}
+
 // Wordmark lockup. Figma splash (451:13761) is the reference geometry at 157×41;
 // the home header (451:13866) is exactly the same lockup at 2/3 — verified: the
 // home star export is the splash star's path scaled by 1.5, and the wordmark's

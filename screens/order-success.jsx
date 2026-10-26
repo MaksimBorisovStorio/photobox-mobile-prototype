@@ -23,10 +23,10 @@
 
 const OS_A = '../shared/assets';
 const OS_FONT = PB_DISPLAY;
-const OS_TEAL = '#007377';
-const OS_DEEP = '#004B53';
+const OS_TEAL = '#007F70';
+const OS_DEEP = '#023C42';
 const OS_EDGE = '#E1ECEC';
-const OS_MINT = '#EDF5F6';
+const OS_MINT = '#FFFFFF';
 const OS_PAPER = '#F7F5EF';
 const OS_BOARD = '#0b4a4b';
 const OS_TITLE = 'My photo book';
@@ -281,7 +281,7 @@ function OrderSuccessScreen() {
 
   return (
     <div data-os-still={still || calm ? '' : undefined} data-os-calm={calm ? '' : undefined} style={{
-      width: '100%', height: '100%', position: 'relative', overflow: 'hidden', background: '#fff',
+      width: '100%', height: '100%', position: 'relative', overflow: 'hidden', background: PB_PAPER,
       display: 'flex', flexDirection: 'column', color: '#333', fontFamily: OS_FONT,
     }}>
       <style>{OS_CSS}</style>
@@ -290,7 +290,7 @@ function OrderSuccessScreen() {
         {/* ── Hero: a teal spotlight with slow light rays and twinkles */}
         <div style={{ position: 'relative', paddingBottom: 26, display: 'flex', flexDirection: 'column', alignItems: 'center',
           overflow: 'hidden', borderRadius: '0 0 32px 32px',
-          background: 'radial-gradient(120% 70% at 50% 34%, #0E9E9A 0%, #007377 38%, #00535A 72%, #003A40 100%)' }}>
+          background: 'radial-gradient(120% 70% at 50% 34%, #0E9E9A 0%, #007F70 38%, #00535A 72%, #003A40 100%)' }}>
           <div style={{ alignSelf: 'stretch', position: 'relative', zIndex: 2 }}><IOSStatusBar dark /></div>
           <div style={{ position: 'relative', width: 375, maxWidth: '100%', height: 262, perspective: 1100 }}>
             <div className="os-loop" style={{
@@ -397,11 +397,7 @@ function OrderSuccessScreen() {
               <span style={{ fontSize: 17, fontWeight: 700, color: OS_DEEP }}>Share the excitement</span>
               <span style={{ fontSize: 14, lineHeight: 1.35, color: '#555' }}>Send a sneak peek of {multi ? 'your order' : OS_TITLE} to friends and family.</span>
             </div>
-            <button onClick={share} {...press(0.97)} style={{
-              height: 40, padding: '0 16px', borderRadius: 10, border: 'none', background: OS_TEAL, color: '#fff',
-              display: 'flex', alignItems: 'center', gap: 6, fontFamily: OS_FONT, fontSize: 15, fontWeight: 700,
-              cursor: 'pointer', transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
-            }}><OsSvg name="share" size={20} />Share</button>
+            <button onClick={share} {...press(0.97)} style={pbButton('primary', { height: 44, padding: '0 16px', gap: 6, fontSize: 15 })}><OsSvg name="share" size={20} />Share</button>
           </div>
 
           <div onClick={() => setPlaying(p => !p)} {...press(0.98)} style={{
@@ -436,11 +432,7 @@ function OrderSuccessScreen() {
               <span style={{ fontSize: 15, fontWeight: 700, color: OS_DEEP }}>Questions about your order?</span>
               <span style={{ fontSize: 14, color: '#555' }}>We're happy to help.</span>
             </div>
-            <button {...press(0.97)} style={{
-              height: 36, padding: '0 14px', borderRadius: 10, border: `1.5px solid ${OS_TEAL}`, background: 'transparent',
-              color: OS_TEAL, fontFamily: OS_FONT, fontSize: 14, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
-              transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
-            }}>Chat with us</button>
+            <button {...press(0.97)} style={pbButton('light', { height: 44, padding: '0 16px', fontSize: 15, background: '#fff', border: `1px solid ${PB_GREEN}`, color: PB_GREEN })}>Chat with us</button>
           </div>
         </div>
       </div>
@@ -448,14 +440,8 @@ function OrderSuccessScreen() {
       {/* ── Bottom action bar */}
       <div style={{ flex: 'none', display: 'flex', flexDirection: 'column', gap: 4, background: '#fff',
         padding: '12px 16px max(28px, calc(env(safe-area-inset-bottom, 0px) + 12px))', boxShadow: '0 -6px 24px rgba(0,62,71,.08)' }}>
-        <button onClick={() => window.navigation.push(`order-tracking.html${multi ? '?items=3' : ''}`)} {...press(0.97)} style={{
-          height: 52, borderRadius: 12, border: 'none', background: OS_TEAL, color: '#fff', fontFamily: OS_FONT,
-          fontSize: 16, fontWeight: 700, cursor: 'pointer', transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
-        }}>Track your order</button>
-        <button onClick={() => window.navigation.replace('home.html')} {...press(0.97)} style={{
-          height: 44, border: 'none', background: 'none', color: '#333', fontFamily: OS_FONT, fontSize: 16,
-          fontWeight: 700, cursor: 'pointer', transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
-        }}>Back to home</button>
+        <button onClick={() => window.navigation.push(`order-tracking.html${multi ? '?items=3' : ''}`)} {...press(0.97)} style={pbButton('primary')}>Track your order</button>
+        <button onClick={() => window.navigation.replace('home.html')} {...press(0.97)} style={pbButton('ghost', { height: 44, color: '#333' })}>Back to home</button>
       </div>
 
       {/* ── Confetti: never blocks a tap, skipped on return and with reduce-motion */}

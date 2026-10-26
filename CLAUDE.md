@@ -449,6 +449,20 @@ Supersedes the old wash-and-white-pill splash/onboarding (nodes `451:13758`,
 by these four screens. The rest of the app (home, account, editor…) is still on the
 old teal `#007377`; moving it is a separate pass.
 
+> **✅ Superseded scope — the start-flow UI is now the whole app's UI (everything except the editor, image picker and 3D preview).**
+> Three things carry over: **page colour** `#F1F6F6` (`PB_PAPER`), **primary green** `#007F70` / rim `#00A389` / ink `#023C42`
+> (replacing the old teal `#007377` everywhere, incl. `--color-primary` / `--color-bg`), and **the Button shape** — r16, 56 tall, Rethink Sans
+> Bold 17/20, 1px rim, **not pills**. `shared/brand.jsx` exports `PB_GREEN`, `PB_GREEN_RIM`, `PB_INK`, `PB_PAPER`, `PB_UI` and
+> `pbButton(kind, extra)` (kinds `primary` / `light` / `ghost`); every page that uses it must load `brand.jsx` before its screen script
+> (all do). White CTAs over photos (home hero, "Make this book", product "Start create") are the `light` look with a white fill.
+> **One header control.** Every back arrow is `PbBackButton` (`shared/brand.jsx`): a 44pt iOS-26 liquid-glass circle — white tint over
+> blur, bright top bevel, specular sweep, drop shadow — with an **ink** chevron so contrast holds on paper, photos and the green order-tracking
+> hero. Header actions (memory-detail "more") use `PbGlassButton`. Default position is `left: 16; top: PB_BACK_TOP`; in-flow headers pass
+> `style={{ position: 'relative', left: 0, top: 0 }}`. Do not add new bespoke back buttons. The editor and the frozen image picker keep
+> their own dark glass.
+> Chips, icon circles, the tab-bar pill and toggles stay round. Applied to home (new + returning + playful), product page, book-choose,
+> memories/create, basket, checkout ×3, order success/tracking, account, editor-review. Cache is `photobox-v65`.
+
 **Faces.** Headlines are Bricolage Grotesque (variable, pinned `opsz 14 / wdth 100`),
 buttons Rethink Sans Bold — both Google Fonts, self-hosted latin subsets
 (`pb-font-bricolage.woff2`, `pb-font-rethinksans.woff2`). `OB_HEAD` / `OB_UI` in
@@ -1406,6 +1420,41 @@ no prompt; "No, I'll place them myself" dismisses and places nothing.
 checkout-payment → order-success` are all built but no longer reachable: the picker used
 to be the only way in, and the editor's Continue arrow is still inert by request.
 Pointing that arrow at `basket.html` is a one-line change when wanted.
+
+#### AI help sheet
+The floating AI button opens `AiSheet` (an `ActionSheet`, ~54% of the screen) from the book view and the page view (`PageView` calls `onAi`).
+A scripted mock chat: after a beat of typing it greets you ("Hi! I'm your photo book assistant ✨ Your book has N photos across M pages…")
+and offers starting points as chips (best photos, cover title, balance layouts, fill every frame, keep original proportions, find a theme);
+tapping a chip or typing a few keywords (`aiMatch`) gets a canned reply plus follow-up chips. Two answers are real — "Fill every frame" and
+"Keep original proportions" call the book-wide fit (`setAllFit`). Nothing is stored; the chat starts fresh each time it opens.
+
+#### Photo fit control (page view)
+Select a photo → **Fit** in the selection toolbar opens `FitPanel`: **Original ratio** (`object-fit: contain`, uncropped, on plain paper)
+or **Fill frame** (`cover`, cropped), applied to that photo at once, plus **Apply to all pages**, which makes the choice the book's
+default and drops every override. State is `FitContext` (`{ mode, over }`, `over` keyed by the photo's src) held in `EditorScreen` and persisted
+as `pb_fit` / `pb_fit_over`; `PhotoWell` reads it via `fitOf`. The Trip to Italy flow starts the book on `contain`. An override follows its photo,
+not its slot, so it survives re-layouts and swaps.
+
+#### Floating AI button (Figma `410:8563` / `721:2337`)
+"AI help" (book view) and "Ask AI" (page view + selected-photo row) are no longer tools in the scrolling row. `Toolbar` renders one
+48px glowing green `AiFab` at its right end (`right: 20`, aligned with the tool icons) — three exported layers: glow, sparkle, plus-lighter
+glint (`pb-editor-fab-*.svg`). It sits outside the row's scroller, so the tools scroll beneath it; the row's end padding reserves room so the last tool
+can scroll clear. It is inside `Toolbar`, so it shows on every toolbar state and goes when a drawer unmounts the toolbar. Inert, like the tools it replaced.
+
+#### Auto-fill by chapter — Trip to Italy flow
+Create → Photo books (`book-choose`) hands the editor two things: `pb_photos` (the flat upload, 40 photos) and
+**`pb_groups`** (`{ cover, groups: [{ title, photos }] }`, from `shared/trip-italy.js` — the same data the album page
+`memory-detail` shows as chapters). When `pb_groups` is present, "Yes, auto-fill" runs `planGroups` instead of one photo
+per page: for each chapter a **title page** (`pb_placed` entry `"title:<text>"`, drawn by `PhotoWell` as serif text on
+plain paper), then the chapter's photos split over **two pages** (8 → 4+4, 7 → 4+3, 2 → 1+1; layouts `1-1 / 2-3 / 3-5 / 4-0`
+written to `pb_layouts`), then a **blank page** (bare `"title:"`) so the next title lands on a right-hand page again and every
+chapter's two photo pages stay one spread. The cover takes the album's cover photo and the book grows by whole spreads
+(9 chapters → 35 pages → 36). `pageThumb` skips title entries. Without `pb_groups` auto-fill is unchanged.
+**Original proportions + cover name.** Create also sets `pb_fit = 'contain'` and `pb_cover_title = 'Trip to Italy'`.
+`pb_fit` makes `PhotoWell` use `object-fit: contain` on a transparent well (module var `PB_FIT`), so no photo is cropped;
+`planGroups` then picks, per page, the `LAYOUTS` template (and order of the page's ≤4 photos) that covers the most paper given
+each photo's width/height (`aspects` in `shared/trip-italy.js`, `bestLayout`). `pb_cover_title` replaces the "Add text"
+placeholder on the cover (`coverTitleOf`); a theme's own cover copy still wins. All three keys are cleared by the editor's close button.
 
 #### Page view mode (Figma `451:14499`)
 Tapping any page in the book view zooms into it: one page nearly fills the width

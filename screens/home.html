@@ -10,7 +10,12 @@
   <link rel="manifest" href="../manifest.json">
   <link rel="stylesheet" href="../shared/styles.css">
   <style>
-    html, body { margin:0; padding:0; background: #FFFFFF; }
+    /* iOS 26 Safari tints and blurs the strip behind the status bar with the
+       background of the page or of a fixed element at the top. Over the dark hero a
+       white page gave a white blur across the photo, so the colour follows the
+       header: hero teal while the hero is up, white once the bar turns solid
+       (HomeNewScreen sets --hn-top). */
+    html, body { margin:0; padding:0; background: var(--hn-top, #0b2b2d); }
     ::-webkit-scrollbar { display: none; }
   </style>
   <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
@@ -38,7 +43,7 @@
     function App() {
       const mobile = useIsMobile();
       if (mobile) return (
-        <div style={{position:'fixed', inset:0, background:'#FFFFFF', overflow:'hidden'}}>
+        <div style={{position:'fixed', inset:0, background:'var(--hn-top, #0b2b2d)', overflow:'hidden'}}>
           <HomeNewScreen />
         </div>
       );
