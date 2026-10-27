@@ -91,6 +91,157 @@ const PB_FIT = (() => { try { return sessionStorage.getItem('pb_fit') === 'conta
 // src, set from the page view's Fit control. Persisted as pb_fit / pb_fit_over by EditorScreen.
 const FitContext = React.createContext({ mode: PB_FIT ? 'contain' : 'cover', over: {} });
 const fitOf = (fit, photo) => (photo && fit.over[photo]) || fit.mode;
+// The scripted "low-quality photo" moment (see LowQNudge): which photo the AI flagged, how far the
+// moment has got, and the actions. null when there is nothing to show. PhotoWell reads it to put a
+// warning on the flagged photo; Toolbar reads it to hang the AI's message off its button.
+const LowQ = React.createContext(null);
+
+// ── Text editing (page view). The cover's title and every chapter title page can be selected and
+// restyled: rewrite it (the AI offers names), change its font, size, alignment and colour. Edits
+// are kept per text in `pb_texts`, keyed 'cover' or 't:<the chapter's original title>', as
+// { text, font, size (× the design's own), align, color }. A text is just a span wherever it is
+// drawn (cover designs, title pages, thumbnails, the book view) — EditText applies the edits — and
+// it is only selectable where the context says so, which is page view.
+const TextCtx = React.createContext({ over: {}, canSelect: false, selId: null, onSelect: null });
+const TEXT_FONTS = [
+  { id: 'theme',  label: 'Default',     css: null },
+  { id: 'serif',  label: 'Serif',       css: 'Georgia, "Times New Roman", serif', weight: 700 },
+  { id: 'modern', label: 'Modern',      css: '"DM Sans", -apple-system, system-ui, sans-serif', weight: 800 },
+  { id: 'bold',   label: 'Bold',        css: '"Bricolage Grotesque", "DM Sans", sans-serif', weight: 700 },
+  { id: 'cond',   label: 'Condensed',   css: '"Big Shoulders Display", "Alumni Sans", sans-serif', weight: 800 },
+  { id: 'hand',   label: 'Handwritten', css: '"Caveat", cursive', weight: 700 },
+  { id: 'slab',   label: 'Slab',        css: '"Coustard", Georgia, serif', weight: 400 },
+  { id: 'fun',    label: 'Playful',     css: '"Changa One", "DM Sans", sans-serif', weight: 400 },
+];
+// ── Stickers (page view's Stickers tool). The twenty "Fill" stickers from the Figma (731:6756), exported
+// as outlined SVG (their lettering is paths, so no fonts are needed). A sticker sits on one page, at a
+// centre point (x, y — % of the page), a width (w — % of the page, in container units so it scales
+// with the leaf) and a rotation (r). They live in pb_stickers, keyed by slot (0 is the cover, then two
+// per spread — the same slot indices layouts use), and show in the book view as well. Only inside page
+// view are they interactive: drag to move, the corner handle to scale and turn, × to remove.
+const STICKERS = [
+  ['love', 'Love it'], ['vibes', 'Vibes'], ['fresh', 'Fresh'], ['hot', 'Hot'], ['ok', 'OK'], ['winner', 'Winner'],
+  ['idea', 'Idea'], ['gold', 'Pure gold'], ['thisorthat', 'This or that'], ['steal', 'Steal this'], ['wip', 'W.I.P.'],
+  ['peek', 'Take a peek'], ['explore', 'Keep exploring'], ['thoughts', 'Thoughts?'], ['cutit', 'Cut it'],
+  ['later', 'Save for later'], ['dope', 'Dope'], ['notsure', 'Not sure'], ['killed', 'Killed it'], ['deets', 'Check the deets'],
+];
+const stickerSrc = id => `${A}/stk-${id}.svg`;
+const StickerCtx = React.createContext({ items: {}, canEdit: false, selKey: null, onSelect: null, onChange: null, onRemove: null });
+// Page n's slot index: spread ⌊n/2⌋, and the right-hand leaf when n is odd (spread 0's left leaf is the inside cover).
+const pageSlot = n => 1 + 2 * Math.floor(n / 2) + (n % 2);
+
+function StickerItem({ slot, st }) {
+  const sc = React.useContext(StickerCtx);
+  const ref = React.useRef(null);
+  const edit = sc.canEdit;
+  const sel = edit && sc.selKey === st.key;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const place = (x, y, w, r) => ({ left: `${x}%`, top: `${y}%`, width: `${w}cqw`, transform: `translate(-50%, -50%) rotate(${r}deg)` });
+  // Follow one pointer on `el` until it lifts. Moves are written straight to the DOM — re-rendering the
+  // whole editor per pointermove would stutter — and committed once, on release.
+  const track = (el, pointerId, move, commit) => {
+    try { el.setPointerCapture(pointerId); } catch (err) { /* not fatal */ }
+    const end = () => {
+      el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', end); el.removeEventListener('pointercancel', end);
+      commit();
+    };
+    el.addEventListener('pointermove', move); el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+  };
+  const onDown = e => {
+    if (!edit) return;
+    e.stopPropagation();
+    sc.onSelect(st.key);
+    const el = ref.current, box = el.parentElement.getBoundingClientRect();
+    const sx = e.clientX, sy = e.clientY;
+    let x = st.x, y = st.y, moved = false;
+    track(el, e.pointerId, ev => {
+      moved = true;
+      x = clamp(st.x + (ev.clientX - sx) / box.width * 100, 6, 94);
+      y = clamp(st.y + (ev.clientY - sy) / box.height * 100, 6, 94);
+      el.style.left = `${x}%`; el.style.top = `${y}%`;
+    }, () => { if (moved) sc.onChange(slot, st.key, { x, y }); });
+  };
+  const onHandleDown = e => {
+    e.stopPropagation();
+    const el = ref.current, rc = el.getBoundingClientRect();
+    const cx = rc.left + rc.width / 2, cy = rc.top + rc.height / 2;
+    const d0 = Math.max(8, Math.hypot(e.clientX - cx, e.clientY - cy)), a0 = Math.atan2(e.clientY - cy, e.clientX - cx);
+    let w = st.w, r = st.r, moved = false;
+    track(e.currentTarget, e.pointerId, ev => {
+      moved = true;
+      w = clamp(st.w * Math.hypot(ev.clientX - cx, ev.clientY - cy) / d0, 12, 80);
+      r = st.r + (Math.atan2(ev.clientY - cy, ev.clientX - cx) - a0) * 180 / Math.PI;
+      el.style.width = `${w}cqw`; el.style.transform = `translate(-50%, -50%) rotate(${r}deg)`;
+    }, () => { if (moved) sc.onChange(slot, st.key, { w, r }); });
+  };
+  const knob = { position: 'absolute', width: 28, height: 28, borderRadius: 14, border: 'none', padding: 0, cursor: 'pointer',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FFFFFF', boxShadow: '0 2px 8px rgba(0,0,0,0.45)',
+    touchAction: 'none', WebkitTapHighlightColor: 'transparent' };
+  return (
+    <div ref={ref} onPointerDown={onDown} onClick={edit ? e => e.stopPropagation() : undefined}
+         role={edit ? 'button' : undefined} aria-label={edit ? 'Sticker' : undefined}
+         style={Object.assign({
+           position: 'absolute', zIndex: sel ? 3 : 2, pointerEvents: edit ? 'auto' : 'none', touchAction: 'none',
+           cursor: edit ? 'grab' : 'default', WebkitTapHighlightColor: 'transparent', userSelect: 'none', WebkitUserSelect: 'none',
+           outline: sel ? '1.5px dashed #00C2C9' : 'none', outlineOffset: 5, borderRadius: 4,
+         }, place(st.x, st.y, st.w, st.r))}>
+      <img src={stickerSrc(st.id)} alt="" draggable={false} style={{ display: 'block', width: '100%', height: 'auto', pointerEvents: 'none',
+        filter: 'drop-shadow(0 1px 1.5px rgba(0,0,0,0.28))', animation: 'pbStickerPop 420ms cubic-bezier(.34,1.5,.64,1) both' }} />
+      {sel && (
+        <React.Fragment>
+          <button type="button" aria-label="Remove sticker" onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); sc.onRemove(slot, st.key); }}
+            style={Object.assign({}, knob, { left: -16, top: -16 })}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#222" strokeWidth="2.4" strokeLinecap="round"><path d="M3 3l8 8M11 3l-8 8" /></svg>
+          </button>
+          <button type="button" aria-label="Resize and rotate" onPointerDown={onHandleDown}
+            style={Object.assign({}, knob, { right: -16, bottom: -16, cursor: 'nwse-resize', background: '#00C2C9' })}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#032" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.5 2.5h4v4M13.5 2.5l-4.5 4.5M6.5 13.5h-4v-4M2.5 13.5L7 9" /></svg>
+          </button>
+        </React.Fragment>
+      )}
+    </div>
+  );
+}
+// The stickers on one slot, drawn over its page. The parent must be a size container (every leaf is).
+function UserStickers({ slot }) {
+  const sc = React.useContext(StickerCtx);
+  const list = slot == null ? null : sc.items[slot];
+  if (!list || !list.length) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 4 }}>
+      {list.map(st => <StickerItem key={st.key} slot={slot} st={st} />)}
+    </div>
+  );
+}
+
+const TEXT_COLORS = ['#FFFFFF', '#111111', '#023C42', '#F6F1E7', '#E0457B', '#D32F2F', '#F57C00', '#FFC107', '#2E9A57', '#00A389', '#2D6CDF', '#6C4BC8'];
+const TEXT_IDEAS_COVER = ['Our Italian summer', 'Two weeks of sun', 'La dolce vita', 'Bella Italia', 'Sun, sea & pasta', 'Italia, mon amour'];
+const TEXT_IDEAS_PAGE = ['Golden moments', 'Along the way', 'Little things', 'Just us', 'Dolce far niente', 'Remember this'];
+
+function EditText({ id, text, style }) {
+  const tc = React.useContext(TextCtx);
+  const ov = tc.over[id] || {};
+  const edited = Object.keys(ov).length > 0;
+  const font = TEXT_FONTS.find(f => f.id === ov.font);
+  const m = /^([\d.]+)(.*)$/.exec(String(style.fontSize || ''));
+  const st = Object.assign({}, style);
+  if (m && ov.size) st.fontSize = `${parseFloat(m[1]) * ov.size}${m[2]}`;
+  if (font && font.css) Object.assign(st, { fontFamily: font.css, fontWeight: font.weight, fontStyle: 'normal', textTransform: 'none', letterSpacing: 'normal' });
+  if (ov.align) st.textAlign = ov.align;
+  if (ov.color) st.color = ov.color;
+  // Edited text may no longer fit on one line, so it wraps rather than being cut off.
+  if (edited) Object.assign(st, { whiteSpace: 'normal', overflow: 'visible', textOverflow: 'clip', wordBreak: 'break-word', lineHeight: 1.12 });
+  const on = tc.canSelect;
+  const sel = on && tc.selId === id;
+  if (on) Object.assign(st, { pointerEvents: 'auto', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' });
+  if (sel) Object.assign(st, { outline: '1.5px dashed #00C2C9', outlineOffset: '1.2cqi', borderRadius: 2, background: 'rgba(0,194,201,0.12)' });
+  return (
+    <span style={st} role={on ? 'button' : undefined} aria-pressed={on ? sel : undefined}
+          onClick={on ? e => { e.stopPropagation(); tc.onSelect(id, text); } : undefined}>
+      {ov.text != null ? ov.text : text}
+    </span>
+  );
+}
 const coverTitleOf = t => (t.title === 'Add text' && PB_COVER_TITLE) || t.title;
 
 // A chapter title page is stored in pb_placed as the string "title:<text>", so every
@@ -257,7 +408,7 @@ function leafBox(left, t = CLASSIC, color) {
 
 // `blank` is an inside-cover leaf: it carries no page number and cannot hold a photo,
 // so it is plain paper — no well, no placeholder, nothing to tap.
-function Leaf({ side, photos, onOpen, label, layout, onEmpty, blank, n }) {
+function Leaf({ side, photos, onOpen, label, layout, onEmpty, blank, n, slot }) {
   const left = side === 'left';
   const t = useTheme();
   const { colors } = React.useContext(BookPaint);
@@ -284,6 +435,7 @@ function Leaf({ side, photos, onOpen, label, layout, onEmpty, blank, n }) {
       <div style={{ position: 'relative', flex: 1, minWidth: 0, containerType: 'size' }}>
         {!blank && <LayoutWell layout={layout} photos={photos} onEmpty={onEmpty} />}
         {!blank && <ThemeSticker n={n} />}
+        <UserStickers slot={slot} />
       </div>
     </div>
   );
@@ -300,6 +452,7 @@ function Leaf({ side, photos, onOpen, label, layout, onEmpty, blank, n }) {
 function PhotoWell({ photo, style, iconSize = 24, index }) {
   const t = useTheme();
   const fitCtx = React.useContext(FitContext);
+  const lq = React.useContext(LowQ);
   const contain = fitOf(fitCtx, photo) === 'contain';
   if (isTitle(photo)) {
     // A chapter title page: just the paper, with the title set on it. Sized in container
@@ -313,8 +466,9 @@ function PhotoWell({ photo, style, iconSize = 24, index }) {
         boxSizing: 'border-box', WebkitUserSelect: 'none', userSelect: 'none', color: t.ink || '#2A2A2A',
       }, style)}>
         <span style={{ width: '10cqw', height: 2, background: 'currentColor', opacity: .45 }} />
-        <span style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 700, fontSize: '10cqw', lineHeight: 1.1,
-          letterSpacing: '-0.01em' }}>{photo.slice(TITLE_PREFIX.length)}</span>
+        <EditText id={`t:${photo.slice(TITLE_PREFIX.length)}`} text={photo.slice(TITLE_PREFIX.length)}
+                  style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 700, fontSize: '10cqw', lineHeight: 1.1,
+                           letterSpacing: '-0.01em', display: 'block', maxWidth: '100%' }} />
       </div>
     );
   }
@@ -333,6 +487,14 @@ function PhotoWell({ photo, style, iconSize = 24, index }) {
       ) : (
         <img src={`${A}/pb-editor-add-image.svg`} alt="" width={iconSize} height={iconSize}
              draggable={false} style={{ display: 'block', WebkitUserDrag: 'none' }} />
+      )}
+      {photo && lq && lq.flag && photo === lq.src && (
+        <span aria-hidden style={{
+          position: 'absolute', top: '4cqw', right: '4cqw', width: 'clamp(14px, 8cqw, 26px)', height: 'clamp(14px, 8cqw, 26px)',
+          borderRadius: '50%', background: '#FFB020', color: '#2A1A00', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontFamily: TEXT, fontWeight: 800, fontSize: 'clamp(9px, 5cqw, 16px)', lineHeight: 1,
+          boxShadow: '0 0 0 2px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.4)', animation: 'pbPulse 1.8s ease-in-out infinite',
+        }}>!</span>
       )}
     </div>
   );
@@ -819,10 +981,10 @@ function CoverFront({ design, photos, layout, onEmpty, adjust, iconSize, pad, bg
     );
   };
   const title = (style, color) => (
-    <span style={Object.assign(titleStyle(t), {
+    <EditText id="cover" text={coverTitleOf(t)} style={Object.assign(titleStyle(t), {
       position: 'absolute', zIndex: 1, lineHeight: 1.2, color: color || ink,
       fontSize: `${10.5 * t.size}cqi`, pointerEvents: 'none',
-    }, style)}>{coverTitleOf(t)}</span>
+    }, style)} />
   );
   const centred = { left: '8%', right: '8%', textAlign: 'center' };
   const onPhoto = { color: '#FFFFFF', textShadow: '0 0.4cqi 2cqi rgba(0,0,0,0.45)' };
@@ -873,10 +1035,10 @@ function CoverFront({ design, photos, layout, onEmpty, adjust, iconSize, pad, bg
       // Classic — the node's own cover: title on top, the photo below it.
       <div style={{ position: 'absolute', left: p.left, right: p.right, top: p.top, bottom: p.bottom,
                     display: 'flex', flexDirection: 'column', gap: '3cqi' }}>
-        <span style={Object.assign(titleStyle(t), {
+        <EditText id="cover" text={coverTitleOf(t)} style={Object.assign(titleStyle(t), {
           flex: '0 0 auto', color: ink, fontSize: `${10.5 * t.size}cqi`, lineHeight: 1.25,
           paddingLeft: '1cqi',
-        })}>{coverTitleOf(t)}</span>
+        })} />
         <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
           <LayoutWell layout={layout} photos={photos || []} onEmpty={onEmpty}
                       adjust={adjust} iconSize={iconSize}
@@ -1183,7 +1345,8 @@ function LayoutWell({ layout, photos, iconSize = 24, style, onSelect, selected, 
             </div>
           );
         }
-        if (!pickable || !photo) {
+        // A chapter title page is text, not a photo: its words are what get selected.
+        if (!pickable || !photo || isTitle(photo)) {
           return <PhotoWell key={i} photo={photo} iconSize={icon} index={i}
                             style={Object.assign({ flex: 'none' }, box)} />;
         }
@@ -1304,6 +1467,7 @@ function CoverInterior({ onOpen, layout, photos, onEmpty }) {
             <CoverFront design={paint.cover} layout={layout} photos={photos} onEmpty={onEmpty}
                         bg={color || t.page} />
             <ThemeSticker n={null} />
+            <UserStickers slot={0} />
           </div>
         </div>
   );
@@ -1324,7 +1488,7 @@ function CoverBlock({ aspect, onOpen, layout, photos, onEmpty }) {
 // `photos` is the placed list, indexed by page number — page n holds photos[n-1].
 // The inside-front and inside-back leaves carry no page number, so they stay empty.
 function SpreadBlock({ aspect, left, right, showPlus, onAdd, photos, onOpen,
-                      layoutFor, pool, onEmpty }) {
+                      layoutFor, pool, onEmpty, slotL, slotR }) {
   const name = n => (n ? `page ${n}` : 'the inside cover');
   const at = (n, side) => {
     const layout = layoutFor && layoutFor(side);
@@ -1334,11 +1498,11 @@ function SpreadBlock({ aspect, left, right, showPlus, onAdd, photos, onOpen,
     <div style={{ position: 'relative', width: '100%' }}>
       <Sheet aspect={aspect} interior={
         <React.Fragment>
-          <Leaf side="left" n={left} photos={at(left, 'left')} label={name(left)}
+          <Leaf side="left" n={left} slot={slotL} photos={at(left, 'left')} label={name(left)}
                 layout={layoutFor && layoutFor('left')}
                 onEmpty={onEmpty && left ? i => onEmpty(left, (layoutFor('left') || FULL_PAGE).length, i) : undefined}
                 blank={!left} onOpen={onOpen && left ? (() => onOpen('left')) : undefined} />
-          <Leaf side="right" n={right} photos={at(right, 'right')} label={name(right)}
+          <Leaf side="right" n={right} slot={slotR} photos={at(right, 'right')} label={name(right)}
                 layout={layoutFor && layoutFor('right')}
                 onEmpty={onEmpty && right ? i => onEmpty(right, (layoutFor('right') || FULL_PAGE).length, i) : undefined}
                 blank={!right} onOpen={onOpen && right ? (() => onOpen('right')) : undefined} />
@@ -1538,6 +1702,28 @@ const SELECTED_TOOLS = [
   { id: 'delete',  label: 'Delete',  icon: 'pb-editor-tool-delete.svg' },
 ];
 
+// The text controls' tabs, drawn along the top of TextPanel (five of them fit the width, where a
+// toolbar row would have scrolled and hidden Align and Color behind the AI button). Glyphs are
+// inline, stroke = currentColor, 24px — the Figma has no text tools to export.
+const TEXT_TABS = [
+  { id: 'edit',  label: 'Edit',  glyph: <><path d="M4 20h4L19.5 8.5l-4-4L4 16z" /><path d="M13.5 6.5l4 4" /></> },
+  { id: 'font',  label: 'Font',  glyph: <><path d="M3.5 18L8 6l4.5 12" /><path d="M5 14h6" /><path d="M14.5 18v-6m0 1.5c0-1.4 1-2 2.2-2 1.5 0 2.3.8 2.3 2.2V18m0-2.2c-.4-.3-1-.4-1.8-.4-1.4 0-2.6.5-2.6 1.6 0 .9.8 1.4 1.9 1.4.9 0 1.9-.4 2.5-1.2" /></> },
+  { id: 'size',  label: 'Size',  glyph: <><path d="M3 18V7h8M7 7v11" /><path d="M13 18v-6h8M17 12v6" /></> },
+  { id: 'align', label: 'Align', glyph: <><path d="M4 7h16M4 12h10M4 17h14" /></> },
+  { id: 'color', label: 'Color', glyph: <><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none" /></> },
+];
+// The toolbar while a sticker is selected: Back, then add another, or remove this one.
+const STICKER_TOOLS = [
+  { id: 'back',   label: 'Back',    icon: 'pb-editor-sel-back.svg' },
+  { divider: true },
+  { id: 'more',   label: 'Add more', glyph: <><circle cx="12" cy="12" r="8.5" /><path d="M8.5 14.2c.9 1.3 2 1.9 3.5 1.9s2.6-.6 3.5-1.9" /><path d="M9.2 9.8h.01M14.8 9.8h.01" strokeWidth="2.4" /></> },
+  { id: 'delete', label: 'Remove',  icon: 'pb-editor-tool-delete.svg' },
+];
+// While a text is selected the toolbar keeps only Back: the panel above it carries the controls.
+const TEXT_TOOLS = [
+  { id: 'back',  label: 'Back',  icon: 'pb-editor-sel-back.svg' },
+];
+
 function PhotosStackIcon({ photos, count }) {
   return (
     // 26×24 per the node. The badge deliberately breaks out of it — 13px to the right
@@ -1576,7 +1762,7 @@ function PhotosStackIcon({ photos, count }) {
 
 // The node's drop-shadow sits on the row; applied per tool instead, which composites
 // identically (tools never overlap) and keeps a filter off the scroll container.
-function Tool({ label, icon, children, onClick }) {
+function Tool({ label, icon, glyph, children, onClick }) {
   return (
     <button type="button" onClick={onClick} {...press(0.9)} style={{
       flex: '0 0 auto', width: 68, padding: '0 8px', boxSizing: 'border-box',
@@ -1586,9 +1772,11 @@ function Tool({ label, icon, children, onClick }) {
       transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
       filter: 'drop-shadow(0px 4px 2px rgba(0,0,0,0.25))',
     }}>
-      {children || (
+      {children || (glyph ? (
+        <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>{glyph}</svg>
+      ) : (
         <img src={`${A}/${icon}`} alt="" width={24} height={24} style={{ display: 'block' }} />
-      )}
+      ))}
       <span style={{
         fontFamily: '-apple-system, "SF Pro", system-ui, sans-serif', fontWeight: 510,
         fontSize: 12, lineHeight: '20px', whiteSpace: 'nowrap',
@@ -1616,7 +1804,7 @@ const BLUR_BANDS = [[16, 24, 56], [8, 40, 78], [4, 56, 100], [2, 74, 122], [1, 9
 const AI_FAB = 48;
 const AI_FAB_RESERVE = 20 + AI_FAB + 8;   // right margin + button + air — the row's end padding
 const AI_FAB_MASK = 'linear-gradient(to right, #000 0, #000 calc(100% - 180px), rgba(0,0,0,0) calc(100% - 70px))';
-function AiFab({ onClick }) {
+function AiFab({ onClick, alert }) {
   return (
     <button type="button" aria-label="AI help" onClick={onClick} {...press(0.92)} style={{
       position: 'absolute', right: 20, width: AI_FAB, height: AI_FAB, padding: 0, border: 'none', background: 'none',
@@ -1629,11 +1817,16 @@ function AiFab({ onClick }) {
         transform: 'translate(-50%, -50%)', display: 'block', pointerEvents: 'none' }} />
       <img src={`${A}/pb-editor-fab-glint.svg`} alt="" draggable={false} style={{ position: 'absolute', left: 15.12 - 4.7, top: 6 - 4.7, width: 27.05, height: 44.44,
         mixBlendMode: 'plus-lighter', display: 'block', pointerEvents: 'none' }} />
+      {alert && (
+        <span aria-hidden style={{ position: 'absolute', top: -2, right: -2, width: 14, height: 14, borderRadius: 7, background: '#FFB020',
+          boxShadow: '0 0 0 2px #1B1B1B', animation: 'pbPulse 1.8s ease-in-out infinite' }} />
+      )}
     </button>
   );
 }
 
 function Toolbar({ photos, tools = TOOLS, gap = 10, padX = 8, onTool }) {
+  const lq = React.useContext(LowQ);
   return (
     <div style={{
       position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 6,
@@ -1690,7 +1883,115 @@ function Toolbar({ photos, tools = TOOLS, gap = 10, padX = 8, onTool }) {
           )
         ))}
       </div>
-      <AiFab onClick={onTool && (() => onTool('ai'))} />
+      {lq && <LowQNudge lq={lq} />}
+      <AiFab onClick={onTool && (() => onTool('ai'))} alert={!!lq && lq.stage === 'min'} />
+    </div>
+  );
+}
+
+// ── "One of your photos is too low-quality to print" — a scripted moment. Right after auto-fill puts
+// the Trip to Italy chapters in the book, the AI speaks up from its button: one photo is too small to
+// print sharply. The bubble shows which photo (and which page), and offers two fixes: upscale it, or
+// replace it with another shot from the same day. Both are canned — nothing is really enhanced — but
+// Replace really swaps the photo in the book. It hangs off the AI button, so it lives inside Toolbar
+// and goes with it when a drawer covers the toolbar. Closing it leaves an amber dot on the button
+// (stage 'min'); tapping the button brings it back.
+// stages: open → min (closed) · upscaling → fixed · replacing → replaced · done (gone)
+function LowQNudge({ lq }) {
+  const { stage, src, n, uploaded } = lq;
+  if (stage === 'min' || stage === 'done') return null;
+  const i = Math.max(0, uploaded.indexOf(src));
+  const alts = [];
+  for (let k = 1; alts.length < 4 && k <= uploaded.length; k++) {
+    const c = uploaded[(i + k * 3) % uploaded.length];
+    if (c && c !== src && alts.indexOf(c) < 0) alts.push(c);
+  }
+  const sharp = stage === 'upscaling' || stage === 'fixed';
+  const done = stage === 'fixed' || stage === 'replaced';
+  const ok = stage === 'fixed';                       // 'sharp' starts the photo clearing; 'ok' is when it is certified
+  const body = stage === 'open' ? 'One of your photos is too low-resolution to print sharply. It may look soft on paper.'
+    : stage === 'upscaling' ? 'Enhancing detail…'
+    : stage === 'fixed' ? 'Done. The photo is now sharp enough to print.'
+    : stage === 'replacing' ? 'Here are some other shots from the same day. Tap one to swap it in.'
+    : 'Replaced. Your book is ready to print.';
+  const chip = (label, onClick, primary) => (
+    <button type="button" onClick={onClick} {...press(0.97)} style={{
+      flex: 1, height: 40, borderRadius: 20, border: 'none', cursor: 'pointer', padding: '0 12px', whiteSpace: 'nowrap',
+      background: primary ? '#007F70' : 'rgba(255,255,255,0.1)', color: '#fff',
+      boxShadow: primary ? 'inset 0 0 0 1px #00A389' : 'inset 0 0 0 1px rgba(255,255,255,0.14)',
+      fontFamily: TEXT, fontSize: 14, fontWeight: 600, letterSpacing: '-0.2px', transition: 'transform 140ms ease',
+      WebkitTapHighlightColor: 'transparent' }}>{label}</button>
+  );
+  return (
+    <div role="dialog" aria-label="AI help" style={{
+      position: 'absolute', right: 16, width: 'min(320px, calc(100% - 32px))', boxSizing: 'border-box', zIndex: 3,
+      bottom: 'calc(max(37px, calc(env(safe-area-inset-bottom, 0px) + 8px)) + 4px + 48px + 14px)',
+      padding: 14, borderRadius: 22, pointerEvents: 'auto',
+      background: 'rgba(34,34,34,0.96)', backdropFilter: 'blur(20px) saturate(140%)', WebkitBackdropFilter: 'blur(20px) saturate(140%)',
+      boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.09), 0 16px 40px rgba(0,0,0,0.55)',
+      display: 'flex', flexDirection: 'column', gap: 12, animation: 'pbBubbleIn 320ms cubic-bezier(.2,.9,.3,1.2) both', transformOrigin: 'bottom right',
+    }}>
+      <span aria-hidden style={{ position: 'absolute', right: 24, bottom: -6, width: 14, height: 14, background: 'rgba(34,34,34,0.96)',
+        transform: 'rotate(45deg)', borderRadius: 3, boxShadow: '2px 2px 0 rgba(255,255,255,0.05)' }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span aria-hidden style={{ width: 24, height: 24, borderRadius: 12, background: '#007F70', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 0 10px rgba(0,163,137,0.55)' }}>
+          <img src={`${A}/pb-editor-fab-star.svg`} alt="" width={14} height={13} style={{ display: 'block' }} />
+        </span>
+        <span style={{ flex: 1, fontFamily: TEXT, fontSize: 13, fontWeight: 700, letterSpacing: '.02em', color: '#9BE3DC' }}>AI help</span>
+        {!done && stage !== 'upscaling' && (
+          <button type="button" aria-label="Close" onClick={lq.onClose} {...press(0.9)} style={{ width: 28, height: 28, borderRadius: 14, border: 'none', cursor: 'pointer', padding: 0,
+            background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 140ms ease' }}>
+            <img src={`${A}/pb-editor-close.svg`} alt="" width={16} height={16} style={{ display: 'block' }} />
+          </button>
+        )}
+      </div>
+
+      <p style={{ margin: 0, fontFamily: TEXT, fontSize: 15, lineHeight: '21px', letterSpacing: '-0.24px', color: '#fff' }}>{body}</p>
+
+      {(stage === 'open' || stage === 'upscaling' || stage === 'fixed') && (
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <button type="button" aria-label={lq.canShow ? 'Show this photo on its page' : 'The photo'} onClick={lq.canShow ? lq.onShow : undefined}
+            {...press(0.97)} style={{ position: 'relative', flex: 'none', width: 72, height: 72, padding: 0, border: 'none', borderRadius: 12, overflow: 'hidden',
+              cursor: lq.canShow ? 'pointer' : 'default', background: '#111', transition: 'transform 140ms ease' }}>
+            <img src={src} alt="" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block',
+              filter: sharp ? 'none' : 'blur(1.1px) contrast(.95)', transition: 'filter 1.6s ease' }} />
+            {!sharp && <span style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(0,0,0,.12) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,.12) 1px, transparent 1px)',
+              backgroundSize: '6px 6px', pointerEvents: 'none' }} />}
+            <span style={{ position: 'absolute', left: 4, top: 4, width: 20, height: 20, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: ok ? '#00A389' : '#FFB020', color: ok ? '#fff' : '#2A1A00', fontFamily: TEXT, fontWeight: 800, fontSize: 13, transition: 'background .3s ease' }}>{ok ? '✓' : '!'}</span>
+          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
+            <span style={{ fontFamily: TEXT, fontSize: 15, fontWeight: 600, letterSpacing: '-0.24px', color: '#fff' }}>Page {n}</span>
+            <span style={{ fontFamily: TEXT, fontSize: 13, lineHeight: '17px', color: ok ? '#9BE3DC' : '#FFC964', transition: 'color .3s ease' }}>
+              {ok ? '2560 × 1707 px · print-ready' : stage === 'upscaling' ? 'Upscaling to 2560 × 1707 px…' : '640 × 427 px · too small to print'}</span>
+            {stage === 'upscaling' && (
+              <span aria-hidden style={{ marginTop: 4, height: 4, width: 120, borderRadius: 2, background: 'rgba(255,255,255,0.14)', overflow: 'hidden' }}>
+                <span style={{ display: 'block', height: '100%', background: '#00C2A8', transformOrigin: 'left', animation: 'pbBar 1.8s ease-in-out both' }} />
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {stage === 'replacing' && (
+        <div style={{ display: 'flex', gap: 8 }}>
+          {alts.map(a => (
+            <button key={a} type="button" aria-label="Use this photo" onClick={() => lq.onPick(a)} {...press(0.95)} style={{ flex: 1, minWidth: 0, aspectRatio: '1', padding: 0, border: 'none',
+              borderRadius: 10, overflow: 'hidden', cursor: 'pointer', background: '#111', transition: 'transform 140ms ease' }}>
+              <img src={a} alt="" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {stage === 'open' && (
+        <div style={{ display: 'flex', gap: 8 }}>
+          {chip('Upscale with AI', lq.onUpscale, true)}
+          {chip('Replace photo', lq.onReplace)}
+        </div>
+      )}
+      {stage === 'replacing' && <div style={{ display: 'flex' }}>{chip('Back', lq.onBack)}</div>}
     </div>
   );
 }
@@ -2024,6 +2325,7 @@ function CoverUnit({ w, h, pageW, frontRef, layout, adjust, photos, onEmpty, onS
                       bg={slotColor(paint.colors, 0) || t.page} />
         </div>
         <ThemeSticker n={null} />
+        <UserStickers slot={0} />
       </BigLeaf>
     </BookUnit>
   );
@@ -2293,6 +2595,150 @@ function AiSheet({ closing, onClose, photoCount, pageCount, onFitAll }) {
         </form>
       </div>
     </ActionSheet>
+  );
+}
+
+// ── The sticker sheet — an Instagram-style grid in a bottom sheet. Tapping a sticker puts it on the page
+// you are looking at, selected, and the sheet closes so you can drag it where you want.
+function StickerSheet({ closing, onClose, onPick }) {
+  return (
+    <ActionSheet closing={closing} minHeight="64%" onDismiss={onClose} labelledBy="pb-stk-title">
+      <div style={{ display: 'flex', flexDirection: 'column', height: '64vh', minHeight: 420, maxHeight: '100%' }}>
+        <span aria-hidden style={{ alignSelf: 'center', width: 36, height: 5, borderRadius: 3, background: 'rgba(255,255,255,0.22)', margin: '8px 0 0' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px 12px' }}>
+          <p id="pb-stk-title" style={{ margin: 0, flex: 1, fontFamily: TEXT, fontSize: 20, fontWeight: 700, color: '#fff', letterSpacing: '-0.3px' }}>Stickers</p>
+          <button type="button" aria-label="Close" onClick={onClose} {...press(0.9)} style={{ width: 32, height: 32, borderRadius: 16, border: 'none', cursor: 'pointer',
+            background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, transition: 'transform 140ms ease' }}>
+            <img src={`${A}/pb-editor-close.svg`} alt="" width={20} height={20} style={{ display: 'block' }} />
+          </button>
+        </div>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch',
+          padding: '0 16px max(20px, calc(env(safe-area-inset-bottom, 0px) + 12px))',
+          display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, alignContent: 'start' }}>
+          {STICKERS.map(([id, name]) => (
+            <button key={id} type="button" aria-label={name} onClick={() => onPick(id)} {...press(0.94)} style={{
+              aspectRatio: '1', padding: 0, border: 'none', borderRadius: 20, cursor: 'pointer', background: '#272727',
+              boxShadow: 'inset 0 0 0 1px #363636', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent' }}>
+              <img src={stickerSrc(id)} alt="" draggable={false} loading="lazy" style={{ maxWidth: '78%', maxHeight: '78%', objectFit: 'contain', display: 'block' }} />
+            </button>
+          ))}
+        </div>
+      </div>
+    </ActionSheet>
+  );
+}
+
+// ── The text controls — one panel above the toolbar for whichever tool is open (Edit / Font /
+// Size / Align / Color), in FitPanel's glass. Edit is a text field with the AI's name ideas under
+// it; everything applies at once, so the page behind shows the result and there is nothing to confirm.
+function TextPanel({ kind, onKind, text, ov, ideas, onChange, onClose }) {
+  const shell = {
+    position: 'absolute', left: 16, right: 16, zIndex: 8, bottom: 'calc(139px + env(safe-area-inset-bottom, 0px) + 6px)',
+    padding: 8, borderRadius: 22, boxSizing: 'border-box',
+    background: 'rgba(32,32,32,0.94)', backdropFilter: 'blur(20px) saturate(140%)', WebkitBackdropFilter: 'blur(20px) saturate(140%)',
+    boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.08), 0 12px 30px rgba(0,0,0,0.5)',
+    display: 'flex', flexDirection: 'column', gap: 8, animation: 'pbFadeIn 160ms ease both',
+  };
+  const row = { display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', padding: '2px 2px' };
+  const shown = ov.text != null ? ov.text : text;
+  const size = ov.size || 1;
+  const isSeg = (on, extra) => Object.assign({
+    flex: 1, height: 44, borderRadius: 12, border: 'none', cursor: 'pointer', padding: 0,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    background: on ? '#F0F0F0' : 'transparent', color: on ? '#222' : '#DDD',
+    transition: 'transform 140ms ease, background 160ms ease', WebkitTapHighlightColor: 'transparent',
+  }, extra);
+  const body = (() => {
+    if (kind === 'edit') return (
+      <React.Fragment>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <input autoFocus value={shown} aria-label="Text" onChange={e => onChange({ text: e.target.value })}
+            onFocus={e => e.target.select()}
+            style={{ flex: 1, minWidth: 0, height: 44, borderRadius: 14, border: 'none', outline: 'none', padding: '0 14px', boxSizing: 'border-box',
+              background: '#272727', color: '#fff', fontFamily: TEXT, fontSize: 17, letterSpacing: '-0.3px', boxShadow: 'inset 0 0 0 1px #363636' }} />
+          <button type="button" aria-label="Done" onClick={onClose} {...press(0.92)} style={{ width: 44, height: 44, borderRadius: 22, border: 'none', cursor: 'pointer',
+            background: '#007F70', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, transition: 'transform 140ms ease' }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+          </button>
+        </div>
+        <div style={Object.assign({ alignItems: 'center' }, row)}>
+          <span aria-hidden style={{ flex: 'none', display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 6, fontFamily: TEXT, fontSize: 13, fontWeight: 700, color: '#9BE3DC', whiteSpace: 'nowrap' }}>
+            <img src={`${A}/pb-editor-fab-star.svg`} alt="" width={16} height={15} style={{ display: 'block' }} />Ideas
+          </span>
+          {ideas.map(idea => (
+            <button key={idea} type="button" onClick={() => onChange({ text: idea })} {...press(0.97)} style={{ flex: 'none', height: 36, padding: '0 14px', borderRadius: 18,
+              border: 'none', cursor: 'pointer', color: '#9BE3DC', background: 'rgba(0,127,112,0.16)', boxShadow: 'inset 0 0 0 1px rgba(155,227,220,0.35)',
+              fontFamily: TEXT, fontSize: 14, fontWeight: 600, letterSpacing: '-0.2px', whiteSpace: 'nowrap', transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent' }}>{idea}</button>
+          ))}
+        </div>
+      </React.Fragment>
+    );
+    if (kind === 'font') return (
+      <div style={row}>
+        {TEXT_FONTS.map(f => {
+          const on = (ov.font || 'theme') === f.id;
+          return (
+            <button key={f.id} type="button" aria-pressed={on} onClick={() => onChange({ font: f.id === 'theme' ? null : f.id })} {...press(0.97)} style={{
+              flex: 'none', width: 92, height: 64, borderRadius: 14, border: 'none', cursor: 'pointer', padding: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
+              background: on ? '#F0F0F0' : 'rgba(255,255,255,0.08)', color: on ? '#222' : '#fff', transition: 'transform 140ms ease, background 160ms ease', WebkitTapHighlightColor: 'transparent' }}>
+              <span style={{ fontFamily: f.css || 'inherit', fontWeight: f.weight || 700, fontSize: 24, lineHeight: '28px' }}>Aa</span>
+              <span style={{ fontFamily: TEXT, fontSize: 11, fontWeight: 600, opacity: .75 }}>{f.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    );
+    if (kind === 'size') return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 10px' }}>
+        <span aria-hidden style={{ fontFamily: TEXT, fontWeight: 700, fontSize: 13, color: '#ccc' }}>A</span>
+        <input className="pb-range" type="range" min="50" max="200" step="5" value={Math.round(size * 100)} aria-label="Text size"
+          onChange={e => onChange({ size: Number(e.target.value) / 100 })}
+          style={{ '--v': `${((size * 100 - 50) / 150) * 100}%` }} />
+        <span aria-hidden style={{ fontFamily: TEXT, fontWeight: 700, fontSize: 22, color: '#ccc' }}>A</span>
+        <span style={{ flex: 'none', width: 44, textAlign: 'right', fontFamily: TEXT, fontSize: 14, fontWeight: 600, color: '#fff' }}>{Math.round(size * 100)}%</span>
+      </div>
+    );
+    if (kind === 'align') return (
+      <div style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 16, background: 'rgba(0,0,0,0.45)' }}>
+        {[['left', 'M4 7h16M4 12h10M4 17h14'], ['center', 'M4 7h16M7 12h10M5 17h14'], ['right', 'M4 7h16M10 12h10M6 17h14']].map(([a, d]) => (
+          <button key={a} type="button" aria-label={`Align ${a}`} aria-pressed={(ov.align || 'default') === a} onClick={() => onChange({ align: a })} {...press(0.97)} style={isSeg((ov.align || 'default') === a)}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d={d} /></svg>
+          </button>
+        ))}
+      </div>
+    );
+    return (
+      <div style={Object.assign({ alignItems: 'center' }, row)}>
+        <button type="button" aria-label="Automatic colour" aria-pressed={!ov.color} onClick={() => onChange({ color: null })} {...press(0.95)} style={{ flex: 'none', height: 36, padding: '0 14px', borderRadius: 18,
+          border: 'none', cursor: 'pointer', background: !ov.color ? '#F0F0F0' : 'rgba(255,255,255,0.1)', color: !ov.color ? '#222' : '#fff',
+          fontFamily: TEXT, fontSize: 14, fontWeight: 600, transition: 'transform 140ms ease' }}>Auto</button>
+        {TEXT_COLORS.map(c => (
+          <button key={c} type="button" aria-label={`Colour ${c}`} aria-pressed={ov.color === c} onClick={() => onChange({ color: c })} {...press(0.92)} style={{ flex: 'none', width: 36, height: 36, borderRadius: 18,
+            border: 'none', cursor: 'pointer', padding: 0, background: c, transition: 'transform 140ms ease',
+            boxShadow: ov.color === c ? '0 0 0 2px #1F1F1F, 0 0 0 4px #FFFFFF' : 'inset 0 0 0 1px rgba(255,255,255,0.25)' }} />
+        ))}
+      </div>
+    );
+  })();
+  return (
+    <div role="dialog" aria-label="Text" onClick={e => e.stopPropagation()} style={shell}>
+      <div role="tablist" style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 16, background: 'rgba(0,0,0,0.45)' }}>
+        {TEXT_TABS.map(t => {
+          const on = kind === t.id;
+          return (
+            <button key={t.id} type="button" role="tab" aria-selected={on} onClick={() => onKind(t.id)} {...press(0.95)} style={{
+              flex: 1, minWidth: 0, height: 48, borderRadius: 12, border: 'none', cursor: 'pointer', padding: 0, display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center', gap: 2, background: on ? '#F0F0F0' : 'transparent', color: on ? '#222' : '#DDD',
+              transition: 'transform 140ms ease, background 160ms ease', WebkitTapHighlightColor: 'transparent' }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{t.glyph}</svg>
+              <span style={{ fontFamily: TEXT, fontSize: 11, fontWeight: 600, letterSpacing: '-0.1px' }}>{t.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      {body}
+    </div>
   );
 }
 
@@ -3150,7 +3596,8 @@ function PhotoTray({ closing, photos, used = {}, onPick, onClose, onUpload,
 // puts its top edge at 231.3 against the node's 231.
 function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
                    layouts, onSetLayout, spacings, onSetSpacing, cover, onEmptyTap, onSwapPages, onBack, onAdd,
-                   colors, onSetColor, coverDesignId, onSetCoverDesign, fit, onFit, onFitAll, onAi }) {
+                   colors, onSetColor, coverDesignId, onSetCoverDesign, fit, onFit, onFitAll, onAi, texts, onSetText,
+                   stickers, onAddSticker, onChangeSticker, onRemoveSticker }) {
   const { useState, useRef, useEffect, useLayoutEffect, useMemo } = React;
   const [fitOpen, setFitOpen] = useState(false);   // the Fit control, open only while a photo is selected
   const slots = useMemo(() => slotsFor(pages), [pages]);
@@ -3256,6 +3703,24 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
   // which slot of that page's layout. It lives here rather than in the leaf because
   // the toolbar is a sibling and has to swap with it.
   const [selected, setSelected] = useState(null);
+  // ── Selected text: { id, text } (text = the original wording), and which of its controls is open.
+  // A text and a photo are never selected together.
+  const [selText, setSelText] = useState(null);
+  const [textPanel, setTextPanel] = useState(null);
+  const clearText = () => { setSelText(null); setTextPanel(null); };
+  // ── Stickers: the sheet ('open' / 'closing'), and which one is selected (its key).
+  const [stickerSheet, setStickerSheet] = useState(null);
+  const [selSticker, setSelSticker] = useState(null);
+  const closeStickers = () => { setStickerSheet('closing'); setTimeout(() => setStickerSheet(null), 320); };
+  const stickerCtx = useMemo(() => ({
+    items: stickers || {}, canEdit: true, selKey: selSticker,
+    onSelect: k => { setSelected(null); setSelText(null); setTextPanel(null); setSelSticker(k); },
+    onChange: onChangeSticker, onRemove: (slot, key) => { onRemoveSticker(slot, key); setSelSticker(null); },
+  }), [stickers, selSticker]);
+  const textCtx = useMemo(() => ({
+    over: texts || {}, canSelect: true, selId: selText && selText.id,
+    onSelect: (id, text) => { setSelected(null); setSelSticker(null); setSelText({ id, text }); setTextPanel('edit'); },
+  }), [texts, selText]);
 
   // ── The layout drawer. 'open' → 'closing' → null, matching the action sheets.
   // The draft is previewed live on the page the drawer was opened over, and only
@@ -3447,7 +3912,7 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
   // 1 + 2i and 2 + 2i. Added spreads are appended, so existing indices never move.
   const leafRef = i => el => { leafRefs.current[i] = el; };
   // Tapping a photo selects it; the strip is only pickable while the drawer is down.
-  const pick = slot => (drawer ? null : (i => setSelected({ slot, i })));
+  const pick = slot => (drawer ? null : (i => { clearText(); setSelSticker(null); setSelected({ slot, i }); }));
   // An empty placeholder opens the photo tray, which lives on EditorScreen so the book
   // view shares it.
   const pickEmpty = slot => (drawer ? null : (i => {
@@ -3472,8 +3937,12 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
     ? (selSlot.n ? pagePhotos(placed, selSlot.n, selCount, []) : coverPhotos(cover, selCount))[selected.i] || null
     : null;
   React.useEffect(() => { if (!selected) setFitOpen(false); }, [selected]);
+  // A selection belongs to the page it is on: moving to another page lets go of it.
+  React.useEffect(() => { clearText(); setSelSticker(null); }, [active]);
 
   return (
+    <TextCtx.Provider value={textCtx}>
+    <StickerCtx.Provider value={stickerCtx}>
     <BookPaint.Provider value={paint}>
     <div ref={rootRef} style={{
       position: 'absolute', inset: 0,
@@ -3484,7 +3953,7 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
         onScroll={onScroll}
         // The iOS-standard escape: a tap on the page anywhere but a photo clears the
         // selection. Slot taps stopPropagation, so they never reach this.
-        onClick={() => { if (selected) setSelected(null); }}
+        onClick={() => { if (selected) setSelected(null); if (selText) clearText(); if (selSticker) setSelSticker(null); }}
         style={{
           position: 'absolute', left: 0, right: 0,
           // With the drawer up the node keeps only its 93-tall blur band at the top
@@ -3524,6 +3993,7 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
                            onSelect={pick(1 + 2 * i)} selected={selectedIn(1 + 2 * i)}
                            adjust={adjustFor(1 + 2 * i)} onEmpty={pickEmpty(1 + 2 * i)} />}
                   {l && <ThemeSticker n={l} />}
+                  <UserStickers slot={1 + 2 * i} />
                 </BigLeaf>
                 <BigLeaf side="right" slotRef={leafRef(2 + 2 * i)} slot={r ? 2 + 2 * i : null}>
                   {r && <BigWell photos={pageAt(r, layoutFor(2 + 2 * i))}
@@ -3531,6 +4001,7 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
                            onSelect={pick(2 + 2 * i)} selected={selectedIn(2 + 2 * i)}
                            adjust={adjustFor(2 + 2 * i)} onEmpty={pickEmpty(2 + 2 * i)} />}
                   {r && <ThemeSticker n={r} />}
+                  <UserStickers slot={2 + 2 * i} />
                 </BigLeaf>
               </BookUnit>
             ))}
@@ -3593,10 +4064,21 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
           of which Layout is the one live tool. */}
       {!drawer && (
         <Toolbar photos={uploaded}
-                 tools={selected ? SELECTED_TOOLS : pvTools}
-                 gap={selected ? 4 : 8} padX={selected ? 0 : 16}
+                 tools={selText ? TEXT_TOOLS : selSticker ? STICKER_TOOLS : selected ? SELECTED_TOOLS : pvTools}
+                 gap={selected || selText || selSticker ? 4 : 8} padX={selected || selText || selSticker ? 0 : 16}
                  onTool={id => {
                    if (id === 'ai') { onAi(); return; }
+                   if (selText) { if (id === 'back') clearText(); return; }
+                   if (selSticker) {
+                     if (id === 'back') setSelSticker(null);
+                     if (id === 'more') setStickerSheet('open');
+                     if (id === 'delete') {
+                       const sl = Object.keys(stickers || {}).find(k => (stickers[k] || []).some(x => x.key === selSticker));
+                       if (sl != null) onRemoveSticker(Number(sl), selSticker);
+                       setSelSticker(null);
+                     }
+                     return;
+                   }
                    if (selected) {
                      if (id === 'back') setSelected(null);
                      if (id === 'fit') setFitOpen(o => !o);
@@ -3608,11 +4090,23 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
                      }
                      return;
                    }
+                   if (id === 'stickers') setStickerSheet('open');
                    if (id === 'layout') openDrawer();
                    if (id === 'covers') openCovers();
                    if (id === 'spacing') openSpacing();
                    if (id === 'color') openColor();
                  }} />
+      )}
+
+      {stickerSheet && (
+        <StickerSheet closing={stickerSheet === 'closing'} onClose={closeStickers}
+                      onPick={id => { setSelected(null); clearText(); setSelSticker(onAddSticker(active, id)); closeStickers(); }} />
+      )}
+
+      {!drawer && selText && textPanel && (
+        <TextPanel kind={textPanel} onKind={setTextPanel} text={selText.text} ov={(texts || {})[selText.id] || {}}
+                   ideas={selText.id === 'cover' ? TEXT_IDEAS_COVER : TEXT_IDEAS_PAGE}
+                   onChange={patch => onSetText(selText.id, patch)} onClose={clearText} />
       )}
 
       {!drawer && selected && fitOpen && selPhoto && (
@@ -3653,6 +4147,8 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
       )}
     </div>
     </BookPaint.Provider>
+    </StickerCtx.Provider>
+    </TextCtx.Provider>
   );
 }
 
@@ -4294,7 +4790,52 @@ function EditorScreen() {
   });
   // The AI assistant sheet: null / 'open' / 'closing', like the action sheets.
   const [aiSheet, setAiSheet] = useState(null);
-  const openAi = () => setAiSheet('open');
+  // Text edits (see EditText): { [id]: { text, font, size, align, color } }, kept in pb_texts.
+  const [texts, setTexts] = useState(() => { try { return JSON.parse(sessionStorage.getItem('pb_texts') || '{}') || {}; } catch (e) { return {}; } });
+  const setText = (id, patch) => setTexts(prev => {
+    const cur = Object.assign({}, prev[id], patch);
+    Object.keys(cur).forEach(k => { if (cur[k] == null) delete cur[k]; });
+    const next = Object.assign({}, prev, { [id]: cur });
+    try { sessionStorage.setItem('pb_texts', JSON.stringify(next)); } catch (e) { /* best-effort */ }
+    return next;
+  });
+  // Stickers (see StickerItem): { [slot]: [{ key, id, x, y, w, r }] }, kept in pb_stickers.
+  const [stickers, setStickers] = useState(() => { try { return JSON.parse(sessionStorage.getItem('pb_stickers') || '{}') || {}; } catch (e) { return {}; } });
+  const commitStickers = next => {
+    try { sessionStorage.setItem('pb_stickers', JSON.stringify(next)); } catch (e) { /* best-effort */ }
+    return next;
+  };
+  const addSticker = (slot, id) => {
+    const key = `s${Date.now().toString(36)}${Math.floor(Math.random() * 1e4)}`;
+    // a little off-centre and a little askew, so a second sticker does not land exactly on the first
+    const n = (stickers[slot] || []).length;
+    const st = { key, id, x: 50 + ((n * 9) % 24) - 8, y: 46 + ((n * 11) % 26) - 8, w: 40, r: Math.round((Math.random() - 0.5) * 16) };
+    setStickers(prev => commitStickers(Object.assign({}, prev, { [slot]: (prev[slot] || []).concat(st) })));
+    return key;
+  };
+  const changeSticker = (slot, key, patch) => setStickers(prev => commitStickers(Object.assign({}, prev, {
+    [slot]: (prev[slot] || []).map(s => (s.key === key ? Object.assign({}, s, patch) : s)) })));
+  const removeSticker = (slot, key) => setStickers(prev => commitStickers(Object.assign({}, prev, {
+    [slot]: (prev[slot] || []).filter(s => s.key !== key) })));
+  const stickersCtx = useMemo(() => ({ items: stickers, canEdit: false, selKey: null, onSelect: null, onChange: null, onRemove: null }), [stickers]);
+  const textsCtx = useMemo(() => ({ over: texts, canSelect: false, selId: null, onSelect: null }), [texts]);
+  // The scripted low-quality moment: { src, n, stage } — see LowQNudge. Restored after a reload, except that
+  // anything mid-flight counts as finished and a message that never got shown is shown straight away.
+  const [lowq, setLowq] = useState(() => {
+    try {
+      const q = JSON.parse(sessionStorage.getItem('pb_lowq') || 'null');
+      if (!q) return null;
+      return Object.assign({}, q, { stage: q.stage === 'wait' ? 'open' : (q.stage === 'open' || q.stage === 'min') ? q.stage : 'done' });
+    } catch (e) { return null; }
+  });
+  const setLq = patch => setLowq(prev => {
+    if (!prev) return prev;
+    const next = Object.assign({}, prev, patch);
+    try { sessionStorage.setItem('pb_lowq', JSON.stringify(next)); } catch (e) { /* best-effort */ }
+    return next;
+  });
+  // While the message is parked on the button, the button brings it back rather than opening the chat.
+  const openAi = () => { if (lowq && lowq.stage === 'min') setLq({ stage: 'open' }); else setAiSheet('open'); };
   const closeAi = () => { setAiSheet('closing'); setTimeout(() => setAiSheet(null), 320); };
   const setPhotoFit = (photo, mode) => setFit(f => {
     const next = { mode: f.mode, over: Object.assign({}, f.over, { [photo]: mode }) };
@@ -4733,7 +5274,50 @@ function EditorScreen() {
     const needed = Math.ceil((plan.placed.length - book.pages) / 2);
     if (needed > 0) setAdded(a => Math.max(a, needed));
     dismissSheet();
+    startLowQ(plan.placed);
   };
+
+  // The scripted moment: flag the sixth photo in the book and, once the book has settled, have the AI say so.
+  const startLowQ = list => {
+    let seen = 0, found = null;
+    list.forEach((e, idx) => {
+      (Array.isArray(e) ? e : [e]).forEach(ph => {
+        if (found || !ph || isTitle(ph)) return;
+        if (++seen === 6) found = { src: ph, n: idx + 1 };
+      });
+    });
+    if (!found) return;
+    const q = Object.assign({}, found, { stage: 'wait' });
+    setLowq(q);
+    try { sessionStorage.setItem('pb_lowq', JSON.stringify(q)); } catch (e) { /* best-effort */ }
+    setTimeout(() => setLq({ stage: 'open' }), 2600);
+  };
+  // Upscale: a beat of "enhancing", then done. Replace: pick another shot, which really goes into the book.
+  useEffect(() => {
+    if (!lowq) return undefined;
+    const next = lowq.stage === 'upscaling' ? ['fixed', 1900] : (lowq.stage === 'fixed' || lowq.stage === 'replaced') ? ['done', 2800] : null;
+    if (!next) return undefined;
+    const t = setTimeout(() => setLq({ stage: next[0] }), next[1]);
+    return () => clearTimeout(t);
+  }, [lowq && lowq.stage]);
+  const replaceLowQ = alt => {
+    const swap = e => (Array.isArray(e) ? e.map(x => (x === lowq.src ? alt : x)) : (e === lowq.src ? alt : e));
+    setPlaced(prev => {
+      const next = prev.map(swap);
+      try { sessionStorage.setItem('pb_placed', JSON.stringify(next)); } catch (e) { /* best-effort */ }
+      return next;
+    });
+    setLq({ stage: 'replaced', src: alt });
+  };
+  // Page n sits in spread ⌊n/2⌋; spread 0's left leaf is the inside cover, so page n is slot 1 + 2·⌊n/2⌋ + (n odd ? 1 : 0).
+  const lqValue = lowq && lowq.stage !== 'done' ? Object.assign({}, lowq, {
+    uploaded, flag: ['open', 'min', 'upscaling', 'replacing'].indexOf(lowq.stage) >= 0,
+    canShow: pageView === null && !arrange,
+    onShow: () => openPage(1 + 2 * Math.floor(lowq.n / 2) + (lowq.n % 2)),
+    onClose: () => setLq({ stage: 'min' }), onBack: () => setLq({ stage: 'open' }),
+    onUpscale: () => setLq({ stage: 'upscaling' }), onReplace: () => setLq({ stage: 'replacing' }),
+    onPick: replaceLowQ,
+  }) : null;
 
   const pages = book.pages + added * 2;
   const total = (parseFloat(book.total) + added * EXTRA_SPREAD_PRICE).toFixed(2);
@@ -4799,6 +5383,10 @@ function EditorScreen() {
         @keyframes pbScrimIn  { from { opacity: 0; } to { opacity: 1; } }
         @keyframes pbScrimOut { from { opacity: 1; } to { opacity: 0; } }
         @keyframes pbFadeIn   { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes pbStickerPop { 0% { opacity: 0; transform: scale(.35) rotate(-12deg); } 100% { opacity: 1; transform: none; } }
+        @keyframes pbPulse    { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.18); } }
+        @keyframes pbBubbleIn { from { opacity: 0; transform: translateY(10px) scale(.9); } to { opacity: 1; transform: none; } }
+        @keyframes pbBar      { from { transform: scaleX(0); } to { transform: scaleX(1); } }
         @keyframes pbAiDot    { 0%, 80%, 100% { opacity: .3; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
         .pb-range { -webkit-appearance: none; appearance: none; width: 100%; height: 28px;
           margin: 0; background: transparent; touch-action: pan-y; }
@@ -4817,6 +5405,9 @@ function EditorScreen() {
       `}</style>
 
       <BookTheme.Provider value={bookTheme}>
+      <LowQ.Provider value={lqValue}>
+      <TextCtx.Provider value={textsCtx}>
+      <StickerCtx.Provider value={stickersCtx}>
       <FitContext.Provider value={fit}>
       <BookPaint.Provider value={{ colors: v.colors, cover: coverDesignId }}>
       {arrange ? (
@@ -4837,6 +5428,8 @@ function EditorScreen() {
           colors={colors} onSetColor={setColor}
           coverDesignId={coverDesignId} onSetCoverDesign={setCoverDesign}
           fit={fit} onFit={setPhotoFit} onFitAll={setAllFit} onAi={openAi}
+          texts={texts} onSetText={setText}
+          stickers={stickers} onAddSticker={addSticker} onChangeSticker={changeSticker} onRemoveSticker={removeSticker}
           onAdd={() => setAdded(n => n + 1)}
         />
       ) : (
@@ -4874,7 +5467,7 @@ function EditorScreen() {
                         /* No onEmpty in the book view: a tap anywhere on a page opens
                            it in page view, and placeholders are filled from there. */ />
             {spreads.map(([l, r], i) => (
-              <SpreadBlock key={i} aspect={aspect} left={l} right={r} photos={v.placed}
+              <SpreadBlock key={i} aspect={aspect} left={l} right={r} photos={v.placed} slotL={1 + 2 * i} slotR={2 + 2 * i}
                            showPlus={i < spreads.length - 1}
                            onAdd={() => setAdded(n => n + 1)}
                            pool={uploaded}
@@ -4907,7 +5500,7 @@ function EditorScreen() {
         // the product page's choice, not the editor's content.
         try {
           ['pb_placed', 'pb_uploaded', 'pb_photos', 'pb_groups', 'pb_cover_title', 'pb_fit', 'pb_layouts', 'pb_spacing', 'pb_cover',
-           'pb_theme', 'pb_theme_base', 'pb_style', 'pb_colors', 'pb_cover_design']
+           'pb_theme', 'pb_theme_base', 'pb_style', 'pb_colors', 'pb_cover_design', 'pb_lowq', 'pb_texts', 'pb_stickers']
             .forEach(k => sessionStorage.removeItem(k));
           sessionStorage.setItem('pb_nav', 'pop');
         } catch (e) {}
@@ -4974,6 +5567,9 @@ function EditorScreen() {
       )}
       </BookPaint.Provider>
       </FitContext.Provider>
+      </StickerCtx.Provider>
+      </TextCtx.Provider>
+      </LowQ.Provider>
       </BookTheme.Provider>
     </div>
   );

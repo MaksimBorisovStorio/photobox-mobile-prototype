@@ -1050,7 +1050,35 @@ keeps `z-index:0`: if the blur is ever restored, an absolutely-positioned
 The same 96px ramp trick is still the right answer wherever a `backdrop-filter` really
 is wanted — a plain one leaves a hard seam at its top edge.
 
-### Photo book page — option flow (Figma `406:7183`)
+### Photo book PDP — `screens/product-photobook.html` + `.jsx` (not a Figma node)
+Every "Photo books" link in the app (home, collections, reorder) lands on a **product page**, not the
+option flow. Its one action, **Select photo book**, pushes `photobook-options.html`.
+Structure: media hero (home's story hero — slides, progress bars, tap to skip, hold to pause, Ken Burns;
+copy stacked as on home: a chip that changes per slide, then a fixed "Photo book" headline and
+"From €14.99", no CTA) → rounded sheet over it → delivery card ("Order today, get it by <date>", the
+date is today + 4 days) → Why you'll love it (six USPs, 2×3) → Make it yours (swipeable cover styles) →
+Good to know (accordion) → gift-box strip → reviews (mock) → sticky glass bar with price + CTA. A glass
+header with the title fades in once the hero has scrolled away.
+Media is photobox.co.uk's own landscape-L-hardcover product page (`/product-pictures/PAP_347/product-page-slider/CRO_1372/`:
+`video-slider-1.mp4` + `image-slider-1..5.jpg`; its `video-cover-slider-1.jpg` is a 932-byte error page, so the poster is a
+frame cut from the film). Self-hosted: `photobook-film.mp4` (re-encoded 1080²→720², 577KB, no audio, faststart),
+`photobook-film-poster.jpg`, `pbx-pdp-1..5.jpg`. "Make it yours" uses the category page's `Photobook/cover/*` and
+`binding/layflat` close-ups (`pbx-cover-*.jpg`, `pbx-binding-layflat.jpg`). The film plays muted/inline on slide 1,
+restarts each lap and pauses while the hero is held; ⚠️ `python3 -m http.server` has no Range support, so check
+video on the Pages URL. Names are `PDP_…`/`Pdp…` (global lexical scope). Rating, reviews and USP copy are mock.
+⚠️ `PdpReveal` uses an IntersectionObserver, which needs rendered frames — in headless-Chrome
+screenshots a section jumped to can read opacity 0; force frames (nudge `scrollTop` on an interval).
+The old page (format → cover → size → review → Start create) is unchanged but renamed
+`screens/photobook-options.html` + `.jsx`; its back arrow returns to the PDP. The benefit chips are gone:
+under the title there is now a **ready-made row** (`PRESETS` → `PresetCard`: Great for trips / Most popular /
+Best value / Gift favourite, each a complete `sel`) whose tap calls `startBook(sel)` — writes `pb_book` and
+opens the editor at once. The pictures are photobox.co.uk's own category-page product photography (the
+`PAP_*` "lady image" blocks, self-hosted as `shared/assets/pbx-book-pap<N>.jpg`); each preset uses the picture of
+the product that page lists for the same orientation / size / cover (its `data-*` attributes carry them), and the
+page has no portrait cut-out so that pick is the landscape one. After the row comes an "or build your own" divider and the customiser as before. Prices come
+from `summarise`, so they match the review block. Not in the Figma.
+
+### Photo book options page — option flow (Figma `406:7183`)
 One tall scrolling page on a 402 frame with **24px gutters**: hero (`406:7432`) →
 three option sections (`406:7220`, gap 48, padding 40/24) → Lay-flat upsell
 (`406:7296`) → "Review your choice" (`406:7306`).
@@ -1420,6 +1448,48 @@ no prompt; "No, I'll place them myself" dismisses and places nothing.
 checkout-payment → order-success` are all built but no longer reachable: the picker used
 to be the only way in, and the editor's Continue arrow is still inert by request.
 Pointing that arrow at `basket.html` is a one-line change when wanted.
+
+#### Scripted moment: the AI flags a low-quality photo (Trip to Italy flow only)
+After "Yes, auto-fill" with `pb_groups` present, `startLowQ` flags the **sixth photo** in the book and, 2.6s later, a bubble
+(`LowQNudge`) grows out of the floating AI button: "One of your photos is too low-resolution to print sharply", with a thumbnail,
+its page number and "640 × 427 px · too small to print", and two fixes. **Upscale with AI** → "Enhancing detail…" (thumb clears over
+1.6s, 1.9s total) → "Done" → gone. **Replace photo** → four other uploaded shots → tapping one *really* swaps it in `pb_placed`
+→ "Replaced" → gone. The flagged photo carries an amber "!" in every view (`LowQ` context, read by `PhotoWell`); tapping the
+thumbnail opens that page in page view. × parks the message: an amber dot pulses on the AI button and tapping it brings the
+bubble back (instead of the chat) until the moment is resolved. The bubble lives inside `Toolbar`, so it goes with the toolbar when a
+drawer covers it. State is `{src, n, stage}` in `pb_lowq` (stages wait → open ↔ min · upscaling → fixed · replacing → replaced · done);
+a reload restores open/min and treats anything mid-flight as finished. Nothing is really enhanced.
+
+#### Text editing (page view) — not in the Figma
+In page view the **cover title** and every **chapter title page** are selectable. Tap the text: a dashed teal ring appears, the toolbar
+collapses to Back and a glass `TextPanel` rises above it with five tabs — **Edit** (a text field that rewrites live, plus an "Ideas" row
+of AI name suggestions: cover names like "Our Italian summer", "La dolce vita"; page titles like "Golden moments"; the tick deselects),
+**Font** (eight faces already self-hosted: Default, Serif, Modern, Bold, Condensed, Handwritten, Slab, Playful), **Size** (50–200%),
+**Align** (left / centre / right) and **Color** (Auto + 12 swatches). Everything applies at once; there is nothing to confirm and the
+undo pill is still inert. The tabs live in the panel rather than the toolbar because a toolbar row of seven scrolls and hides Align and
+Color behind the AI button.
+Mechanics: every text is drawn by `EditText` (cover designs and title pages), which reads `TextCtx` — `over` is `pb_texts`
+(`{ 'cover' | 't:<original chapter title>': { text, font, size, align, color } }`), `canSelect` is true only inside `PageView`. So an edit
+shows in the book view, thumbnails and drawers too, keyed to the *original* title so the edit survives re-typing it. Edited text wraps
+instead of ellipsising. `LayoutWell` no longer makes a title page a selectable *photo* (`isTitle`). ⚠️ The page view's **Add text** tool is
+still inert — adding a new text box is the obvious next step; theme stickers, photo captions and the spine title are not editable.
+Cleared with the rest on the editor's close button.
+
+#### Stickers (page view's Stickers tool) — Figma `731:6756` "Fill Stickers"
+Tapping **Stickers** (any page, or the cover) opens a bottom sheet (`StickerSheet`) — an Instagram-style 3-column grid of the 20 "Fill"
+stickers (Love it, Vibes, Fresh, Hot, OK, Winner, Idea, Pure gold, This or that, Steal this, W.I.P., Take a peek, Keep exploring,
+Thoughts?, Cut it, Save for later, Dope, Not sure, Killed it, Check the deets). Tap one: it pops onto the page you are looking at,
+selected, and the sheet closes. **Drag** it anywhere on the page; the teal corner handle **scales and turns** it (one finger — distance and
+angle from the sticker's centre), the white × removes it. While one is selected the toolbar becomes Back · Add more · Remove. Several per page.
+Stickers show in the book view too (not in the 3D preview, thumbnails or arrange mode).
+Data: `pb_stickers` = `{ [slot]: [{ key, id, x, y, w, r }] }` — slot as for layouts (0 cover, then 2 per spread; `pageSlot(n)`), x/y the centre
+in % of the page, `w` a width in `cqw` (so it scales with the leaf — every leaf is a size container), `r` degrees. `StickerCtx` carries it;
+only inside `PageView` is `canEdit` true. ⚠️ Drag and resize write straight to the element's style and commit once on release —
+re-rendering the whole editor per pointermove stutters. Stickers have `touch-action: none`, or a finger-drag would scroll the page strip.
+Assets: `shared/assets/stk-<name>.svg` (760KB for all 20), lettering is outlined so no fonts. ⚠️ Figma's SVG export prepends two
+background rects (a `#2E2E2E` viewport fill and a 2200×2692 white canvas) — stripped; and **`Save for later` and `HOT!` had NaN path
+data** (`Lnan nanL…`) that dropped the folder's yellow body and the cup — patched by deleting the `Lnan nan` segment. Check any
+re-export for both. Cleared with the rest on the editor's close button.
 
 #### AI help sheet
 The floating AI button opens `AiSheet` (an `ActionSheet`, ~54% of the screen) from the book view and the page view (`PageView` calls `onAi`).
@@ -2505,9 +2575,9 @@ Not a Figma node. The editor's Continue arrow now goes **editor → book-preview
 A CSS-3D book (no WebGL, no dependency), dark like the editor (`BP_BG`). Each leaf is a `preserve-3d`
 div hinged on its left edge with front/back faces; `BpBlock` adds the page-block edges so it has real
 thickness from the side. **Drag orbits** (pitch clamped ±80°, inertia), **pinch / wheel zooms**, a tap
-on the left/right half (or the arrows) turns a page, "Reset view" eases back. Header: Close (→
-`editor-review.html`; →`home.html` when opened from a shared link) and Share (`navigator.share`, else
-copies the link). The share link carries the book in its hash (`#b=…`: page size + `pb_placed`), so it
+on the left/right half (or the arrows) turns a page, "Reset view" eases back. Header: Close (back, `navigation.pop()`; →`home.html` when opened from a shared link), the title, and a green
+**Buy** button (→ `editor-review.html`; hidden on a shared link). Share (`navigator.share`, else copies the link) is a
+round button floating at the stage's top-left. The share link carries the book in its hash (`#b=…`: page size + `pb_placed`), so it
 works on another device — but only on the same deployment, since photos are relative paths.
 Reads `pb_book`, `pb_placed`, falls back to `pb_uploaded` / sample photos. `pb_layouts` is not drawn.
 
@@ -2541,6 +2611,17 @@ hero (back, order number, arrival date) → status stepper (`2150:16853`; one `c
 teal up to it) → "Your order" items, shipping and price accordions → Get help (inert) / Reorder
 (→ product page). The book thumbnail is the customer's cover; the calendar keeps the node's image
 (`ot-thumb-calendar.png`). Names, dates and euros follow `MOCK`, not the node's £ / Emma Carter.
+
+⚠️ Home's **Make this book** (the live-book moment) goes to `book-choose.html` ("Choose your photo book"), not the PDP. `book-choose` is
+hard-wired to the Trip to Italy album, so choosing another collection in the chips still lands there; `pb_collection` is written but unread.
+
+⚠️ **book-choose's middle is a carousel** of five suggestions (`BC_PRESETS`), each a complete cover/format/size *and* a cover style: the
+photo classic (recommended, landscape hardcover M), then four bold typographic covers drawn live in `BcCover` — Sorbet pink (portrait M),
+Aegean navy (portrait L), Garden green (soft square M), Full photo (layflat landscape L). Slides are 78% wide with 11% spacers, so slide *k* is
+centred at `scrollLeft = k × 0.78 × width`; swiping sets `sel` from the centred preset and the three rows follow it (editing a row turns the
+eyebrow to "CUSTOMISED"). Cover type is sized in container units (`cqw`/`cqh`) so it scales with the format. Create also writes
+`pb_cover_design` (classic / band / round / framed / bleed) and `pb_colors[0]` (the board colour) for the editor. The block scales down
+about its centre on short phones (min 0.4), so below ~700px tall it gets small.
 
 ### Home, first-time customer — `screens/home.html` + `home-new.jsx` (handoff "Home New Customer" 3a)
 `home.html` now shows the **new-customer** home; the previous Figma-verified home (order tracker,

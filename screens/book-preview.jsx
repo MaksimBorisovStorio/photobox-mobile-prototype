@@ -391,7 +391,9 @@ function BookPreviewScreen() {
     catch (e) { window.prompt('Copy this link', url); }
   };
 
-  const close = () => (data.shared ? window.navigation.replace('home.html') : window.navigation.push('editor-review.html'));
+  // Close goes back to wherever the book was opened from (the editor); Buy is the way forward.
+  const close = () => (data.shared ? window.navigation.replace('home.html') : window.navigation.pop());
+  const buy = () => window.navigation.push('editor-review.html');
 
   const ease = easing ? `transform 600ms ${BP_EASE}` : 'none';
 
@@ -402,7 +404,8 @@ function BookPreviewScreen() {
     }}>
       <IOSStatusBar dark />
 
-      {/* Header: close · title · share */}
+      {/* Header: close · title · buy. Someone who opened a shared link has nothing to buy yet,
+          so they get an empty slot that keeps the title centred. */}
       <div style={{ position: 'relative', height: 56, flexShrink: 0, display: 'flex', alignItems: 'center',
         justifyContent: 'space-between', padding: '0 16px' }}>
         <BpRound label="Close" onClick={close}>
@@ -410,12 +413,11 @@ function BookPreviewScreen() {
         </BpRound>
         <span style={{ position: 'absolute', left: 0, right: 0, textAlign: 'center', pointerEvents: 'none',
           fontFamily: BP_TEXT, fontSize: 17, fontWeight: 700, color: '#fff' }}>Preview</span>
-        <BpRound label="Share" onClick={share}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"
-            strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 15V3" /><path d="m7.5 7.5 4.5-4.5 4.5 4.5" /><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7" />
-          </svg>
-        </BpRound>
+        {data.shared ? <span style={{ width: 40 }} /> : (
+          <button onClick={buy} {...press(0.97)} style={{
+            ...pbButton('primary', { height: 36, padding: '0 18px', borderRadius: 12, fontSize: 15, zIndex: 2 }),
+          }}>Buy</button>
+        )}
       </div>
 
       {/* Stage */}
@@ -494,6 +496,15 @@ function BookPreviewScreen() {
               );
             })}
           </div>
+        </div>
+
+        <div onPointerDown={e => e.stopPropagation()} style={{ position: 'absolute', top: 8, left: 16 }}>
+          <BpRound label="Share" onClick={share}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"
+              strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 15V3" /><path d="m7.5 7.5 4.5-4.5 4.5 4.5" /><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7" />
+            </svg>
+          </BpRound>
         </div>
 
         {moved && (

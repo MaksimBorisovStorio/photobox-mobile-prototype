@@ -311,7 +311,9 @@ function HnBookMoment() {
   const col = HN_RECENT[sel];
   const make = () => {
     try { sessionStorage.setItem('pb_collection', col.id); } catch (e) {}
-    hnGo('product-photobook.html')();
+    // book-choose is the "Choose your photo book" step; today it only knows the Trip to Italy album,
+    // so every collection lands there.
+    hnGo('book-choose.html')();
   };
   return (
     <div style={{ margin: '28px 16px 0', borderRadius: 28, overflow: 'hidden', position: 'relative',

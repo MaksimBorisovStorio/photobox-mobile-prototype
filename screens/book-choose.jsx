@@ -6,6 +6,11 @@
 // sessionStorage.pb_book (the same shape product-photobook's bookConfig writes) and the
 // album's photos to pb_photos, then pushes the editor, which offers to auto-fill them.
 //
+// The middle of the page is a swipeable carousel of five suggestions, each a different cover style
+// (a photo classic, then four bold typographic covers in the manner of travel-guide coffee-table books:
+// big colour fields, a heavy display word, the album photo in a shape). Swiping picks that suggestion's
+// cover / format / size and the three rows below follow it; changing a row afterwards customises it.
+//
 // Deviations: the node's hero is a flat export of one specific book; here it is drawn live
 // so it follows the chosen format and cover. Its "Hardcover / Landscape / Medium (20x20 cm)"
 // is inconsistent with a landscape format, so Medium uses the 20 × 15 the product page has.
@@ -36,13 +41,27 @@ const BC_SIZES = {
 };
 const BC_SIZE_BASE = { xl: 34.99, l: 29.99, m: 24.99 };
 
-// What we recommend: the sturdy cover, the shape of most trip photos, the size that fits a
-// gift or a coffee table. All three can be changed below.
-const BC_PICK = { cover: 'hardcover', format: 'landscape', size: 'm' };
+// What we recommend, first, then four other looks. Each is a complete cover / format / size, plus a
+// `design` (how the cover is drawn here) and `editor`, what the editor starts the cover with
+// (`pb_cover_design`, and `paper` → `pb_colors[0]`). All three choices can be changed below.
+const BC_PRESETS = [
+  { id: 'classic', design: 'classic', eyebrow: 'RECOMMENDED FOR THIS ALBUM',
+    sel: { cover: 'hardcover', format: 'landscape', size: 'm' }, editor: { design: 'classic' } },
+  { id: 'sorbet', design: 'sorbet', eyebrow: 'BOLD AND PLAYFUL',
+    sel: { cover: 'hardcover', format: 'portrait', size: 'm' }, editor: { design: 'band', paper: '#F7A8C4' } },
+  { id: 'aegean', design: 'aegean', eyebrow: 'THE STATEMENT COVER',
+    sel: { cover: 'hardcover', format: 'portrait', size: 'l' }, editor: { design: 'round', paper: '#22379B' } },
+  { id: 'garden', design: 'garden', eyebrow: 'FRESH AND LIVELY',
+    sel: { cover: 'softcover', format: 'square', size: 'm' }, editor: { design: 'framed', paper: '#2E9A57' } },
+  { id: 'full', design: 'full', eyebrow: 'LET THE PHOTO SPEAK',
+    sel: { cover: 'layflat', format: 'landscape', size: 'l' }, editor: { design: 'bleed' } },
+];
+const BC_PICK = BC_PRESETS[0].sel;
 
 const BC_TRIP = window.PB_TRIP_ITALY;
 const BC_ALBUM = {
   title: 'Trip to Italy',
+  place: 'Italy',                 // the word the bold covers are built around
   photo: BC_TRIP.cover,
   // every photo of the album, in group order — handed to the editor for auto-fill
   photos: BC_TRIP.groups.reduce((all, g) => all.concat(g.photos), []),
@@ -57,26 +76,79 @@ function bcPrice(sel) {
   return BC_SIZE_BASE[sel.size] + cov.add;
 }
 
-// ── The book, drawn live: spine band, cover photo, title. ──
-function BookHero({ sel }) {
+// ── The book, drawn live: spine band, cover, title. `design` picks the cover's look; its type and
+// shapes are sized in container units (cqw / cqh of the cover), so they scale with the format. ──
+const BC_HEAVY = `${PB_DISPLAY}`;
+function BcCover({ design, album }) {
+  const photo = (extra) => (
+    <img src={album.photo} alt="" draggable={false} style={{ position: 'absolute', objectFit: 'cover', display: 'block', ...extra }} />
+  );
+  const word = (txt, extra) => (
+    <span style={{ position: 'absolute', fontFamily: BC_HEAVY, fontWeight: 900, textTransform: 'uppercase', whiteSpace: 'nowrap',
+      lineHeight: 0.86, letterSpacing: '-0.035em', ...extra }}>{txt}</span>
+  );
+  const ph = album.place;
+  if (design === 'sorbet') return (
+    <div style={{ position: 'absolute', inset: 0, background: '#F7A8C4' }}>
+      {word('Trip to', { left: '8cqw', top: '7cqh', fontSize: '7cqw', color: '#B3123F', letterSpacing: '.02em' })}
+      {word(ph, { left: '7cqw', top: '13cqh', fontSize: '29cqw', color: '#0B6B3F' })}
+      {photo({ left: '18cqw', right: '18cqw', bottom: '7cqh', width: '64cqw', height: '52cqh',
+        borderRadius: '32cqw 32cqw 1.5cqw 1.5cqw', boxShadow: '0 0 0 1.2cqw #FFF4F7' })}
+    </div>
+  );
+  if (design === 'aegean') return (
+    <div style={{ position: 'absolute', inset: 0, background: '#22379B' }}>
+      {word(ph, { left: '8cqw', top: '7cqh', fontSize: '25cqw', color: '#52D6CB' })}
+      {word('Trip', { left: '8cqw', top: '22cqh', fontSize: '25cqw', color: '#FFFFFF' })}
+      {photo({ left: '24cqw', bottom: '12cqh', width: '52cqw', height: '52cqw', borderRadius: '50%',
+        boxShadow: '0 0 0 2cqw #52D6CB, 0 0 0 4cqw #FFFFFF, 0 0 0 6cqw #7DA1FF' })}
+    </div>
+  );
+  if (design === 'garden') return (
+    <div style={{ position: 'absolute', inset: 0, background: '#2E9A57' }}>
+      {photo({ left: '9cqw', top: '9cqh', width: '82cqw', height: '52cqh', borderRadius: '10cqw', boxShadow: '0 0 0 1.2cqw #F3FFF6' })}
+      {word('Trip to', { left: '9cqw', top: '67cqh', fontSize: '7.5cqw', color: '#FFF3B0', letterSpacing: '.02em' })}
+      {word(ph, { left: '8cqw', top: '73cqh', fontSize: '24cqw', color: '#FFE066' })}
+    </div>
+  );
+  if (design === 'full') return (
+    <div style={{ position: 'absolute', inset: 0, background: '#222' }}>
+      {photo({ inset: 0, width: '100%', height: '100%' })}
+      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(rgba(0,0,0,.45), rgba(0,0,0,0) 38%)' }} />
+      {word(album.title, { left: '6cqw', top: '7cqh', fontSize: '7cqw', color: '#fff', fontWeight: 800, letterSpacing: '.04em',
+        textShadow: '0 1px 8px rgba(0,0,0,.35)' })}
+    </div>
+  );
+  // classic: cream board, caps title, the photo inset
+  return (
+    <div style={{ position: 'absolute', inset: 0, background: '#fbfaf7' }}>
+      <div style={{ position: 'absolute', left: 14, top: 12, right: 14, fontFamily: 'Oswald, "Arial Narrow", ' + BC_DISPLAY,
+        fontWeight: 700, fontSize: 14, letterSpacing: '.02em', textTransform: 'uppercase', color: '#111', lineHeight: 1 }}>{album.title}</div>
+      {photo({ left: 14, right: 14, top: 34, bottom: 14, width: 'calc(100% - 28px)', height: 'calc(100% - 48px)' })}
+    </div>
+  );
+}
+
+const BC_SPINE = { classic: null, sorbet: '#E88BAE', aegean: '#16276F', garden: '#1F7A40', full: null };
+
+function BookHero({ sel, design = 'classic' }) {
   const fmt = BC_FORMATS.find(f => f.id === sel.format);
   const cov = BC_COVERS.find(c => c.id === sel.cover);
   const soft = cov.id === 'softcover';
   const W = fmt.ratio >= 1 ? (fmt.ratio > 1 ? 262 : 220) : 190;
   const H = W / fmt.ratio;
+  const tint = BC_SPINE[design];
   return (
     <div key={sel.format + sel.cover} style={{ position: 'relative', width: W, height: H, animation: 'bcPop .45s cubic-bezier(.2,.8,.2,1) both',
       borderRadius: 4, background: '#fff', boxShadow: '0 22px 28px -10px rgba(0,40,40,.35), 0 3px 6px rgba(0,0,0,.12)' }}>
       {/* spine */}
       <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: soft ? 9 : 14, borderRadius: '4px 0 0 4px',
-        background: 'linear-gradient(90deg, #cfd6d6, #f4f6f6 40%, #dfe5e5 70%, #c4cccc)' }} />
+        background: tint ? `linear-gradient(90deg, ${tint}, ${tint} 60%, rgba(0,0,0,.18))`
+          : 'linear-gradient(90deg, #cfd6d6, #f4f6f6 40%, #dfe5e5 70%, #c4cccc)' }} />
       {/* cover */}
       <div style={{ position: 'absolute', left: soft ? 9 : 14, top: 0, right: 0, bottom: 0, borderRadius: '0 4px 4px 0',
-        background: '#fbfaf7', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', left: 14, top: 12, right: 14, fontFamily: 'Oswald, "Arial Narrow", ' + BC_DISPLAY,
-          fontWeight: 700, fontSize: 14, letterSpacing: '.02em', textTransform: 'uppercase', color: '#111', lineHeight: 1 }}>{BC_ALBUM.title}</div>
-        <img src={BC_ALBUM.photo} alt="" draggable={false} style={{ position: 'absolute', left: 14, right: 14, top: 34, bottom: 14,
-          width: 'calc(100% - 28px)', height: 'calc(100% - 48px)', objectFit: 'cover' }} />
+        overflow: 'hidden', containerType: 'size' }}>
+        <BcCover design={design} album={BC_ALBUM} />
         {/* page-edge sheen */}
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, rgba(0,0,0,.10), rgba(0,0,0,0) 8%)' }} />
       </div>
@@ -142,14 +214,72 @@ function BcSheet({ title, options, value, onPick, onClose }) {
   );
 }
 
-function BookChooseScreen() {
-  const [sel, setSel] = React.useState(BC_PICK);
-  const [open, setOpen] = React.useState(null);   // 'cover' | 'format' | 'size'
+// The numbers behind one selection, shared by the carousel's slides and the rows.
+function bcSpec(sel) {
   const cov = BC_COVERS.find(c => c.id === sel.cover);
   const fmt = BC_FORMATS.find(f => f.id === sel.format);
-  const siz = bcSize(sel.format, sel.size);
-  const price = bcPrice(sel);
-  const recommended = sel.cover === BC_PICK.cover && sel.format === BC_PICK.format && sel.size === BC_PICK.size;
+  return { cov, fmt, siz: bcSize(sel.format, sel.size), price: bcPrice(sel) };
+}
+const bcSame = (a, b) => a.cover === b.cover && a.format === b.format && a.size === b.size;
+
+// One slide of the carousel: the book, its eyebrow, name and price. Slides beside the centre one
+// sit back — a little smaller and dimmer, text hidden — so only the book hints at the next suggestion.
+function BcSlide({ preset, sel, active }) {
+  const { cov, fmt, price } = bcSpec(sel);
+  const stock = bcSame(sel, preset.sel);
+  return (
+    <div style={{ flex: '0 0 78%', scrollSnapAlign: 'center', scrollSnapStop: 'always', display: 'flex', flexDirection: 'column',
+      alignItems: 'center', gap: 20, minWidth: 0 }}>
+      <div style={{ height: 256, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        transform: active ? 'none' : 'scale(0.86)', opacity: active ? 1 : 0.7, transition: 'transform .3s ease, opacity .3s ease' }}>
+        <BookHero sel={sel} design={preset.design} />
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, textAlign: 'center',
+        opacity: active ? 1 : 0, transition: 'opacity .25s ease' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: BC_TEXT, fontSize: 12, fontWeight: 700, letterSpacing: '.14em', color: BC_TEAL }}>
+          <svg width="14" height="14" viewBox="0 0 24 24"><path d="M10 2.5c.4 3.9 2.1 5.6 6 6-3.9.4-5.6 2.1-6 6-.4-3.9-2.1-5.6-6-6 3.9-.4 5.6-2.1 6-6Zm8 10c.25 2.2 1.3 3.25 3.5 3.5-2.2.25-3.25 1.3-3.5 3.5-.25-2.2-1.3-3.25-3.5-3.5 2.2-.25 3.25-1.3 3.5-3.5Z" fill="currentColor" /></svg>
+          {stock ? preset.eyebrow : 'CUSTOMISED'}
+        </span>
+        <span style={{ fontFamily: BC_DISPLAY, fontWeight: 700, fontSize: 26, lineHeight: 1.1, letterSpacing: '-0.4px' }}>
+          {cov.title.replace(' · Layflat', '')} {fmt.title}<br />Photo book{cov.layflat ? ' with Layflat' : ''}
+        </span>
+        <span style={{ fontFamily: BC_TEXT, fontSize: 16, color: '#6b8080' }}>€{price.toFixed(2)} · 24 pages</span>
+      </div>
+    </div>
+  );
+}
+
+function BookChooseScreen() {
+  const [idx, setIdx] = React.useState(0);               // the suggestion in the middle of the carousel
+  const [sel, setSel] = React.useState(BC_PICK);          // its cover / format / size, plus any change made below
+  const [open, setOpen] = React.useState(null);   // 'cover' | 'format' | 'size'
+  const scroller = React.useRef(null);
+  const area = React.useRef(null), inner = React.useRef(null);
+  const [fit, setFit] = React.useState(1);
+  // The carousel is ~400 tall; on a short phone it scales down about its centre rather than clip.
+  React.useLayoutEffect(() => {
+    const a = area.current, n = inner.current;
+    if (!a || !n) return undefined;
+    const measure = () => setFit(Math.max(0.4, Math.min(1, (a.clientHeight - 16) / n.offsetHeight)));
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(a);
+    return () => ro.disconnect();
+  }, []);
+  const { cov, fmt, siz, price } = bcSpec(sel);
+  const preset = BC_PRESETS[idx];
+
+  // Slides are 78% of the scroller with an 11% spacer either side, so slide k is centred at
+  // scrollLeft = k × slide width. Moving to another slide takes that suggestion's choices.
+  const onScroll = e => {
+    const el = e.currentTarget;
+    const i = Math.max(0, Math.min(BC_PRESETS.length - 1, Math.round(el.scrollLeft / (el.clientWidth * 0.78))));
+    if (i !== idx) { setIdx(i); setSel(BC_PRESETS[i].sel); }
+  };
+  const goTo = i => {
+    const el = scroller.current;
+    if (el) el.scrollTo({ left: i * el.clientWidth * 0.78, behavior: 'smooth' });
+  };
 
   const create = () => {
     try {
@@ -164,6 +294,9 @@ function BookChooseScreen() {
       // the album's name goes on the cover, and its photos keep their own proportions
       sessionStorage.setItem('pb_cover_title', BC_TRIP.title);
       sessionStorage.setItem('pb_fit', 'contain');
+      // the chosen suggestion's cover style: the editor's matching design, and the board colour for the bold ones
+      sessionStorage.setItem('pb_cover_design', preset.editor.design);
+      sessionStorage.setItem('pb_colors', JSON.stringify(preset.editor.paper ? { 0: preset.editor.paper } : {}));
     } catch (e) {}
     window.navigation.push('editor.html');
   };
@@ -196,20 +329,23 @@ function BookChooseScreen() {
         <span style={{ fontFamily: BC_DISPLAY, fontWeight: 700, fontSize: 17, letterSpacing: '-0.2px' }}>Choose your photo book</span>
       </div>
 
-      {/* hero: the book and its headline, on the teal */}
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 22, padding: '0 20px 40px' }}>
-        <div style={{ height: 250, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><BookHero sel={sel} /></div>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, textAlign: 'center' }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: BC_TEXT, fontSize: 12, fontWeight: 700, letterSpacing: '.14em',
-            color: BC_TEAL, visibility: recommended ? 'visible' : 'hidden' }}>
-            <svg width="14" height="14" viewBox="0 0 24 24"><path d="M10 2.5c.4 3.9 2.1 5.6 6 6-3.9.4-5.6 2.1-6 6-.4-3.9-2.1-5.6-6-6 3.9-.4 5.6-2.1 6-6Zm8 10c.25 2.2 1.3 3.25 3.5 3.5-2.2.25-3.25 1.3-3.5 3.5-.25-2.2-1.3-3.25-3.5-3.5 2.2-.25 3.25-1.3 3.5-3.5Z" fill="currentColor" /></svg>
-            RECOMMENDED FOR THIS ALBUM
-          </span>
-          <span style={{ fontFamily: BC_DISPLAY, fontWeight: 700, fontSize: 26, lineHeight: 1.1, letterSpacing: '-0.4px' }}>
-            {cov.title.replace(' · Layflat', '')} {fmt.title}<br />Photo book{cov.layflat ? ' with Layflat' : ''}
-          </span>
-          <span style={{ fontFamily: BC_TEXT, fontSize: 16, color: '#6b8080' }}>€{price.toFixed(2)} · 24 pages</span>
+      {/* the middle of the page: a carousel of suggestions — swipe for another cover style */}
+      <div ref={area} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 0 8px' }}>
+       <div ref={inner} style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, transform: `scale(${fit})`, transformOrigin: 'center' }}>
+        <div ref={scroller} onScroll={onScroll} style={{ display: 'flex', width: '100%', overflowX: 'auto', overflowY: 'hidden',
+          scrollSnapType: 'x mandatory', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
+          <div aria-hidden style={{ flex: '0 0 11%' }} />
+          {BC_PRESETS.map((p, i) => <BcSlide key={p.id} preset={p} sel={i === idx ? sel : p.sel} active={i === idx} />)}
+          <div aria-hidden style={{ flex: '0 0 11%' }} />
         </div>
+        <div role="tablist" aria-label="Suggestions" style={{ display: 'flex', gap: 8 }}>
+          {BC_PRESETS.map((p, i) => (
+            <button key={p.id} role="tab" aria-selected={i === idx} aria-label={`Suggestion ${i + 1} of ${BC_PRESETS.length}`} onClick={() => goTo(i)}
+              style={{ width: i === idx ? 22 : 8, height: 8, padding: 0, border: 'none', borderRadius: 4, cursor: 'pointer',
+                background: i === idx ? BC_TEAL : 'rgba(2,60,66,.2)', transition: 'width .25s ease, background .25s ease', WebkitTapHighlightColor: 'transparent' }} />
+          ))}
+        </div>
+       </div>
       </div>
 
       {/* choices + CTA: a floating card with margins, as home's cards */}

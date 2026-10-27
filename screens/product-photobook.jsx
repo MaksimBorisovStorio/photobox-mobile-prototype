@@ -1,690 +1,399 @@
-// screens/product-photobook.jsx
-// Figma: "Photo book page" — node 406:7183 (hero 406:7432, options 406:7220).
-// Baseline frame is 402 wide with 24px gutters; card rows scroll horizontally
-// because 3×245 + 2×12 = 759 overflows the 354 content width, as designed.
-const A = '../shared/assets';
+// screens/product-photobook.jsx — Photo book product page (PDP).
+//
+// The first stop for every "Photo books" link in the app. It sells the product — what a photo
+// book is, how it gets made, what it looks like — and its one action, "Select photo book",
+// opens photobook-options.html, which is the old format / cover / size flow.
+//
+// Not a Figma node; designed from the app's own patterns:
+//   - a full-bleed media hero that is home's story hero (slides, progress bars, tap to skip,
+//     hold to pause, Ken Burns) minus the CTA — the bar at the bottom carries it;
+//   - the hero copy is home's too: a caption chip that changes per slide, then a fixed "Photo book"
+//     headline and "From €14.99";
+//   - a rounded sheet riding up over the hero, as on home;
+//   - a delivery card (arrival date), Why you'll love it (six USPs), Make it yours (a swipeable
+//     row of cover styles), a details accordion, the gift-box upsell and reviews;
+//   - a sticky bottom bar with the price and the action.
+//
+// Media is photobox.co.uk's own landscape-L-hardcover product page: its slider (the film, five
+// product photos) and the category page's cover / binding close-ups, self-hosted as `pbx-*`.
+// `photobook-film.mp4` is that page's 1080² film re-encoded to 720² (577KB, no audio, faststart);
+// its poster is a frame from the film. Set `PDP_VIDEO` to null and slide 1 is the poster alone.
+// Swap anything in `PDP_SLIDES` / `PDP_STYLES` — nothing else needs to change. Rating and review
+// copy are mock.
+// ⚠️ `python3 -m http.server` does not do HTTP Range requests, which Safari needs for <video> —
+// check the film on a phone against the GitHub Pages URL, not the local server.
+// ⚠️ Top-level names in a classic script are global: everything here is `PDP_…` / `Pdp…`.
 
-// Card artwork. Figma layers the same photo two or three times at specific
-// transforms (a zoomed backdrop plus the product on top), so the percentages
-// are carried over verbatim per card rather than collapsed to object-fit.
-const SHOTS = {
-  a:  { src: 'pb-shot-a.jpg', bg: '#f1f5f6', layers: [
-        { h: '100%',    left: '-60.21%', top: '0%',     w: '220.43%' },
-        { h: '72.03%',  left: '-29.39%', top: '8.35%',  w: '158.78%' } ] },
-  b:  { src: 'pb-shot-b.jpg', bg: '#f1f5f6', layers: [
-        { h: '100.15%', left: '-60.38%', top: '-0.08%', w: '220.76%' },
-        { h: '62.61%',  left: '-19%',    top: '7.33%',  w: '138%' } ] },
-  c:  { src: 'pb-shot-b.jpg', bg: '#f1f5f6', layers: [
-        { h: '100.15%', left: '-60.38%', top: '-0.08%', w: '220.76%' },
-        { h: '61.29%',  left: '-17.55%', top: '9.25%',  w: '135.1%' } ] },
-  xl: { src: 'pb-shot-xl.jpg', bg: '#efefef', layers: [
-        { h: '80.29%',  left: '-6.33%',  top: '3.33%',  w: '112.66%' },
-        { h: '96.45%',  left: '-17.67%', top: '3.45%',  w: '135.34%' },
-        { h: '71.27%',  left: '0%',      top: '0.03%',  w: '100%' } ] },
-  lg: { src: 'pb-shot-large.jpg', bg: '#f1f5f6', layers: [
-        { h: '71.27%',  left: '0%',      top: '0.1%',   w: '100%' } ] },
-};
+const PDP_A = '../shared/assets';
+const PDP_VIDEO = '../shared/assets/photobook-film.mp4';
+const PDP_HERO_H = 520;
+const PDP_STORY_MS = 6000;
+const PDP_EASE = 'cubic-bezier(.2,.8,.2,1)';
+const PDP_HEAD = '"Bricolage Grotesque", "DM Sans", -apple-system, system-ui, sans-serif';
+const PDP_HEAD_VARIATION = '"opsz" 14, "wdth" 100';
+const PDP_TEXT = '-apple-system, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif';
+const PDP_OPTIONS = 'photobook-options.html';
 
-const FORMATS = [
-  { id: 'landscape', title: 'Landscape', price: 'From €24.99', shot: 'a' },
-  { id: 'portrait',  title: 'Portrait',  price: 'From €24.99', shot: 'b' },
-  { id: 'square',    title: 'Square',    price: 'From €24.99', shot: 'c' },
+// Square sources in a portrait hero: `cover` crops the sides, so `pos` picks which side to keep.
+const PDP_SLIDES = [
+  { img: 'photobook-film-poster.jpg', pos: '50% 50%', tag: 'See it in motion', video: PDP_VIDEO },
+  { img: 'pbx-pdp-1.jpg', pos: '50% 50%', tag: 'Made to be held' },
+  { img: 'pbx-pdp-2.jpg', pos: '50% 50%', tag: 'Landscape hardcover' },
+  { img: 'pbx-pdp-3.jpg', pos: '0% 50%',  tag: 'Four sizes to choose from' },
+  { img: 'pbx-pdp-4.jpg', pos: '35% 50%', tag: 'Premium hardcover finish' },
+  { img: 'pbx-pdp-5.jpg', pos: '50% 50%', tag: 'Flexible page layouts' },
 ];
 
-const COVERS = [
-  { id: 'hardcover', title: 'Hardcover',  price: 'From €24.99', shot: 'a' },
-  { id: 'cutout',    title: 'Cut-out',    price: 'From €24.99', shot: 'c' },
-  { id: 'softcover', title: 'Soft cover', price: 'From €24.99', shot: 'c' },
+// Six USPs, 24px stroke icons (inline, so they take the page's ink and green).
+const PDP_USPS = [
+  { title: 'Lay-flat pages',   text: 'Spreads open fully, so no photo is lost in the spine.',
+    icon: <><path d="M3 5.5C5.5 4.5 9 4.5 12 6.5c3-2 6.5-2 9-1v13c-2.5-1-6-1-9 1-3-2-6.5-2-9-1z" /><path d="M12 6.5v13" /></> },
+  { title: 'Premium paper',    text: 'Matte, satin or gloss, in rich true-to-life colour.',
+    icon: <><rect x="3.5" y="4.5" width="17" height="15" rx="3" /><circle cx="9" cy="10" r="1.6" /><path d="M4 17l5-4.5 4 3.5 3-2.5 4 3.5" /></> },
+  { title: 'Smart auto-fill',  text: 'Your whole book laid out in seconds. Tweak anything.',
+    icon: <><path d="M11 3.5l1.8 4.7 4.7 1.8-4.7 1.8L11 16.5l-1.8-4.7L4.5 10l4.7-1.8z" /><path d="M18 15.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z" /></> },
+  { title: 'Up to 120 pages',  text: 'Room for a weekend away or your whole year.',
+    icon: <><path d="M7 4h10a2 2 0 012 2v12a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2z" /><path d="M9 9h6M9 13h6M9 17h3" /></> },
+  { title: 'Made to last',     text: 'Hardwearing covers and professional printing.',
+    icon: <><path d="M6.5 4h11l3.5 5-9 11L3 9z" /><path d="M3 9h18M9.5 4L8 9l4 11 4-11-1.5-5" /></> },
+  { title: 'Our promise',      text: 'Not right? We will reprint it or refund you.',
+    icon: <><path d="M12 3l7 3v5.5c0 4.5-3 7.8-7 9.5-4-1.7-7-5-7-9.5V6z" /><path d="M8.8 12l2.3 2.3 4.2-4.6" /></> },
 ];
 
-// Cut-out branch: not in node 406:7183. Built on the same card pattern; the
-// artwork is placeholder (reused product shots) until real cut-out photos exist.
-const SHAPES = [
-  { id: 'circular',  title: 'Circular',  price: 'Included', shot: 'c' },
-  { id: 'rectangle', title: 'Rectangle', price: 'Included', shot: 'b' },
-  { id: 'year',      title: 'Year',      price: 'Included', shot: 'a' },
+// Delivery is promised in about 4 days: show the date it would land on if ordered today.
+function pdpArrival() {
+  const d = new Date(); d.setDate(d.getDate() + 4);
+  return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+const PDP_STYLES = [
+  { img: 'pbx-cover-photo.jpg',     pos: '30% 50%', title: 'Photo hardcover', line: 'Your photo, edge to edge' },
+  { img: 'pbx-cover-cutout.jpg',    pos: '60% 40%', title: 'Cut-out',         line: 'Your photo in the cover' },
+  { img: 'pbx-cover-softcover.jpg', pos: '50% 50%', title: 'Soft cover',      line: 'Light and flexible' },
+  { img: 'pbx-binding-layflat.jpg', pos: '40% 50%', title: 'Lay-flat',        line: 'Pages that open fully' },
+  // A collection rather than a cover: the same Trip books card home carries (hn-trip.jpg).
+  { img: 'hn-trip.jpg',             pos: '72% 50%', title: 'Trip books',      line: 'Every journey, bound to last', badge: 'Collection' },
 ];
 
-// Swatches are the PB3 tokens already in styles.css — nothing invented outside it.
-const COLOURS = [
-  { id: 'teal',     title: 'Deep teal', hex: '#007F70' },
-  { id: 'sage',     title: 'Sage',      hex: '#90CED0' },
-  { id: 'offwhite', title: 'Off-white', hex: '#F1F6F6' },
-  { id: 'sand',     title: 'Sand',      hex: '#D9C9A8' },
-  { id: 'charcoal', title: 'Charcoal',  hex: '#333333' },
+const PDP_DETAILS = [
+  { title: 'Paper & printing',  text: 'Premium photo paper in matte, satin or gloss, printed in rich, true-to-life colour.' },
+  { title: 'Binding & lay-flat', text: 'Standard binding, or lay-flat so every spread opens completely and no photo is lost in the spine.' },
+  { title: 'Formats & sizes',    text: 'Landscape, portrait or square, in medium, large and extra large. From 24 up to 120 pages.' },
+  { title: 'Delivery & returns', text: 'Delivered in about 4 days. If it is not right, we will reprint it or refund you.' },
 ];
 
-// Sizes depend on the chosen format. The design names Extra large 39×29 and
-// Large 28×21 (landscape); the other formats rotate/adapt those, plus a Medium.
-// All three cards are 343.779 tall. The design's third size card is 303.779 and
-// sits centred in the row (y=20), but that card is its mislabelled "Soft cover"
-// placeholder — a real third size matches its siblings. Medium reuses the Large
-// photo because the design only ships two size shots.
-const SIZES = {
-  landscape: [
-    { id: 'xl', title: 'Extra large', dim: '39 x 29 cm', price: 'From €24.99', shot: 'xl', w: 261, h: 343.779 },
-    { id: 'l',  title: 'Large',       dim: '28 x 21 cm', price: 'From €24.99', shot: 'lg', w: 245, h: 343.779 },
-    { id: 'm',  title: 'Medium',      dim: '20 x 15 cm', price: 'From €24.99', shot: 'lg', w: 245, h: 343.779 },
-  ],
-  portrait: [
-    { id: 'xl', title: 'Extra large', dim: '29 x 39 cm', price: 'From €24.99', shot: 'xl', w: 261, h: 343.779 },
-    { id: 'l',  title: 'Large',       dim: '21 x 28 cm', price: 'From €24.99', shot: 'lg', w: 245, h: 343.779 },
-    { id: 'm',  title: 'Medium',      dim: '15 x 20 cm', price: 'From €24.99', shot: 'lg', w: 245, h: 343.779 },
-  ],
-  square: [
-    { id: 'xl', title: 'Extra large', dim: '30 x 30 cm', price: 'From €24.99', shot: 'xl', w: 261, h: 343.779 },
-    { id: 'l',  title: 'Large',       dim: '21 x 21 cm', price: 'From €24.99', shot: 'lg', w: 245, h: 343.779 },
-    { id: 'm',  title: 'Medium',      dim: '15 x 15 cm', price: 'From €24.99', shot: 'lg', w: 245, h: 343.779 },
-  ],
-};
-
-const DISPLAY = '-apple-system, "SF Pro Display", system-ui, sans-serif';
-const TEXT    = '-apple-system, "SF Pro Text", system-ui, sans-serif';
-
-// ── Selection radio — Figma node 406:7232 (32px, glass ring). The export only
-// carries the unselected state, so the selected state fills it with the brand
-// secondary and adds a check.
-function SelectDot({ selected }) {
-  return (
-    <div style={{
-      position: 'absolute', left: 16, top: 16, width: 32, height: 32,
-      borderRadius: '50%', boxSizing: 'border-box',
-      background: selected ? 'var(--colour-foreground-fg-secondary, #007F70)' : 'rgba(0,0,0,0.1)',
-      border: '2px solid #FFFFFF',
-      backdropFilter: 'blur(2px)', WebkitBackdropFilter: 'blur(2px)',
-      boxShadow: '0px 4px 4px rgba(0,0,0,0.25)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      transition: 'background 160ms ease',
-    }}>
-      {selected && (
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
-          <path d="M3.5 8.4L6.3 11.2L12.5 5" stroke="#fff" strokeWidth="2.2"
-                strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      )}
-    </div>
-  );
-}
-
-// ── Option card — Figma node 406:7227
-function OptionCard({ shot, title, dim, price, selected, onSelect, showInfo,
-                      w = 245, h = 303.779, tall }) {
-  const s = SHOTS[shot];
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      aria-pressed={selected}
-      onPointerDown={e => { e.currentTarget.style.transform = 'scale(0.97)'; }}
-      onPointerUp={e => { e.currentTarget.style.transform = 'scale(1)'; }}
-      onPointerLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
-      style={{
-        position: 'relative', flex: '0 0 auto', width: w, height: h,
-        borderRadius: 20, overflow: 'hidden', padding: 0,
-        border: selected
-          ? '2px solid var(--colour-foreground-fg-secondary, #007F70)'
-          : '1px solid #FFFFFF',
-        boxShadow: '0px 4px 4px -4px rgba(0,0,0,0.25)',
-        background: s.bg, cursor: 'pointer',
-        display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
-        alignItems: 'flex-start', paddingTop: 24, boxSizing: 'border-box',
-        transition: 'transform 140ms ease, border-color 160ms ease',
-        WebkitTapHighlightColor: 'transparent', textAlign: 'left',
-      }}
-    >
-      {/* artwork layers */}
-      <div aria-hidden style={{ position: 'absolute', inset: 0, borderRadius: 20, overflow: 'hidden', pointerEvents: 'none' }}>
-        {s.layers.map((l, i) => (
-          <img key={i} src={`${A}/${s.src}`} alt=""
-               style={{ position: 'absolute', left: l.left, top: l.top,
-                        width: l.w, height: l.h, maxWidth: 'none', display: 'block' }} />
-        ))}
-      </div>
-
-      {/* caption — node 406:7228: blurred gradient scrim */}
-      <div style={{
-        position: 'relative', width: '100%', boxSizing: 'border-box',
-        padding: tall ? '32px 20px 24px' : '24px 20px 20px',
-        display: 'flex', flexDirection: 'column', justifyContent: 'center',
-        backdropFilter: 'blur(25px)', WebkitBackdropFilter: 'blur(25px)',
-        background: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.5) 100%)',
-      }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, width: '100%',
-                      filter: 'drop-shadow(0px 0px 2px rgba(0,0,0,0.25))' }}>
-          <p style={{ margin: 0, fontFamily: DISPLAY, fontWeight: 700, fontSize: 22,
-                      lineHeight: '28px', letterSpacing: '0.35px', color: '#FFFFFF' }}>{title}</p>
-          {dim && (
-            <p style={{ margin: 0, fontFamily: TEXT, fontSize: 17, lineHeight: '22px',
-                        letterSpacing: '-0.41px', color: '#FAFAFA' }}>{dim}</p>
-          )}
-          <p style={{ margin: 0, fontFamily: TEXT, fontSize: 13, lineHeight: '18px',
-                      letterSpacing: '-0.08px', color: '#FAFAFA' }}>{price}</p>
-        </div>
-      </div>
-
-      <SelectDot selected={selected} />
-
-      {showInfo && (
-        <img src={`${A}/pb-icon-info.svg`} alt="" aria-hidden
-             style={{ position: 'absolute', right: 14, top: 251, width: 32, height: 32,
-                      mixBlendMode: 'soft-light', display: 'block' }} />
-      )}
-    </button>
-  );
-}
-
-// ── Section — Figma node 406:7221: 22px title, 24px gap, 12px card gap.
-// The row bleeds past the 24px gutters so cards can scroll to the screen edge,
-// with bottom padding so the card shadow is not clipped by overflow-x.
-function OptionSection({ title, children, innerRef }) {
-  return (
-    <div ref={innerRef} style={{ display: 'flex', flexDirection: 'column', gap: 24, width: '100%' }}>
-      <p style={{ margin: 0, fontFamily: DISPLAY, fontWeight: 700, fontSize: 22,
-                  lineHeight: '28px', letterSpacing: '0.35px',
-                  color: 'var(--colour-foreground-fg-black, #333)' }}>{title}</p>
-      <div style={{
-        display: 'flex', gap: 12, alignItems: 'center',
-        margin: '0 -24px', padding: '0 24px 10px',
-        overflowX: 'auto', overflowY: 'hidden',
-        scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch',
-      }}>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function ColourSwatch({ hex, title, selected, onSelect }) {
-  return (
-    <button
-      type="button" onClick={onSelect} aria-pressed={selected} aria-label={title}
-      onPointerDown={e => { e.currentTarget.style.transform = 'scale(0.94)'; }}
-      onPointerUp={e => { e.currentTarget.style.transform = 'scale(1)'; }}
-      onPointerLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
-      style={{
-        flex: '0 0 auto', border: 'none', background: 'none', padding: 0,
-        cursor: 'pointer', display: 'flex', flexDirection: 'column',
-        alignItems: 'center', gap: 8, width: 72,
-        transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
-      }}
-    >
-      <span style={{
-        width: 56, height: 56, borderRadius: '50%', background: hex,
-        boxSizing: 'border-box', display: 'block',
-        border: '1px solid rgba(0,0,0,0.06)',
-        boxShadow: selected
-          ? '0 0 0 2px #FFFFFF, 0 0 0 4px var(--colour-foreground-fg-secondary, #007F70), 0px 4px 4px -4px rgba(0,0,0,0.25)'
-          : '0px 4px 4px -4px rgba(0,0,0,0.25)',
-        transition: 'box-shadow 160ms ease',
-      }} />
-      <span style={{ fontFamily: TEXT, fontSize: 13, lineHeight: '18px', letterSpacing: '-0.08px',
-                     color: selected ? 'var(--colour-foreground-fg-black, #333)' : '#777',
-                     fontWeight: selected ? 600 : 400, textAlign: 'center' }}>{title}</span>
-    </button>
-  );
-}
-
-// ── Lay-flat upsell — Figma node 406:7296
-function LayFlatCard({ on, onToggle }) {
-  return (
-    <div style={{
-      width: '100%', height: 398, boxSizing: 'border-box', padding: 20,
-      background: 'var(--colour-foreground-fg-white, #FFFFFF)', borderRadius: 24,
-      overflow: 'hidden', display: 'flex', flexDirection: 'column',
-      justifyContent: 'space-between',
-    }}>
-      {/* Toggle — node 406:7297. The export carries only the off state, so this
-          is drawn in code with the same 55×32 geometry and glass ring. */}
-      <button
-        type="button" role="switch" aria-checked={on} aria-label="Add Lay-flat"
-        onClick={onToggle}
-        style={{
-          width: 55, height: 32, borderRadius: 16, padding: 0, flexShrink: 0,
-          position: 'relative', cursor: 'pointer', boxSizing: 'border-box',
-          border: '2px solid #FFFFFF',
-          background: on ? 'var(--colour-foreground-fg-secondary, #007F70)' : 'rgba(0,0,0,0.1)',
-          boxShadow: '0px 4px 4px -4px rgba(0,0,0,0.25)',
-          transition: 'background 180ms ease',
-          WebkitTapHighlightColor: 'transparent',
-        }}
-      >
-        <span style={{
-          position: 'absolute', top: 2, left: on ? 25 : 2,
-          width: 24, height: 24, borderRadius: '50%', background: '#FFFFFF',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-          transition: 'left 180ms cubic-bezier(0.32,0.72,0.24,1)',
-        }} />
-      </button>
-
-      <div style={{ flex: '1 1 0', minHeight: 0, position: 'relative', width: '100%' }}>
-        <div style={{
-          position: 'absolute', left: 'calc(50% - 1px)', top: 'calc(50% - 21.84px)',
-          transform: 'translate(-50%, -50%) scaleX(-1)',
-          width: 356, height: 183, overflow: 'hidden',
-        }}>
-          <img src={`${A}/pb-layflat.png`} alt=""
-               style={{ position: 'absolute', left: '-14.61%', top: '-0.05%',
-                        width: '128.65%', height: '100.11%', maxWidth: 'none', display: 'block' }} />
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
-        <p style={{ margin: 0, fontFamily: DISPLAY, fontWeight: 700, fontSize: 22,
-                    lineHeight: '28px', letterSpacing: '0.35px',
-                    color: 'var(--colour-foreground-fg-black, #333)' }}>Add Lay-flat</p>
-        <p style={{ margin: 0, fontFamily: TEXT, fontWeight: 600,
-                    color: 'var(--colour-foreground-fg-black, #333)' }}>
-          <span style={{ fontSize: 13, lineHeight: '18px', letterSpacing: '-0.08px' }}>+ </span>
-          <span style={{ fontSize: 15, lineHeight: '20px', letterSpacing: '-0.24px' }}>€1.99 per page</span>
-        </p>
-        <p style={{ margin: 0, fontFamily: TEXT, fontSize: 13, lineHeight: '18px',
-                    letterSpacing: '-0.08px', color: '#777' }}>
-          Pages open completely flat, perfect for panoramic spreads.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-// ── Review your choice — Figma node 406:7306 ──────────────────────────────────
-// The design's background is four copies of the same photo at these transforms;
-// its export is byte-identical to pb-shot-a.jpg, so the file is reused. The photo
-// follows the chosen format so the block previews what was actually selected.
-const REVIEW_LAYERS = [
-  { h: '100%',   left: '-60.13%', top: '0%',     w: '220.43%' },
-  { h: '89.08%', left: '-48.09%', top: '7.97%',  w: '196.35%' },
-  { h: '74.41%', left: '-31.92%', top: '17.4%',  w: '164.01%' },
-  { h: '67.63%', left: '-24.46%', top: '24.56%', w: '149.09%' },
+const PDP_REVIEWS = [
+  { name: 'Sofia, Madrid',   text: 'The paper and colours are stunning. Our trip to Italy looks like a magazine.' },
+  { name: 'Daniel, Leeds',   text: 'Auto-fill did the whole book in seconds. I only moved two photos.' },
+  { name: 'Marie, Lyon',     text: 'I gave one to my parents. They have not put it down since.' },
 ];
 
-// Price model. The option cards all read a flat "From €24.99" while the review
-// block reads €44.99 for Large / Landscape / Hardcover / Layflat, so these
-// increments are reverse-engineered to hit that exact total: 29.99 + 10 + 5.
-const SIZE_BASE   = { xl: 34.99, l: 29.99, m: 24.99 };
-const COVER_ADD   = { softcover: 0, hardcover: 10, cutout: 15 };
-const LAYFLAT_ADD = 5;
+const pdpPush = href => () => window.navigation.push(href);
 
-// Single source of truth for the summary, shared by the sticky bar and the
-// full review block so they can never drift apart.
-function summarise({ format, cover, size, shape, colour, layflat }) {
-  const fmt = FORMATS.find(f => f.id === format);
-  const cov = COVERS.find(c => c.id === cover);
-  const siz = size ? SIZES[format].find(z => z.id === size) : null;
-  const shp = SHAPES.find(x => x.id === shape);
-  const col = COLOURS.find(x => x.id === colour);
-
-  // The label is "From", so an unfinished selection shows the cheapest option
-  // still consistent with it — truthful at every step, and it converges on the
-  // exact total once everything is chosen.
-  const base = siz ? SIZE_BASE[siz.id] : Math.min(...Object.values(SIZE_BASE));
-  const add  = cov ? COVER_ADD[cov.id] : Math.min(...Object.values(COVER_ADD));
-
-  return {
-    line1: siz ? `${siz.title} ${fmt.title}` : fmt.title,
-    line2: cov ? `${cov.title}${layflat ? ' with Layflat' : ''}` : '',
-    detail: !siz ? ''
-      : (cover === 'cutout' && shp && col
-          ? `${siz.dim} · ${shp.title} cut-out, ${col.title}`
-          : siz.dim),
-    total: (base + add + (layflat ? LAYFLAT_ADD : 0)).toFixed(2),
-    src: SHOTS[fmt.shot].src,
-  };
-}
-
-// Handed to the editor, which reads it back out of sessionStorage. It needs the
-// resolved title, page count, price and page proportions; recomputing them there
-// would mean duplicating SIZES / SIZE_BASE / COVER_ADD.
-function bookConfig(sel) {
-  const fmt = FORMATS.find(f => f.id === sel.format);
-  const siz = SIZES[sel.format].find(z => z.id === sel.size);
-  const dim = /(\d+)\s*x\s*(\d+)/.exec(siz.dim);
-  return {
-    title: `${siz.title} ${fmt.title} photo book`,
-    // Nothing in the flow picks a page count yet, so every book starts on the
-    // number the editor node shows (451:15652).
-    pages: 24,
-    total: summarise(sel).total,
-    pageW: Number(dim[1]), pageH: Number(dim[2]),
-    // Read by the upgrade page, so a layflat chosen here arrives already selected.
-    layflat: !!sel.layflat,
-    cover: (COVERS.find(c => c.id === sel.cover) || {}).title,
-  };
-}
-
-// Condensed summary bar: the review block's headline and price only, pinned to
-// the bottom while the user is still choosing. It hides as soon as the full
-// review block scrolls into view so the two never show at once.
-function SummaryBar({ summary }) {
-  return (
-    <div style={{
-      position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 5,
-      boxSizing: 'border-box',
-      background: '#F1F6F6',
-      borderRadius: '24px 24px 0 0',
-      boxShadow: '0px -4px 16px -1px rgba(0,77,74,0.10)',
-      padding: 24,
-      paddingBottom: 'max(24px, calc(env(safe-area-inset-bottom, 0px) + 8px))',
-      display: 'flex', gap: 24, alignItems: 'flex-start', justifyContent: 'space-between',
-      animation: 'pbBarIn 220ms cubic-bezier(0.32,0.72,0.24,1) both',
-    }}>
-      <p style={{ margin: 0, fontFamily: DISPLAY, fontWeight: 600, fontSize: 20,
-                  lineHeight: '24px', letterSpacing: '0.38px',
-                  color: 'var(--colour-foreground-fg-black, #333)' }}>
-        {summary.line1}{summary.line2 ? <><br />{summary.line2}</> : null}
-      </p>
-      <p style={{ margin: 0, textAlign: 'right', whiteSpace: 'nowrap',
-                  color: 'var(--colour-foreground-fg-black, #333)' }}>
-        <span style={{ fontFamily: TEXT, fontSize: 15, lineHeight: '20px', letterSpacing: '-0.24px' }}>From</span>
-        <br />
-        <span style={{ fontFamily: DISPLAY, fontWeight: 600, fontSize: 20,
-                       lineHeight: '24px', letterSpacing: '0.38px' }}>€{summary.total}</span>
-      </p>
-    </div>
-  );
-}
-
-function ReviewSection({ format, cover, size, shape, colour, layflat, onStart, innerRef }) {
-  const sum = summarise({ format, cover, size, shape, colour, layflat });
-  const { line1, line2, detail, total, src } = sum;
-
-  return (
-    <div ref={innerRef} style={{
-      position: 'relative', width: '100%', height: 542, overflow: 'hidden',
-      borderRadius: '24px 24px 0 0', background: '#F1F6F6',
-      display: 'flex', flexDirection: 'column', alignItems: 'center',
-      justifyContent: 'space-between',
-    }}>
-      <div aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-        {REVIEW_LAYERS.map((l, i) => (
-          <img key={i} src={`${A}/${src}`} alt=""
-               style={{ position: 'absolute', left: l.left, top: l.top,
-                        width: l.w, height: l.h, maxWidth: 'none', display: 'block' }} />
-        ))}
-      </div>
-
-      {/* Progressive blur behind the header text. A single backdrop-filter is
-          uniform and leaves a hard edge where it stops, so this stacks layers of
-          doubling blur, each masked to a shorter band near the top. Because each
-          layer samples the backdrop *including the layers already painted below
-          it*, the blur accumulates — ~31px at the very top easing to 0 by the
-          bottom of the scrim. */}
-      <div aria-hidden style={{
-        // Ends above the 243px scrim bottom; see the note on the layer stops.
-        position: 'absolute', left: 0, right: 0, top: 0, height: 240,
-        pointerEvents: 'none',
-      }}>
-        {/* Stops are absolute px, not percentages: percentages scale with the
-            container, which pushed the strong layers down over the book photo.
-            [blur, fully-opaque-until, gone-by] — the strong layers stay near the
-            top, only the 1px layer has a tail. The stops sit well above the scrim's
-            243px bottom because the effect reaches further than the masks suggest:
-            each layer blurs the already-blurred composite beneath it, and a layer's
-            blur samples past its own mask. Measured, not guessed — the book photo
-            below must stay crisp. */}
-        {[[16, 8, 38], [8, 20, 66], [4, 34, 96], [2, 52, 128], [1, 70, 160]].map(
-          ([blur, solid, gone]) => {
-            const fade = `linear-gradient(to bottom, #000 0px, #000 ${solid}px,` +
-                         ` rgba(0,0,0,0) ${gone}px)`;
-            return (
-              <div key={blur} style={{
-                position: 'absolute', inset: 0,
-                backdropFilter: `blur(${blur}px)`, WebkitBackdropFilter: `blur(${blur}px)`,
-                maskImage: fade, WebkitMaskImage: fade,
-              }} />
-            );
-          })}
-      </div>
-
-      {/* scrim — node 406:7307 */}
-      <div style={{
-        position: 'relative', width: '100%', height: 243, boxSizing: 'border-box',
-        padding: 24, display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-        background: 'linear-gradient(to top, rgba(0,0,0,0.01) 0%, rgba(0,0,0,0.5) 100%)',
-      }}>
-        <div style={{ flex: '1 1 0', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <p style={{ margin: 0, fontFamily: TEXT, fontWeight: 600, fontSize: 13,
-                      lineHeight: '18px', letterSpacing: '-0.08px',
-                      color: 'rgba(255,255,255,0.75)' }}>Review your choice</p>
-          <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', justifyContent: 'center', width: '100%' }}>
-            <div style={{ flex: '1 1 0', minWidth: 0, display: 'flex', flexDirection: 'column',
-                          gap: 8, justifyContent: 'center' }}>
-              <p style={{ margin: 0, fontFamily: DISPLAY, fontWeight: 600, fontSize: 20,
-                          lineHeight: '24px', letterSpacing: '0.38px', color: '#FFFFFF' }}>
-                {line1}<br />{line2}
-              </p>
-              <p style={{ margin: 0, fontFamily: TEXT, fontSize: 13, lineHeight: '18px',
-                          letterSpacing: '-0.08px', color: '#FAFAFA' }}>{detail}</p>
-              <p style={{ margin: 0, fontFamily: TEXT, fontSize: 13, lineHeight: '18px',
-                          letterSpacing: '-0.08px', color: '#FAFAFA' }}>Price not included delivery</p>
-            </div>
-            <p style={{ margin: 0, textAlign: 'right', whiteSpace: 'nowrap', color: '#FFFFFF' }}>
-              <span style={{ fontFamily: TEXT, fontSize: 15, lineHeight: '20px', letterSpacing: '-0.24px' }}>From</span>
-              <br />
-              <span style={{ fontFamily: DISPLAY, fontWeight: 600, fontSize: 20,
-                             lineHeight: '24px', letterSpacing: '0.38px' }}>€{total}</span>
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* CTA — node 406:7315/7316. Figma specifies "Brandon Text a Bold", which is
-          not available; Teachers is the self-hosted brand face used on other CTAs. */}
-      <div style={{
-        position: 'relative', width: '100%', boxSizing: 'border-box', padding: 24,
-        paddingBottom: 'max(24px, calc(env(safe-area-inset-bottom, 0px) + 8px))',
-      }}>
-        <button
-          type="button" onClick={onStart}
-          onPointerDown={e => { e.currentTarget.style.transform = 'scale(0.97)'; }}
-          onPointerUp={e => { e.currentTarget.style.transform = 'scale(1)'; }}
-          onPointerLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
-          style={pbButton('light', { width: '100%', background: '#FFFFFF', border: '1px solid #FFFFFF', color: PB_INK })}
-        >
-          <span>Start create</span>
-          <img src={`${A}/pb-icon-arrow.svg`} alt="" width={24} height={24} style={{ display: 'block' }} />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-const BENEFITS = [
-  { icon: 'pb-icon-quality.svg',  lines: ['Lasting', 'quality'] },
-  { icon: 'pb-icon-pages.svg',    lines: ['Up to', '120 pages'] },
-  { icon: 'pb-icon-delivery.svg', lines: ['Delivery', 'in 4 days'] },
-];
-
-function ProductPhotobookScreen() {
-  const { useState, useRef, useEffect } = React;
-  const [format, setFormat] = useState(null);
-  const [cover,  setCover]  = useState(null);
-  const [shape,  setShape]  = useState(null);
-  const [colour, setColour] = useState(null);
-  const [size,   setSize]   = useState(null);
-  const [layflat, setLayflat] = useState(false);
-
-  const isCutout = cover === 'cutout';
-  // Progressive reveal: a step appears once everything before it is answered.
-  const showCover  = !!format;
-  const showCutout = showCover && isCutout;
-  const showSize   = showCover && (!isCutout || (!!shape && !!colour));
-  const showExtras = showSize && !!size;
-  const complete   = showExtras;
-
-  // Scroll each newly revealed step into view.
-  const refs = { cover: useRef(null), shape: useRef(null), colour: useRef(null), size: useRef(null) };
-  const scrollerRef = useRef(null);
-  const reviewRef = useRef(null);
-  const [reviewSeen, setReviewSeen] = useState(false);
-  const reveal = key => {
-    requestAnimationFrame(() => {
-      const el = refs[key] && refs[key].current;
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    });
-  };
-
-  // The condensed bar yields to the full review block the moment it appears.
-  useEffect(() => {
-    if (!complete) { setReviewSeen(false); return; }
-    const el = reviewRef.current, root = scrollerRef.current;
-    if (!el || !root || typeof IntersectionObserver === 'undefined') return;
-    const io = new IntersectionObserver(
-      entries => setReviewSeen(entries[0].isIntersecting),
-      { root, threshold: 0.01 }
-    );
+// Fades a section up the first time it scrolls into view.
+function PdpReveal({ children, root }) {
+  const ref = React.useRef(null);
+  const [shown, setShown] = React.useState(false);
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el || !('IntersectionObserver' in window)) { setShown(true); return undefined; }
+    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setShown(true); io.disconnect(); } },
+      { root: root && root.current, threshold: 0.1 });
     io.observe(el);
     return () => io.disconnect();
-  }, [complete]);
-
-  // Choosing a different format invalidates the size picked under the old one.
-  const pickFormat = id => { setFormat(id); setSize(null); reveal('cover'); };
-  const pickCover = id => {
-    setCover(id);
-    if (id !== 'cutout') { setShape(null); setColour(null); }
-    reveal(id === 'cutout' ? 'shape' : 'size');
-  };
-
+  }, []);
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%',
-                  background: '#F1F6F6', overflow: 'hidden' }}>
-      <style>{`
-        @keyframes pbBarIn {
-          from { opacity: 0; transform: translateY(100%); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
-      <div ref={scrollerRef} style={{
-        position: 'absolute', inset: 0, overflowY: 'auto', overflowX: 'hidden',
-        WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none',
-      }}>
-        {/* ── Hero — Figma node 406:7432 ── */}
-        <div style={{ paddingTop: PB_BACK_TOP }}>
-          <div style={{ padding: '0 16px' }}>
-            <PbBackButton style={{ position: 'relative', left: 0, top: 0 }} />
-          </div>
+    <div ref={ref} style={{ opacity: shown ? 1 : 0, transform: shown ? 'none' : 'translateY(20px)',
+      transition: `opacity .7s ${PDP_EASE}, transform .7s ${PDP_EASE}` }}>{children}</div>
+  );
+}
 
-          {/* title block — node 406:7444 */}
-          <div style={{ padding: '32px 24px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <p style={{ margin: 0, fontFamily: '"Teachers", -apple-system, system-ui, sans-serif',
-                        fontWeight: 700, fontSize: 42, lineHeight: '41px', letterSpacing: '-0.63px',
-                        color: 'var(--colour-foreground-fg-black, #333)' }}>
-              Photo books
-            </p>
-            <p style={{ margin: 0, fontFamily: TEXT, letterSpacing: '-0.41px', color: '#007F70' }}>
-              <span style={{ fontSize: 17, lineHeight: '22px' }}>Start from </span>
-              <span style={{ fontSize: 17, lineHeight: '22px', fontWeight: 700 }}>€14.99</span>
-            </p>
-          </div>
+const PdpTitle = ({ children }) => (
+  <p style={{ margin: 0, fontFamily: PDP_HEAD, fontWeight: 600, fontSize: 24, lineHeight: '30px',
+    letterSpacing: '-0.6px', color: PB_INK, fontVariationSettings: PDP_HEAD_VARIATION }}>{children}</p>
+);
 
-          {/* benefits — node 406:7433 */}
-          <div style={{ display: 'flex', gap: 16, alignItems: 'center', padding: 16, marginTop: 15 }}>
-            {BENEFITS.map(b => (
-              <div key={b.icon} style={{
-                flex: '1 1 0', minWidth: 0, height: 94, borderRadius: 24,
-                background: 'var(--colour-foreground-fg-white, #FFFFFF)',
-                overflow: 'hidden', padding: '0 4px', boxSizing: 'border-box',
-                display: 'flex', flexDirection: 'column', gap: 8,
-                alignItems: 'center', justifyContent: 'center',
-              }}>
-                <img src={`${A}/${b.icon}`} alt="" width={24} height={24} style={{ display: 'block' }} />
-                <p style={{ margin: 0, fontFamily: TEXT, fontWeight: 600, fontSize: 15,
-                            lineHeight: '20px', letterSpacing: '-0.24px', color: '#777',
-                            textAlign: 'center' }}>
-                  {b.lines[0]}<br />{b.lines[1]}
-                </p>
-              </div>
-            ))}
-          </div>
+// ── Media hero. Tap the right side to skip ahead, the left to go back; holding pauses.
+function PdpHero() {
+  const { useState, useEffect, useRef } = React;
+  const [i, setI] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const down = useRef(null);
+  const reduced = typeof obReducedMotion === 'function' ? obReducedMotion()
+    : !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  useEffect(() => {
+    if (paused || reduced) return undefined;
+    const t = setTimeout(() => setI(n => (n + 1) % PDP_SLIDES.length), PDP_STORY_MS);
+    return () => clearTimeout(t);
+  }, [i, paused, reduced]);
+  const s = PDP_SLIDES[i];
+  return (
+    <div
+      onPointerDown={e => { down.current = { t: Date.now() }; setPaused(true); }}
+      onPointerUp={e => {
+        setPaused(false);
+        const d = down.current; down.current = null;
+        if (!d || Date.now() - d.t > 350) return;
+        const r = e.currentTarget.getBoundingClientRect();
+        setI(n => (n + (e.clientX - r.left > r.width * 0.35 ? 1 : PDP_SLIDES.length - 1)) % PDP_SLIDES.length);
+      }}
+      onPointerLeave={() => setPaused(false)}
+      style={{ position: 'relative', height: PDP_HERO_H, overflow: 'hidden', background: '#0b2b2d', touchAction: 'pan-y' }}>
+      {PDP_SLIDES.map((sl, k) => (
+        <div key={k} style={{ position: 'absolute', inset: 0, opacity: k === i ? 1 : 0, transition: 'opacity .7s ease' }}>
+          <img src={`${PDP_A}/${sl.img}`} alt="" draggable={false} style={{
+            position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: sl.pos,
+            animation: k === i && !reduced ? `pdpKen ${PDP_STORY_MS + 1500}ms ease-out both` : 'none',
+            animationPlayState: paused ? 'paused' : 'running' }} />
+          {sl.video && (
+            <video src={sl.video} poster={`${PDP_A}/${sl.img}`} muted loop playsInline preload="auto"
+              ref={el => {
+                if (!el) return;
+                if (k === i && !paused) el.play().catch(() => {});
+                else el.pause();
+                if (k !== i && el.currentTime) el.currentTime = 0;     // start from the top next lap
+              }}
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover',
+                opacity: k === i ? 1 : 0 }} />
+          )}
         </div>
+      ))}
+      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none',
+        background: 'linear-gradient(rgba(0,0,0,.40) 0%, rgba(0,0,0,0) 24%, rgba(0,0,0,0) 62%, rgba(0,20,22,.62) 100%)' }} />
 
-        {/* ── Options — Figma node 406:7220: gap 48, padding 40/24 ── */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 48,
-                      padding: '40px 24px', boxSizing: 'border-box' }}>
-          <OptionSection title="Choose Format">
-            {FORMATS.map(f => (
-              <OptionCard key={f.id} {...f} tall showInfo
-                          selected={format === f.id} onSelect={() => pickFormat(f.id)} />
-            ))}
-          </OptionSection>
-
-          {showCover && (
-            <OptionSection title="Choose cover type" innerRef={refs.cover}>
-              {COVERS.map(c => (
-                <OptionCard key={c.id} {...c}
-                            selected={cover === c.id} onSelect={() => pickCover(c.id)} />
-              ))}
-            </OptionSection>
-          )}
-
-          {showCutout && (
-            <OptionSection title="Choose cut-out shape" innerRef={refs.shape}>
-              {SHAPES.map(s => (
-                <OptionCard key={s.id} {...s}
-                            selected={shape === s.id}
-                            onSelect={() => { setShape(s.id); reveal(colour ? 'size' : 'colour'); }} />
-              ))}
-            </OptionSection>
-          )}
-
-          {showCutout && (
-            <div ref={refs.colour} style={{ display: 'flex', flexDirection: 'column', gap: 24, width: '100%' }}>
-              <p style={{ margin: 0, fontFamily: DISPLAY, fontWeight: 700, fontSize: 22,
-                          lineHeight: '28px', letterSpacing: '0.35px',
-                          color: 'var(--colour-foreground-fg-black, #333)' }}>
-                Choose cover colour
-              </p>
-              <div style={{
-                display: 'flex', gap: 12, alignItems: 'flex-start',
-                margin: '0 -24px', padding: '0 24px 10px',
-                overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'none',
-              }}>
-                {COLOURS.map(c => (
-                  <ColourSwatch key={c.id} {...c} selected={colour === c.id}
-                                onSelect={() => { setColour(c.id); reveal('size'); }} />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {showSize && (
-            <OptionSection title="Choose size" innerRef={refs.size}>
-              {SIZES[format].map(s => (
-                <OptionCard key={s.id} {...s}
-                            selected={size === s.id} onSelect={() => setSize(s.id)} />
-              ))}
-            </OptionSection>
-          )}
-
-          {showExtras && <LayFlatCard on={layflat} onToggle={() => setLayflat(v => !v)} />}
-        </div>
-
-        {/* The summary bar is absolutely positioned over the scroller, so the
-            content needs matching room at the end or the last revealed section
-            ends up trapped underneath it with no scroll left — which is exactly
-            what happened to the colour swatches. Not needed once complete: the
-            542-tall review block follows, and the bar hides as it comes into view. */}
-        {!!format && !complete && (
-          <div aria-hidden style={{ height: 'calc(112px + env(safe-area-inset-bottom, 0px))' }} />
-        )}
-
-        {/* Review your choice — full bleed, so it sits outside the 24px gutters */}
-        {complete && (
-          <ReviewSection
-            innerRef={reviewRef}
-            format={format} cover={cover} size={size}
-            shape={shape} colour={colour} layflat={layflat}
-            onStart={() => {
-              const sel = { format, cover, size, shape, colour, layflat };
-              sessionStorage.setItem('pb_book', JSON.stringify(bookConfig(sel)));
-              window.navigation.push('editor.html');
-            }}
-          />
-        )}
+      {/* Same stack as home's hero: chip (changes per slide), headline, one line under it. */}
+      <div style={{ position: 'absolute', left: 20, right: 20, bottom: 72, display: 'flex', flexDirection: 'column', gap: 10, color: '#fff' }}>
+        <span key={i} style={{ alignSelf: 'flex-start', padding: '5px 11px', borderRadius: 999, background: 'rgba(255,255,255,.18)',
+          backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.3)',
+          fontFamily: PB_DISPLAY, fontSize: 12, fontWeight: 700, letterSpacing: '.02em', animation: `pdpUp .6s ${PDP_EASE} both` }}>
+          {s.video ? '▶ ' : ''}{s.tag}
+        </span>
+        <h1 style={{ margin: 0, fontFamily: PB_DISPLAY, fontSize: 36, fontWeight: 700, lineHeight: 1.04, letterSpacing: '-0.6px',
+          textShadow: '0 2px 20px rgba(0,0,0,.3)' }}>Photo book</h1>
+        <span style={{ fontFamily: PB_DISPLAY, fontSize: 16, lineHeight: 1.35, opacity: .9 }}>From €14.99</span>
       </div>
 
-      {!!format && !reviewSeen && (
-        <SummaryBar summary={summarise({ format, cover, size, shape, colour, layflat })} />
-      )}
+      <div style={{ position: 'absolute', left: 20, right: 20, bottom: 52, display: 'flex', gap: 4, zIndex: 2 }}>
+        {PDP_SLIDES.map((_, k) => (
+          <span key={k} style={{ flex: 1, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.35)', overflow: 'hidden' }}>
+            <span key={k === i ? `on${i}` : 'off'} style={{ display: 'block', height: '100%', background: '#fff', transformOrigin: 'left',
+              transform: k < i || reduced ? 'scaleX(1)' : 'scaleX(0)',
+              animation: k === i && !reduced ? `pdpBar ${PDP_STORY_MS}ms linear both` : 'none',
+              animationPlayState: paused ? 'paused' : 'running' }} />
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PdpDelivery() {
+  return (
+    <div style={{ display: 'flex', gap: 16, alignItems: 'center', background: '#fff', borderRadius: 24, padding: '16px 20px',
+      boxShadow: '0 4px 16px -1px rgba(0,77,74,0.08)' }}>
+      <span style={{ flex: 'none', width: 48, height: 48, borderRadius: 24, background: '#DDF0EC', display: 'flex',
+        alignItems: 'center', justifyContent: 'center' }}>
+        <img src={`${PDP_A}/pb-icon-delivery.svg`} alt="" width={24} height={24} style={{ display: 'block' }} />
+      </span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+        <span style={{ fontFamily: PB_UI, fontWeight: 700, fontSize: 17, lineHeight: '22px', color: PB_INK }}>
+          Order today, get it by {pdpArrival()}</span>
+        <span style={{ fontFamily: PDP_TEXT, fontSize: 15, lineHeight: '21px', letterSpacing: '-0.24px', color: '#5b6b6d' }}>
+          Delivery in about 4 days, tracked to your door. Express is available at checkout.</span>
+      </div>
+    </div>
+  );
+}
+
+function PdpUsps() {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      {PDP_USPS.map(u => (
+        <div key={u.title} style={{ background: '#fff', borderRadius: 24, padding: 16, display: 'flex', flexDirection: 'column', gap: 10,
+          boxShadow: '0 4px 16px -1px rgba(0,77,74,0.08)' }}>
+          <span style={{ width: 40, height: 40, borderRadius: 20, background: '#DDF0EC', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={PB_GREEN} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{u.icon}</svg>
+          </span>
+          <span style={{ fontFamily: PB_UI, fontWeight: 700, fontSize: 16, lineHeight: '20px', color: PB_INK }}>{u.title}</span>
+          <span style={{ fontFamily: PDP_TEXT, fontSize: 14, lineHeight: '19px', letterSpacing: '-0.15px', color: '#5b6b6d' }}>{u.text}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// A swipeable row. It bleeds past the page's 20px gutters so cards reach the screen edge, and
+// its bottom padding is what stops the card shadow being sliced off by the scroller.
+function PdpStyles() {
+  return (
+    <div style={{ display: 'flex', gap: 12, margin: '0 -20px', padding: '0 20px 20px', marginBottom: -20,
+      overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'none', scrollSnapType: 'x mandatory', scrollPaddingLeft: 20 }}>
+      {PDP_STYLES.map(c => (
+        <div key={c.title} style={{ flex: 'none', width: 214, height: 270, borderRadius: 24, overflow: 'hidden', position: 'relative',
+          scrollSnapAlign: 'start', background: '#e6eeee', boxShadow: '0 4px 16px -1px rgba(0,77,74,0.1)' }}>
+          <img src={`${PDP_A}/${c.img}`} alt="" draggable={false} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%',
+            objectFit: 'cover', objectPosition: c.pos }} />
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(rgba(0,20,22,0) 55%, rgba(0,20,22,.7) 100%)' }} />
+          {c.badge && (
+            <span style={{ position: 'absolute', left: 12, top: 12, padding: '5px 11px', borderRadius: 999, background: 'rgba(255,255,255,.92)',
+              color: PB_INK, fontFamily: PB_UI, fontWeight: 700, fontSize: 12, lineHeight: '16px',
+              boxShadow: '0px 4px 8px -2px rgba(0,0,0,0.2)' }}>{c.badge}</span>
+          )}
+          <div style={{ position: 'absolute', left: 16, right: 16, bottom: 14, color: '#fff', display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span style={{ fontFamily: PB_UI, fontWeight: 700, fontSize: 19, lineHeight: '24px' }}>{c.title}</span>
+            <span style={{ fontFamily: PDP_TEXT, fontSize: 14, lineHeight: '18px', opacity: .9 }}>{c.line}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PdpDetails() {
+  const [open, setOpen] = React.useState(-1);
+  return (
+    <div style={{ background: '#fff', borderRadius: 24, padding: '0 20px', boxShadow: '0 4px 16px -1px rgba(0,77,74,0.08)' }}>
+      {PDP_DETAILS.map((d, k) => {
+        const on = open === k;
+        return (
+          <div key={d.title} style={{ borderTop: k ? '1px solid rgba(2,60,66,0.08)' : 'none' }}>
+            <button onClick={() => setOpen(on ? -1 : k)} aria-expanded={on} style={{
+              all: 'unset', boxSizing: 'border-box', width: '100%', minHeight: 56, display: 'flex', alignItems: 'center',
+              justifyContent: 'space-between', cursor: 'pointer', fontFamily: PB_UI, fontWeight: 700, fontSize: 17, color: PB_INK }}>
+              {d.title}
+              <svg width="20" height="20" viewBox="0 0 20 20" style={{ transform: on ? 'rotate(180deg)' : 'none', transition: 'transform .25s ease' }}>
+                <path d="M5 7.5l5 5 5-5" fill="none" stroke={PB_INK} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            <div style={{ display: 'grid', gridTemplateRows: on ? '1fr' : '0fr', transition: 'grid-template-rows .3s ease' }}>
+              <div style={{ overflow: 'hidden' }}>
+                <p style={{ margin: 0, padding: '0 0 16px', fontFamily: PDP_TEXT, fontSize: 15, lineHeight: '21px',
+                  letterSpacing: '-0.24px', color: '#5b6b6d' }}>{d.text}</p>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function PdpGift() {
+  return (
+    <div style={{ position: 'relative', height: 150, borderRadius: 24, overflow: 'hidden', background: '#0b2b2d',
+      boxShadow: '0 4px 16px -1px rgba(0,77,74,0.1)' }}>
+      <img src={`${PDP_A}/hn-hero-gift.jpg`} alt="" draggable={false} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%',
+        objectFit: 'cover', objectPosition: '44% 50%' }} />
+      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, rgba(0,20,22,.78) 0%, rgba(0,20,22,.35) 60%, rgba(0,20,22,0) 100%)' }} />
+      <div style={{ position: 'absolute', left: 20, top: 0, bottom: 0, width: '62%', display: 'flex', flexDirection: 'column',
+        justifyContent: 'center', gap: 4, color: '#fff' }}>
+        <span style={{ fontFamily: PDP_HEAD, fontWeight: 600, fontSize: 21, lineHeight: '25px', letterSpacing: '-0.5px',
+          fontVariationSettings: PDP_HEAD_VARIATION }}>Make it a gift</span>
+        <span style={{ fontFamily: PDP_TEXT, fontSize: 14, lineHeight: '19px', opacity: .92 }}>
+          Add our keepsake gift box when you check out.</span>
+      </div>
+    </div>
+  );
+}
+
+function PdpReviews() {
+  return (
+    <div style={{ display: 'flex', gap: 12, margin: '0 -20px', padding: '0 20px 20px', marginBottom: -20,
+      overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'none', scrollSnapType: 'x mandatory', scrollPaddingLeft: 20 }}>
+      {PDP_REVIEWS.map(r => (
+        <div key={r.name} style={{ flex: 'none', width: 270, boxSizing: 'border-box', padding: 20, borderRadius: 24, background: '#fff',
+          scrollSnapAlign: 'start', display: 'flex', flexDirection: 'column', gap: 10, boxShadow: '0 4px 16px -1px rgba(0,77,74,0.08)' }}>
+          <span aria-label="5 stars" style={{ color: '#F5A623', fontSize: 16, letterSpacing: 2 }}>★★★★★</span>
+          <span style={{ fontFamily: PDP_TEXT, fontSize: 16, lineHeight: '22px', letterSpacing: '-0.32px', color: PB_INK }}>“{r.text}”</span>
+          <span style={{ fontFamily: PDP_TEXT, fontSize: 13, color: '#6b7b7d' }}>{r.name}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ProductPhotobookScreen() {
+  const { useState, useRef } = React;
+  const scrollerRef = useRef(null);
+  const [past, setPast] = useState(false);   // scrolled beyond the hero → glass header
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%', background: PB_PAPER, overflow: 'hidden' }}>
+      <style>{`
+        @keyframes pdpKen { from { transform: scale(1.04) } to { transform: scale(1.14) translate3d(-1.5%, -1%, 0) } }
+        @keyframes pdpBar { from { transform: scaleX(0) } to { transform: scaleX(1) } }
+        @keyframes pdpUp { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: none } }
+      `}</style>
+
+      <div ref={scrollerRef}
+        onScroll={e => { const p = e.currentTarget.scrollTop > PDP_HERO_H - 120; if (p !== past) setPast(p); }}
+        style={{ position: 'absolute', inset: 0, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
+        <PdpHero />
+
+        {/* the sheet rides up over the hero */}
+        <div style={{ position: 'relative', marginTop: -28, borderRadius: '28px 28px 0 0', background: PB_PAPER,
+          padding: '24px 20px 0', display: 'flex', flexDirection: 'column', gap: 32 }}>
+
+          <PdpDelivery />
+
+          <PdpReveal root={scrollerRef}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <PdpTitle>Why you'll love it</PdpTitle>
+              <PdpUsps />
+            </div>
+          </PdpReveal>
+
+          <PdpReveal root={scrollerRef}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <PdpTitle>Make it yours</PdpTitle>
+              <PdpStyles />
+            </div>
+          </PdpReveal>
+
+          <PdpReveal root={scrollerRef}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <PdpTitle>Good to know</PdpTitle>
+              <PdpDetails />
+            </div>
+          </PdpReveal>
+
+          <PdpReveal root={scrollerRef}><PdpGift /></PdpReveal>
+
+          <PdpReveal root={scrollerRef}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <PdpTitle>Loved by our customers</PdpTitle>
+              <PdpReviews />
+            </div>
+          </PdpReveal>
+
+          {/* room for the sticky bar, so the last section is not trapped under it */}
+          <div aria-hidden style={{ height: 'calc(100px + env(safe-area-inset-bottom, 0px) - 32px)' }} />
+        </div>
+      </div>
+
+      {/* glass header: appears once the hero has scrolled away */}
+      <div aria-hidden style={{
+        position: 'absolute', left: 0, right: 0, top: 0, zIndex: 4, pointerEvents: 'none',
+        height: `calc(${PB_BACK_TOP} + 54px)`, boxSizing: 'border-box', paddingTop: PB_BACK_TOP,
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+        background: 'rgba(241,246,246,.82)', backdropFilter: 'blur(18px) saturate(140%)', WebkitBackdropFilter: 'blur(18px) saturate(140%)',
+        boxShadow: '0 1px 0 rgba(2,60,66,.08)', opacity: past ? 1 : 0, transition: 'opacity .25s ease' }}>
+        <span style={{ height: 44, lineHeight: '44px', fontFamily: PB_UI, fontWeight: 700, fontSize: 17, color: PB_INK }}>Photo book</span>
+      </div>
+      <PbBackButton style={{ zIndex: 5 }} />
+
+      {/* sticky action bar */}
+      <div style={{
+        position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 4, boxSizing: 'border-box',
+        padding: '12px 20px calc(12px + env(safe-area-inset-bottom, 0px))', display: 'flex', alignItems: 'center', gap: 16,
+        background: 'rgba(255,255,255,.86)', backdropFilter: 'blur(18px) saturate(140%)', WebkitBackdropFilter: 'blur(18px) saturate(140%)',
+        boxShadow: '0 -1px 0 rgba(2,60,66,.08), 0 -12px 28px -16px rgba(0,77,74,.25)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 1, flex: 'none' }}>
+          <span style={{ fontFamily: PDP_TEXT, fontSize: 13, lineHeight: '16px', color: '#5b6b6d' }}>From</span>
+          <span style={{ fontFamily: PB_UI, fontWeight: 700, fontSize: 22, lineHeight: '26px', color: PB_INK }}>€14.99</span>
+        </div>
+        <button onClick={pdpPush(PDP_OPTIONS)} {...press(0.97)} style={{ ...pbButton('primary'), flex: 1 }}>Select photo book</button>
+      </div>
     </div>
   );
 }
