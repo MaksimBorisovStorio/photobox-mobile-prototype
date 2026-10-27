@@ -28,6 +28,8 @@
 
 function AccountScreen() {
   const [activeTab, setActiveTab] = React.useState('account');
+  // 'level' | 'recap' | null — the two rewards overlays (account-rewards.jsx).
+  const [overlay, setOverlay] = React.useState(null);
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative', background: '#F1F6F6' }}>
@@ -53,9 +55,11 @@ function AccountScreen() {
             with semi-axes of 4128 × 634.5, i.e. essentially axis-aligned, deep teal
             in the top-left corner fading out across and down the header. */}
         <div aria-hidden style={{
-          position: 'absolute', top: 0, left: 0, width: '100%', height: 429,
-          backgroundImage: ACCOUNT_WASH,
-          backgroundSize: '100% 100%',
+          // Flat green band instead of the node's wash (removed on request): it ends
+          // halfway down the stats strip so the white welcome copy stays readable.
+          position: 'absolute', top: 0, left: 0, width: '100%',
+          height: 'calc(max(56px, calc(env(safe-area-inset-top, 44px) + 12px)) + 144px)',
+          background: '#007F70',
           pointerEvents: 'none', zIndex: -1,
         }} />
 
@@ -69,6 +73,7 @@ function AccountScreen() {
           <Welcome />
           <StatsStrip />
           <ReferCard />
+          <LoyaltySection onOpen={setOverlay} />
 
           {/* 451:14064 — the four titled cards. No gap: each section carries py 16. */}
           <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -83,6 +88,9 @@ function AccountScreen() {
       </div>
 
       <TabBar activeTab={activeTab} onTabChange={setActiveTab} />
+      <RwStyles />
+      {overlay === 'level' && <RwLevelSheet onClose={() => setOverlay(null)} />}
+      {overlay === 'recap' && <RwRecap onClose={() => setOverlay(null)} />}
     </div>
   );
 }
@@ -110,6 +118,9 @@ const ACCOUNT_WASH =
 // them are SF Pro Semibold at the same size — so the whole screen uses the system
 // stack. Flagged as a substitution rather than silently unified.
 const AC_TEXT = '-apple-system, "SF Pro Text", system-ui, sans-serif';
+// Start-flow faces (current app UI): Bricolage headlines, Rethink Sans controls.
+const AC_HEAD = '"Bricolage Grotesque", "DM Sans", -apple-system, system-ui, sans-serif';
+const AC_UI = '"Rethink Sans", "DM Sans", -apple-system, system-ui, sans-serif';
 const AC_DISPLAY_TEXT = '-apple-system, "SF Pro Display", system-ui, sans-serif';
 
 // The card chrome, shared by the stats strip and all four row cards.
@@ -178,7 +189,7 @@ function StatsStrip() {
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 17,
       padding: '8px 0', borderRadius: 20, overflow: 'hidden',
-      backgroundImage: STATS_FILL, backgroundSize: '100% 100%',
+      background: '#FFFFFF',
       boxShadow: `${CARD_RIM}, ${CARD_SHADOW}`,
     }}>
       {account.stats.map((stat, i) => (
@@ -263,6 +274,144 @@ function ReferCard() {
 }
 
 // ─────────────────────────────────────────────────────────────
+// Loyalty — NOT in Figma. Built from stakeholder feedback ("build out the loyalty
+// section", gamify "make a summer book", discounts on past orders, year recap).
+// Uses the page's own card chrome and teal so it sits with the Figma bands. All
+// cards are inert (press-scale only), like the rest of this screen's rows.
+// ─────────────────────────────────────────────────────────────
+const LY_TEAL = '#007F70';
+
+function LyTitle({ children, aside }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{
+        fontFamily: AC_HEAD, fontVariationSettings: '"opsz" 14, "wdth" 100', fontWeight: 700, fontSize: 24, lineHeight: '40px',
+        letterSpacing: '-0.24px', color: '#333',
+      }}>{children}</div>
+      {aside}
+    </div>
+  );
+}
+
+function PointsPill({ value, dark }) {
+  return (
+    <span style={{
+      fontFamily: AC_UI, fontSize: 12, fontWeight: 700, lineHeight: '15px',
+      padding: '5px 10px', borderRadius: 100, whiteSpace: 'nowrap',
+      background: dark ? '#FFFFFF' : 'rgba(0,127,112,0.1)',
+      color: LY_TEAL,
+    }}>+{value} pts</span>
+  );
+}
+
+function ProgressBar({ value, track, fill }) {
+  return (
+    <div style={{ height: 6, borderRadius: 3, background: track, overflow: 'hidden' }}>
+      <div style={{ width: `${value * 100}%`, height: '100%', borderRadius: 3, background: fill }} />
+    </div>
+  );
+}
+
+function LoyaltySection({ onOpen }) {
+  const ly = window.MOCK.account.loyalty;
+  const ch = ly.challenge;
+  const card = {
+    background: '#F8F8F8', borderRadius: 20, overflow: 'hidden',
+    boxShadow: `${CARD_RIM}, ${CARD_SHADOW}`,
+  };
+  const tap = press(0.97);
+  const tapStyle = {
+    cursor: 'pointer', transition: 'transform 140ms ease',
+    WebkitTapHighlightColor: 'transparent',
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <LyTitle aside={
+        <span style={{ fontFamily: AC_TEXT, fontSize: 15, fontWeight: 700, color: LY_TEAL }}>
+          ★ {ly.points.toLocaleString('en-GB')} pts
+        </span>
+      }>Your rewards</LyTitle>
+
+      {/* Tier — opens the level sheet */}
+      <div {...tap} onClick={() => onOpen('level')} style={{ ...card, ...tapStyle, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{
+            width: 42, height: 42, borderRadius: 21, flexShrink: 0,
+            background: '#D9A93F',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#fff', fontSize: 20,
+          }}>✦</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: AC_TEXT, fontSize: 15, fontWeight: 600, color: '#333' }}>{ly.tier}</div>
+            <div style={{ fontFamily: AC_TEXT, fontSize: 12, color: '#666' }}>{ly.toNext}</div>
+          </div>
+          <span style={{ fontFamily: AC_TEXT, fontSize: 18, color: '#333' }}>›</span>
+        </div>
+        <ProgressBar value={ly.progress} track="#E4E4E4" fill={LY_TEAL} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: AC_TEXT, fontSize: 11, color: '#999' }}>
+          <span>{ly.tier}</span><span>{ly.nextTier}</span>
+        </div>
+      </div>
+
+      {/* Challenge — gamified "make a summer book" */}
+      <div {...tap} style={{
+        ...tapStyle, borderRadius: 20, padding: 16, color: '#fff',
+        background: '#007F70', boxShadow: 'inset 0 0 0 1px #00A389',
+        display: 'flex', flexDirection: 'column', gap: 10,
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontFamily: AC_TEXT, fontSize: 11, fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase', opacity: 0.85 }}>{ch.label}</span>
+          <span style={{ fontFamily: AC_TEXT, fontSize: 11, padding: '3px 8px', borderRadius: 100, background: 'rgba(255,255,255,0.2)' }}>{ch.daysLeft} days left</span>
+        </div>
+        <div style={{ fontFamily: AC_HEAD, fontSize: 22, fontWeight: 700, lineHeight: '26px' }}>{ch.title}</div>
+        <ProgressBar value={ch.done / ch.steps} track="rgba(255,255,255,0.25)" fill="#fff" />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontFamily: AC_TEXT, fontSize: 12, opacity: 0.85 }}>{ch.done} of {ch.steps} steps</span>
+          <PointsPill value={ch.reward} dark />
+        </div>
+      </div>
+
+      {/* Quests */}
+      <div style={{ ...card, display: 'flex', flexDirection: 'column' }}>
+        {ly.quests.map((q, i) => (
+          <React.Fragment key={q.title}>
+            {i > 0 && <div aria-hidden style={{ height: 1, background: '#DDD' }} />}
+            <div {...tap} style={{ ...tapStyle, display: 'flex', alignItems: 'center', gap: 14, padding: '10px 16px', minHeight: 56, boxSizing: 'border-box' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: AC_TEXT, fontSize: 15, fontWeight: 590, color: '#333' }}>{q.title}</div>
+                <div style={{ fontFamily: AC_TEXT, fontSize: 12, color: '#666' }}>{q.status}</div>
+              </div>
+              <PointsPill value={q.reward} />
+            </div>
+          </React.Fragment>
+        ))}
+      </div>
+
+      {/* Discounts on things ordered before */}
+      <div style={{ fontFamily: AC_TEXT, fontSize: 15, fontWeight: 600, color: '#333', marginTop: 4 }}>
+        Order again & save
+      </div>
+      <div style={{ display: 'flex', gap: 8, margin: '-8px -20px', padding: '8px 20px', overflowX: 'auto', scrollbarWidth: 'none' }}>
+        {ly.reorder.map(r => (
+          <div key={r.title} {...tap} style={{ ...card, ...tapStyle, flex: '0 0 240px', display: 'flex', alignItems: 'center', gap: 12, padding: 10 }}>
+            <img src={r.img} alt="" style={{ width: 56, height: 56, borderRadius: 12, objectFit: 'cover', flexShrink: 0 }} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontFamily: AC_TEXT, fontSize: 14, fontWeight: 600, color: '#333', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.title}</div>
+              <div style={{ fontFamily: AC_TEXT, fontSize: 11, color: '#666' }}>{r.sub}</div>
+              <div style={{ fontFamily: AC_TEXT, fontSize: 12, fontWeight: 700, color: '#D44333', marginTop: 2 }}>{r.off} reorder</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Year recap — opens the story player */}
+      <RwRecapCard onOpen={() => onOpen('recap')} />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // The four sections — Figma nodes 451:14065 / 14123 / 14162 / 14187
 // ─────────────────────────────────────────────────────────────
 // Rows are `PB3/AccountRow`: `h 56`, `px 16`, `gap 14`, a 24px icon, a flex-1 title
@@ -317,7 +466,7 @@ function AccountSection({ title, rows }) {
           the same heading metric home's SectionHeader uses, so it takes the same
           PB_DISPLAY stack (DM Sans standing in for Google Sans Flex). */}
       <div style={{
-        fontFamily: PB_DISPLAY, fontWeight: 700, fontSize: 24, lineHeight: '40px',
+        fontFamily: AC_HEAD, fontVariationSettings: '"opsz" 14, "wdth" 100', fontWeight: 700, fontSize: 24, lineHeight: '40px',
         letterSpacing: '-0.24px', color: 'var(--colour-foreground-fg-black, #333)',
       }}>{title}</div>
 

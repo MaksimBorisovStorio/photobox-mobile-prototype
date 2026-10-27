@@ -125,6 +125,29 @@
         { id: 'ord1', title: 'Canada Photo Book', date: '12 Jul 2026', status: 'Delivered', thumb: p('order1', 60, 60) },
         { id: 'ord2', title: 'Italy Prints ×6',   date: '03 Jun 2026', status: 'Delivered', thumb: p('order2', 60, 60) },
       ],
+      // Loyalty section — not in Figma; built from stakeholder feedback + inspo.
+      loyalty: {
+        points: 1840,      // spendable (500 pts = €5 off)
+        lifetime: 1840,    // drives the level; spending never lowers it
+        tier: 'Storyteller',
+        nextTier: 'Legend',
+        progress: 0.7,
+        toNext: '360 pts to Legend · about 2 more books',
+        challenge: {
+          label: 'Summer challenge', daysLeft: 3,
+          title: 'Make a summer photo book',
+          steps: 3, done: 2, reward: 500,
+        },
+        quests: [
+          { title: 'Order 3 print packs', status: '1 of 3 done',  reward: 150 },
+          { title: 'Try a new product',   status: 'Not started',  reward: 100 },
+          { title: 'Refer a friend',      status: '0 of 1 joined', reward: 300 },
+        ],
+        reorder: [
+          { title: 'Canada Photo Book', sub: 'Ordered 12 Jul 2026', off: '15% off', img: '../shared/assets/pb-src-canada.jpg' },
+          { title: 'Italy Prints ×6',   sub: 'Ordered 03 Jun 2026', off: '20% off', img: '../shared/assets/pb-src-italy.jpg' },
+        ],
+      },
     },
   };
 })();
