@@ -355,11 +355,11 @@ function spreadsFor(pages) {
 // The node carries two sheet variants — this one (3 of 4 spreads plus the cover)
 // and a flat white one with a 1px/3px shadow on 451:15592. Standardised on the
 // majority, which is also what the cover uses.
-function Sheet({ aspect, children, interior }) {
+function Sheet({ aspect, children, interior, board }) {
   return (
     <div style={{
       position: 'relative', width: '100%', padding: 4, boxSizing: 'border-box',
-      background: '#F8F8F8', borderRadius: 2,
+      background: board || '#F8F8F8', borderRadius: 2, transition: 'background 240ms ease',
       boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.25), 0px 4px 4px rgba(0,0,0,0.25)',
     }}>
       {/* Interior box — full spread, two leaves wide. Driving the height off
@@ -408,7 +408,7 @@ function leafBox(left, t = CLASSIC, color) {
 
 // `blank` is an inside-cover leaf: it carries no page number and cannot hold a photo,
 // so it is plain paper — no well, no placeholder, nothing to tap.
-function Leaf({ side, photos, onOpen, label, layout, onEmpty, blank, n, slot }) {
+function Leaf({ side, photos, onOpen, label, layout, onEmpty, blank, n, slot, spread }) {
   const left = side === 'left';
   const t = useTheme();
   const { colors } = React.useContext(BookPaint);
@@ -423,17 +423,21 @@ function Leaf({ side, photos, onOpen, label, layout, onEmpty, blank, n, slot }) 
       } : undefined}
       {...(onOpen ? press(0.97) : {})}
       style={Object.assign(leafBox(left, t, n ? slotColor(colors, n + 1) : null), {
+      position: 'relative',
       cursor: onOpen ? 'pointer' : 'default',
       // The press scale reads as the page being pushed in toward the spine rather
       // than the whole sheet shrinking, which is what a centred origin would give.
       transformOrigin: left ? 'right center' : 'left center',
       transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
     })}>
+      {/* A spread layout is laid on the leaf itself, padding and all: the leaf keeps 8–12px of margin
+          around its well, and inside that margin the two halves would never meet at the fold. */}
+      {spread && <SpreadHalf spread={spread} side={side} />}
       {/* A relative box for the layout to position its slots inside; with no layout
           set LayoutWell falls back to the single full-page well the node draws. */}
       {/* A size container, so the theme's sticker can size itself to the page. */}
       <div style={{ position: 'relative', flex: 1, minWidth: 0, containerType: 'size' }}>
-        {!blank && <LayoutWell layout={layout} photos={photos} onEmpty={onEmpty} />}
+        {!spread && !blank && <LayoutWell layout={layout} photos={photos} onEmpty={onEmpty} />}
         {!blank && <ThemeSticker n={n} />}
         <UserStickers slot={slot} />
       </div>
@@ -734,6 +738,80 @@ function layoutIdFor(k) {
 const layoutBase = id => String(id || '').split('|')[0];
 const encodeLayout = (id, slots) => `${layoutBase(id)}|` + slots.map(s =>
   [s.x, s.y, s.w, s.h].map(n => Math.round(n * 100) / 100).join(',')).join(';');
+
+// ── Spread layouts. Everything above is a template for ONE page; these span the whole spread — both
+// pages and the fold between them — so one photo can run edge to edge across the book, or a wide shot
+// can sit over a row of smaller ones. Rects are % of the whole spread box (two pages wide), not of a
+// page well, and already carry their own margins. Not in the Figma. A spread has either its page
+// layouts or one spread layout: choosing one replaces the other. Stored per spread in pb_spreads as
+// "<count>-<index>". Because a photo crosses the fold, they are the layouts that want lay-flat binding.
+const SPREAD_LAYOUTS = {
+  1: [
+    [{ x: 0, y: 0, w: 100, h: 100 }],                      // one photo across the whole spread
+    [{ x: 5, y: 8, w: 90, h: 84 }],
+    [{ x: 0, y: 22, w: 100, h: 56 }],                      // a wide band
+    [{ x: 12, y: 14, w: 76, h: 72 }],
+  ],
+  2: [
+    [{ x: 0, y: 0, w: 64, h: 100 }, { x: 66, y: 0, w: 34, h: 100 }],
+    [{ x: 0, y: 0, w: 100, h: 64 }, { x: 0, y: 66, w: 100, h: 34 }],
+    [{ x: 4, y: 10, w: 58, h: 80 }, { x: 66, y: 10, w: 30, h: 80 }],
+  ],
+  3: [
+    [{ x: 0, y: 0, w: 100, h: 62 }, { x: 0, y: 64, w: 49, h: 36 }, { x: 51, y: 64, w: 49, h: 36 }],
+    [{ x: 0, y: 0, w: 60, h: 100 }, { x: 62, y: 0, w: 38, h: 49 }, { x: 62, y: 51, w: 38, h: 49 }],
+    [{ x: 4, y: 12, w: 30, h: 76 }, { x: 35, y: 12, w: 30, h: 76 }, { x: 66, y: 12, w: 30, h: 76 }],
+  ],
+  4: [
+    [{ x: 0, y: 0, w: 100, h: 55 }, { x: 0, y: 57, w: 32.6, h: 43 }, { x: 33.7, y: 57, w: 32.6, h: 43 }, { x: 67.4, y: 57, w: 32.6, h: 43 }],
+    [{ x: 0, y: 0, w: 49, h: 49 }, { x: 51, y: 0, w: 49, h: 49 }, { x: 0, y: 51, w: 49, h: 49 }, { x: 51, y: 51, w: 49, h: 49 }],
+  ],
+  5: [
+    [{ x: 0, y: 0, w: 100, h: 50 }, { x: 0, y: 52, w: 24.5, h: 48 }, { x: 25.5, y: 52, w: 24.5, h: 48 }, { x: 51, y: 52, w: 24.5, h: 48 }, { x: 76.5, y: 52, w: 23.5, h: 48 }],
+    [{ x: 0, y: 0, w: 49, h: 100 }, { x: 51, y: 0, w: 24.5, h: 49 }, { x: 75.5, y: 0, w: 24.5, h: 49 }, { x: 51, y: 51, w: 24.5, h: 49 }, { x: 75.5, y: 51, w: 24.5, h: 49 }],
+  ],
+};
+const SPREAD_FIT = { mode: 'cover', over: {} };
+const spreadLayoutById = id => {
+  const m = /^(\d)-(\d+)$/.exec(String(id || ''));
+  return (m && SPREAD_LAYOUTS[m[1]] && SPREAD_LAYOUTS[m[1]][m[2]]) || null;
+};
+// The photos a spread layout shows: what its two pages hold, in reading order, topped up from the
+// upload for the slots they leave. A spread with nothing on it stays empty rather than borrowing.
+function spreadPhotosFor(placed, l, r, count, pool) {
+  const out = [];
+  [l, r].forEach(n => {
+    if (!n) return;
+    const e = placed[n - 1];
+    (Array.isArray(e) ? e : [e]).forEach(ph => { if (ph && !isTitle(ph)) out.push(ph); });
+  });
+  if (!out.length) return [];
+  (pool || []).forEach(ph => { if (out.length < count && out.indexOf(ph) < 0) out.push(ph); });
+  return out.slice(0, count);
+}
+// One leaf's half of a spread layout: the layout is drawn twice as wide as the leaf, and the right
+// leaf slides it left by a leaf, so the two halves meet at the fold as one picture. A faint shade
+// runs down the fold edge (a lay-flat book still has a crease).
+function SpreadHalf({ spread, side }) {
+  const layout = spreadLayoutById(spread.id);
+  if (!layout) return null;
+  const left = side === 'left';
+  return (
+    <div aria-hidden style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+      <div style={{ position: 'absolute', top: 0, bottom: 0, width: '200%', left: left ? 0 : '-100%' }}>
+        {/* A spread layout is about filling the spread, so its photos fill their frames even in a book that
+            keeps original proportions everywhere else. */}
+        <FitContext.Provider value={SPREAD_FIT}>
+          <LayoutWell layout={layout} photos={spread.photos || []} iconSize={Math.max(10, 18)} />
+        </FitContext.Provider>
+      </div>
+      {/* The fold. A lay-flat book opens flat, so its crease is a hairline shade and the picture runs on across it;
+          a standard binding curves into the spine, so the shade is wide and dark and a little of the picture goes with it. */}
+      <span style={{ position: 'absolute', top: 0, bottom: 0, width: spread.flat ? '3.5%' : '12%', [left ? 'right' : 'left']: 0,
+        background: `linear-gradient(to ${left ? 'right' : 'left'}, rgba(0,0,0,0), rgba(0,0,0,${spread.flat ? 0.08 : 0.28}))` }} />
+    </div>
+  );
+}
 
 // ── Themes — the book view's Themes tool. Not in the Figma; every theme is mocked.
 //
@@ -1474,9 +1552,11 @@ function CoverInterior({ onOpen, layout, photos, onEmpty }) {
 }
 
 function CoverBlock({ aspect, onOpen, layout, photos, onEmpty }) {
+  // The whole block is the cover, so its frame is the cover's colour too (not the white sheet edge a page spread has).
+  const board = slotColor(React.useContext(BookPaint).colors, 0);
   return (
     <div style={{ position: 'relative', width: '100%' }}>
-      <Sheet aspect={aspect} interior={<CoverInterior onOpen={onOpen} layout={layout} photos={photos} onEmpty={onEmpty} />}>
+      <Sheet aspect={aspect} board={board} interior={<CoverInterior onOpen={onOpen} layout={layout} photos={photos} onEmpty={onEmpty} />}>
         <GutterArt file="pb-editor-hinge.png" offsets={[-11, -3]} width={14} opacity={0.5} />
       </Sheet>
       <Caption right="Cover" />
@@ -1488,7 +1568,9 @@ function CoverBlock({ aspect, onOpen, layout, photos, onEmpty }) {
 // `photos` is the placed list, indexed by page number — page n holds photos[n-1].
 // The inside-front and inside-back leaves carry no page number, so they stay empty.
 function SpreadBlock({ aspect, left, right, showPlus, onAdd, photos, onOpen,
-                      layoutFor, pool, onEmpty, slotL, slotR }) {
+                      layoutFor, pool, onEmpty, slotL, slotR, spread }) {
+  // The cover's colour shows as the frame round the pages, as the cover board does behind a real spread.
+  const board = slotColor(React.useContext(BookPaint).colors, 0);
   const name = n => (n ? `page ${n}` : 'the inside cover');
   const at = (n, side) => {
     const layout = layoutFor && layoutFor(side);
@@ -1496,19 +1578,19 @@ function SpreadBlock({ aspect, left, right, showPlus, onAdd, photos, onOpen,
   };
   return (
     <div style={{ position: 'relative', width: '100%' }}>
-      <Sheet aspect={aspect} interior={
+      <Sheet aspect={aspect} board={board} interior={
         <React.Fragment>
-          <Leaf side="left" n={left} slot={slotL} photos={at(left, 'left')} label={name(left)}
+          <Leaf side="left" n={left} slot={slotL} spread={spread} photos={at(left, 'left')} label={name(left)}
                 layout={layoutFor && layoutFor('left')}
                 onEmpty={onEmpty && left ? i => onEmpty(left, (layoutFor('left') || FULL_PAGE).length, i) : undefined}
                 blank={!left} onOpen={onOpen && left ? (() => onOpen('left')) : undefined} />
-          <Leaf side="right" n={right} slot={slotR} photos={at(right, 'right')} label={name(right)}
+          <Leaf side="right" n={right} slot={slotR} spread={spread} photos={at(right, 'right')} label={name(right)}
                 layout={layoutFor && layoutFor('right')}
                 onEmpty={onEmpty && right ? i => onEmpty(right, (layoutFor('right') || FULL_PAGE).length, i) : undefined}
                 blank={!right} onOpen={onOpen && right ? (() => onOpen('right')) : undefined} />
         </React.Fragment>
       }>
-        <GutterArt file="pb-editor-spine.png" offsets={[-4]} width={8} />
+        <GutterArt file="pb-editor-spine.png" offsets={[-4]} width={8} opacity={spread && spread.flat ? 0.3 : 1} />
       </Sheet>
       <Caption left={left} right={right} />
       {showPlus && <AddSpreadButton onClick={onAdd} />}
@@ -2230,8 +2312,13 @@ function slotsFor(pages) {
 
 // ── One open book in the strip. The three paper layers are the node's own exports;
 // `children` is the live spread that sits slightly above them.
-function BookUnit({ w, h, children }) {
-  const iv = BOOK.interior;
+// `board` is the cover's colour (the Color tool on the cover): the part of the cover that shows behind the pages,
+// a ~9px frame round every spread, takes it. `cover` draws the cover spread itself, which is not a page spread —
+// no paper stack behind it and no inset, just two boards and the groove between them, edge to edge.
+// The board's halves and spine strip are the exported book-block's own geometry (310.67 | 16.35 | 310.67 of 637.69),
+// redrawn as plain boxes so they can take any colour; with no colour set the export is used as it always was.
+function BookUnit({ w, h, children, board, cover }) {
+  const iv = cover ? { left: 0, top: 0, width: 1, height: 1 } : BOOK.interior;
   const layer = (file, box) => (
     <img key={file} src={`${A}/${file}`} alt="" aria-hidden style={{
       position: 'absolute', display: 'block',
@@ -2239,22 +2326,44 @@ function BookUnit({ w, h, children }) {
       width: `${box.width * 100}%`, height: `${box.height * 100}%`,
     }} />
   );
+  const tinted = !!board && !cover;
+  const half = (left) => (
+    <span aria-hidden style={{ position: 'absolute', top: 0, bottom: 0, left: left ? 0 : `${327.021 / 637.691 * 100}%`,
+      width: `${310.67 / 637.691 * 100}%`, borderRadius: 1, background: board }} />
+  );
   return (
     <div style={{
       position: 'relative', flex: '0 0 auto', width: w, height: h,
       filter: PV_BOOK_SHADOW,
     }}>
-      {layer('pb-editor-book-block.svg', { left: 0, top: 0, width: 1, height: 1 })}
-      {layer('pb-editor-book-sheet-a.svg', BOOK.sheetA)}
-      {layer('pb-editor-book-sheet-b.svg', BOOK.sheetB)}
+      {cover ? (
+        // The cover spread: boards edge to edge, outer corners eased, a lit rim, no pages anywhere.
+        <span aria-hidden style={{ position: 'absolute', inset: 0, borderRadius: 3, background: board || '#E3E3E3',
+          boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.22), inset 0 0 0 3px rgba(255,255,255,0.12)' }} />
+      ) : tinted ? (
+        <React.Fragment>
+          {half(true)}{half(false)}
+          <span aria-hidden style={{ position: 'absolute', top: 0, bottom: 0, left: `${310.67 / 637.691 * 100}%`, width: `${16.351 / 637.691 * 100}%`,
+            background: `color-mix(in srgb, ${board} 82%, #fff)`, boxShadow: 'inset 0 0 7.3px rgba(0,0,0,0.25)', borderRadius: 1 }} />
+        </React.Fragment>
+      ) : layer('pb-editor-book-block.svg', { left: 0, top: 0, width: 1, height: 1 })}
+      {!cover && layer('pb-editor-book-sheet-a.svg', BOOK.sheetA)}
+      {!cover && layer('pb-editor-book-sheet-b.svg', BOOK.sheetB)}
       <div style={{
         position: 'absolute',
         left: `${iv.left * 100}%`, top: `${iv.top * 100}%`,
         width: `${iv.width * 100}%`, height: `${iv.height * 100}%`,
         display: 'flex',
-        filter: 'drop-shadow(0px 1.817px 1.817px rgba(0,0,0,0.25))',
+        // Rounded outer corners for the cover. clip-path, not overflow:hidden: overflow:hidden makes this box a scroll
+        // container, and then the front cover's scroll-snap area belongs to *it* rather than to the page strip —
+        // so the strip could never come to rest on the cover (it snapped to the next page instead).
+        clipPath: cover ? 'inset(0 round 3px)' : undefined,
+        filter: cover ? 'none' : 'drop-shadow(0px 1.817px 1.817px rgba(0,0,0,0.25))',
       }}>
         {children}
+        {/* the hinge groove where a hardcover's boards meet the spine */}
+        {cover && <span aria-hidden style={{ position: 'absolute', top: 0, bottom: 0, left: '48.6%', width: '2.8%', pointerEvents: 'none',
+          background: 'linear-gradient(90deg, rgba(0,0,0,0), rgba(0,0,0,0.30) 32%, rgba(255,255,255,0.10) 50%, rgba(0,0,0,0.30) 68%, rgba(0,0,0,0))' }} />}
       </div>
     </div>
   );
@@ -2310,7 +2419,7 @@ function CoverUnit({ w, h, pageW, frontRef, layout, adjust, photos, onEmpty, onS
   const t = useTheme();
   const paint = React.useContext(BookPaint);
   return (
-    <BookUnit w={w} h={h}>
+    <BookUnit w={w} h={h} cover board={slotColor(paint.colors, 0)}>
       <BigLeaf side="left" slot={0}>
         <span aria-hidden style={{
           position: 'absolute', left: PV_WELL.left, bottom: PV_WELL.bottom,
@@ -2593,6 +2702,59 @@ function AiSheet({ closing, onClose, photoCount, pageCount, onFitAll }) {
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5m-6 6 6-6 6 6" /></svg>
           </button>
         </form>
+      </div>
+    </ActionSheet>
+  );
+}
+
+// ── The lay-flat upsell. Choosing a spread layout puts a photo across the fold, which a standard binding
+// swallows into the spine — so, if the book is not lay-flat yet, the layout is applied and this sheet offers
+// the upgrade. The picture is the product page's own lay-flat card art (pb-layflat.png, mirrored and cropped
+// exactly as LayFlatCard does); the benefits are the copy for that card.
+const LAYFLAT_ADD_PRICE = 5;   // the product page's LAYFLAT_ADD
+const LAYFLAT_POINTS = [
+  '24 lay-flat pages included in the base price',
+  'From €0.45 per extra page',
+  'Thicker pages, softer sheen, premium finish',
+  'Nothing lost in the fold',
+  'Opens completely flat',
+  'Perfect for weddings, anniversaries, luxury trips and milestone birthdays',
+];
+function LayflatSheet({ closing, onUpgrade, onKeep }) {
+  return (
+    <ActionSheet closing={closing} minHeight="70%" onDismiss={onKeep} labelledBy="pb-lf-title">
+      <div style={{ display: 'flex', flexDirection: 'column', maxHeight: '88vh', overflowY: 'auto', scrollbarWidth: 'none',
+        padding: '14px 20px max(20px, calc(env(safe-area-inset-bottom, 0px) + 12px))', gap: 16 }}>
+        <span aria-hidden style={{ alignSelf: 'center', width: 36, height: 5, borderRadius: 3, background: 'rgba(255,255,255,0.22)', flex: 'none' }} />
+        {/* the art: the product page's lay-flat card image, same mirroring and crop */}
+        <div style={{ position: 'relative', flex: 'none', height: 168, borderRadius: 20, background: '#F4F4F4', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%) scaleX(-1)', width: 356, height: 183, overflow: 'hidden' }}>
+            <img src={`${A}/pb-layflat.png`} alt="" draggable={false} style={{ position: 'absolute', left: '-14.61%', top: '-0.05%',
+              width: '128.65%', height: '100.11%', maxWidth: 'none', display: 'block' }} />
+          </div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 'none' }}>
+          <p id="pb-lf-title" style={{ margin: 0, fontFamily: DISPLAY, fontWeight: 700, fontSize: 24, lineHeight: '30px', letterSpacing: '0.2px', color: '#fff' }}>Upgrade to lay-flat</p>
+          <p style={{ margin: 0, fontFamily: TEXT, fontSize: 15, lineHeight: '20px', letterSpacing: '-0.24px', color: '#CCCCCC' }}>
+            Your photo runs across both pages. Lay-flat binding keeps all of it.</p>
+        </div>
+        <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10, flex: 'none' }}>
+          {LAYFLAT_POINTS.map(t => (
+            <li key={t} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontFamily: TEXT, fontSize: 15, lineHeight: '20px', letterSpacing: '-0.24px', color: '#fff' }}>
+              <span aria-hidden style={{ flex: 'none', width: 20, height: 20, borderRadius: 10, background: 'rgba(0,163,137,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 0 }}>
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#5FE0CB" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M3.5 8.4l3 3 6-6.4" /></svg>
+              </span>{t}
+            </li>
+          ))}
+        </ul>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 'none', marginTop: 4 }}>
+          <button type="button" onClick={onUpgrade} {...press(0.97)} style={Object.assign({}, pbButton('primary'), { width: '100%' })}>
+            Upgrade to lay-flat · +€{LAYFLAT_ADD_PRICE.toFixed(2)}</button>
+          <button type="button" onClick={onKeep} {...press(0.97)} style={{ height: 48, borderRadius: 16, border: 'none', cursor: 'pointer', background: 'rgba(255,255,255,0.1)',
+            color: '#fff', fontFamily: PB_UI, fontWeight: 700, fontSize: 16, transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent' }}>Keep standard binding</button>
+          <p style={{ margin: 0, textAlign: 'center', fontFamily: TEXT, fontSize: 12, lineHeight: '16px', color: '#9a9a9a' }}>
+            With a standard binding, a little of the picture is lost in the fold.</p>
+        </div>
       </div>
     </ActionSheet>
   );
@@ -2891,7 +3053,7 @@ const LAYOUT_CARD_W = 114;
 // 2px is the border itself.
 const LAYOUT_RING_H = 9.58;
 
-function LayoutCard({ layout, photos, pageAspect, width, selected, onClick, index }) {
+function LayoutCard({ layout, photos, pageAspect, width, selected, onClick, index, spread }) {
   const t = useTheme();
   return (
     <button type="button" onClick={onClick} {...press(0.97)}
@@ -2908,10 +3070,11 @@ function LayoutCard({ layout, photos, pageAspect, width, selected, onClick, inde
         background: t.page, borderRadius: 4,
       }}>
         {/* The same PV_WELL insets the page uses, so the card is the page in little. */}
-        <LayoutWell layout={layout} photos={photos} iconSize={14} style={{
-          left: PV_WELL.left, right: PV_WELL.right,
-          top: PV_WELL.top, bottom: PV_WELL.bottom,
-        }} />
+        {/* A spread card is the whole spread in little: the layout fills it, with the fold down the middle. */}
+        <LayoutWell layout={layout} photos={photos} iconSize={14} style={spread
+          ? { left: 0, right: 0, top: 0, bottom: 0 }
+          : { left: PV_WELL.left, right: PV_WELL.right, top: PV_WELL.top, bottom: PV_WELL.bottom }} />
+        {spread && <span aria-hidden style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 1, background: 'rgba(0,0,0,0.18)' }} />}
       </span>
     </button>
   );
@@ -2921,7 +3084,7 @@ function LayoutCard({ layout, photos, pageAspect, width, selected, onClick, inde
 // that the preview above stays visible and interactive. It is therefore dismissed by
 // its own close button rather than by a tap outside.
 function LayoutDrawer({ closing, count, selected, options, photos, pageAspect,
-                        onCount, onPick, onClose, onConfirm }) {
+                        onCount, onPick, onClose, onConfirm, mode, onMode }) {
   const { useState, useRef, useLayoutEffect } = React;
   const root = useRef(null);
   const [h, setH] = useState(0);
@@ -2940,10 +3103,13 @@ function LayoutDrawer({ closing, count, selected, options, photos, pageAspect,
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+  // A spread card is two pages wide, so it is the same height as a page card at twice the width.
+  const spreadMode = mode === 'spread';
+  const cardAspect = spreadMode ? pageAspect * 2 : pageAspect;
   const room = h ? h - 164 - 16 - LAYOUT_RING_H : 0;
   const cardW = room > 0
-    ? Math.max(48, Math.min(LAYOUT_CARD_W, room * pageAspect))
-    : LAYOUT_CARD_W;
+    ? Math.max(48, Math.min(spreadMode ? LAYOUT_CARD_W * 2 : LAYOUT_CARD_W, room * cardAspect))
+    : (spreadMode ? LAYOUT_CARD_W * 2 : LAYOUT_CARD_W);
 
   const icon = file => (
     <img src={`${A}/${file}`} alt="" width={24} height={24} style={{ display: 'block' }} />
@@ -2969,12 +3135,25 @@ function LayoutDrawer({ closing, count, selected, options, photos, pageAspect,
         </GlassIconButton>
         {/* node 451:14974 — centred on the frame, not between the buttons, so it is
             absolute over the row. pointerEvents:none keeps it off both buttons. */}
+        {onMode ? (
+          // Page | Spread. Only offered where a spread exists (not on the cover).
+          <div role="tablist" id="pb-layout-title" aria-label="Layout for" style={{ position: 'absolute', left: '50%', top: 4, transform: 'translateX(-50%)',
+            display: 'flex', gap: 2, padding: 3, borderRadius: 16, background: 'rgba(0,0,0,0.45)' }}>
+            {[['page', 'Page'], ['spread', 'Spread']].map(([id, label]) => (
+              <button key={id} type="button" role="tab" aria-selected={mode === id} onClick={() => onMode(id)} {...press(0.97)} style={{
+                height: 30, padding: '0 16px', borderRadius: 13, border: 'none', cursor: 'pointer', fontFamily: DISPLAY, fontWeight: 700, fontSize: 13,
+                background: mode === id ? '#F0F0F0' : 'transparent', color: mode === id ? '#222' : '#DDD',
+                transition: 'transform 140ms ease, background 160ms ease', WebkitTapHighlightColor: 'transparent' }}>{label}</button>
+            ))}
+          </div>
+        ) : (
         <p id="pb-layout-title" style={{
           position: 'absolute', left: 0, right: 0, top: 12, margin: 0,
           textAlign: 'center', pointerEvents: 'none',
           fontFamily: DISPLAY, fontWeight: 700, fontSize: 14, lineHeight: '20px',
           color: '#FFFFFF',
         }}>Choose layout</p>
+        )}
         <GlassIconButton label="Apply layout" tint="transparent"
                          accent={CONTINUE_ACCENT} gloss onClick={onConfirm}>
           {icon('pb-editor-check.svg')}
@@ -3006,8 +3185,8 @@ function LayoutDrawer({ closing, count, selected, options, photos, pageAspect,
         scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch',
       }}>
         {options.map((layout, i) => (
-          <LayoutCard key={i} index={i} layout={layout} photos={photos}
-                      pageAspect={pageAspect} width={cardW}
+          <LayoutCard key={i} index={i} layout={layout} photos={photos} spread={spreadMode}
+                      pageAspect={cardAspect} width={cardW}
                       selected={layoutBase(selected) === `${count}-${i}`}
                       onClick={() => onPick(i)} />
         ))}
@@ -3597,7 +3776,8 @@ function PhotoTray({ closing, photos, used = {}, onPick, onClose, onUpload,
 function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
                    layouts, onSetLayout, spacings, onSetSpacing, cover, onEmptyTap, onSwapPages, onBack, onAdd,
                    colors, onSetColor, coverDesignId, onSetCoverDesign, fit, onFit, onFitAll, onAi, texts, onSetText,
-                   stickers, onAddSticker, onChangeSticker, onRemoveSticker }) {
+                   stickers, onAddSticker, onChangeSticker, onRemoveSticker,
+                   spreadLayouts, onSetSpread, layflat, onUpgradeLayflat }) {
   const { useState, useRef, useEffect, useLayoutEffect, useMemo } = React;
   const [fitOpen, setFitOpen] = useState(false);   // the Fit control, open only while a photo is selected
   const slots = useMemo(() => slotsFor(pages), [pages]);
@@ -3734,6 +3914,16 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
   const [flash, setFlash] = useState(0);
   // Which sheet the drawer slot holds, and the spacing sheet's own draft.
   const [kind, setKind] = useState('layout');
+  // Spread layouts: the drawer's Page | Spread switch, its draft, and the lay-flat upsell sheet.
+  const [layMode, setLayMode] = useState('page');
+  const [spreadDraft, setSpreadDraft] = useState('1-0');
+  const [lfSheet, setLfSheet] = useState(null);
+  const spreadOf = s => (s > 0 ? Math.floor((s - 1) / 2) : -1);
+  const spDraftActive = drawer === 'open' && kind === 'layout';
+  // The spread layout a spread draws with: the open drawer's draft for the spread being edited
+  // (none at all while its Page tab is up, so the page layouts preview), else the stored one.
+  const spreadIdFor = i => (spDraftActive && i === spreadOf(target)
+    ? (layMode === 'spread' ? spreadDraft : null) : ((spreadLayouts || {})[i] || null));
   const [spDraft, setSpDraft] = useState(SP_DEFAULT);
   const [spAll, setSpAll] = useState(false);
   // The Covers and Color drawers' drafts. Both preview through BookPaint below and
@@ -3762,6 +3952,11 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
     setDraft(cur || `${c}-0`);
     setFlash(f => f + 1);
     setKind('layout');
+    // Open on the Spread tab when this spread already has a spread layout.
+    const sl = active > 0 ? (spreadLayouts || {})[spreadOf(active)] : null;
+    setLayMode(sl ? 'spread' : 'page');
+    setSpreadDraft(sl || '1-0');
+    if (sl) setCount(Number(sl.split('-')[0]));
     setDrawer('open');
   };
   const openSpacing = () => {
@@ -3807,10 +4002,19 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
     setTimeout(() => setDrawer(null), 320);
   };
   const confirmDrawer = () => {
-    onSetLayout(target, draft);
+    const si = spreadOf(target);
+    if (layMode === 'spread' && si >= 0) {
+      onSetSpread(si, spreadDraft);
+      // A photo across the fold wants a lay-flat binding: offer it, unless the book already has one.
+      if (!layflat) setTimeout(() => setLfSheet('open'), 380);
+    } else {
+      onSetLayout(target, draft);
+      if (si >= 0 && (spreadLayouts || {})[si]) onSetSpread(si, null);   // choosing page layouts replaces the spread's
+    }
     setDrawer('closing');
     setTimeout(() => setDrawer(null), 320);
   };
+  const closeLayflat = () => { setLfSheet('closing'); setTimeout(() => setLfSheet(null), 320); };
   const layoutFor = i => {
     const spacing = drawer && kind === 'spacing' && (spAll || i === target)
       ? spDraft : spacingFor(spacings, i);
@@ -3984,11 +4188,16 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
                        photos={coverPhotos(cover, (layoutFor(0) || FULL_PAGE).length)}
                        onEmpty={pickEmpty(0)}
                        onSelect={pick(0)} selected={selectedIn(0)} />
-            {spreads.map(([l, r], i) => (
-              <BookUnit key={i} w={bookW} h={bookH}>
+            {spreads.map(([l, r], i) => {
+              const sid = spreadIdFor(i);
+              const spr = sid && spreadLayoutById(sid)
+                ? { id: sid, flat: layflat, photos: spreadPhotosFor(placed, l, r, spreadLayoutById(sid).length, uploaded) } : null;
+              return (
+              <BookUnit key={i} w={bookW} h={bookH} board={slotColor(paint.colors, 0)}>
                 <BigLeaf side="left" slotRef={leafRef(1 + 2 * i)} slot={l ? 1 + 2 * i : null}>
+                  {spr && <SpreadHalf spread={spr} side="left" />}
                   {/* An inside-cover leaf (no page number) is plain paper. */}
-                  {l && <BigWell photos={pageAt(l, layoutFor(1 + 2 * i))}
+                  {l && !spr && <BigWell photos={pageAt(l, layoutFor(1 + 2 * i))}
                            layout={layoutFor(1 + 2 * i)} pageW={pageW}
                            onSelect={pick(1 + 2 * i)} selected={selectedIn(1 + 2 * i)}
                            adjust={adjustFor(1 + 2 * i)} onEmpty={pickEmpty(1 + 2 * i)} />}
@@ -3996,7 +4205,8 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
                   <UserStickers slot={1 + 2 * i} />
                 </BigLeaf>
                 <BigLeaf side="right" slotRef={leafRef(2 + 2 * i)} slot={r ? 2 + 2 * i : null}>
-                  {r && <BigWell photos={pageAt(r, layoutFor(2 + 2 * i))}
+                  {spr && <SpreadHalf spread={spr} side="right" />}
+                  {r && !spr && <BigWell photos={pageAt(r, layoutFor(2 + 2 * i))}
                            layout={layoutFor(2 + 2 * i)} pageW={pageW}
                            onSelect={pick(2 + 2 * i)} selected={selectedIn(2 + 2 * i)}
                            adjust={adjustFor(2 + 2 * i)} onEmpty={pickEmpty(2 + 2 * i)} />}
@@ -4004,7 +4214,8 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
                   <UserStickers slot={2 + 2 * i} />
                 </BigLeaf>
               </BookUnit>
-            ))}
+              );
+            })}
           </React.Fragment>
         )}
         <div aria-hidden style={{ flex: `0 0 ${(box.w - pageW) / 2}px` }} />
@@ -4098,6 +4309,11 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
                  }} />
       )}
 
+      {lfSheet && (
+        <LayflatSheet closing={lfSheet === 'closing'} onKeep={closeLayflat}
+                      onUpgrade={() => { onUpgradeLayflat(); closeLayflat(); }} />
+      )}
+
       {stickerSheet && (
         <StickerSheet closing={stickerSheet === 'closing'} onClose={closeStickers}
                       onPick={id => { setSelected(null); clearText(); setSelSticker(onAddSticker(active, id)); closeStickers(); }} />
@@ -4124,11 +4340,25 @@ function PageView({ aspect, pageAspect, pages, placed, uploaded, startSlot,
       )}
       {drawer && kind === 'layout' && (
         <LayoutDrawer
-          closing={drawer === 'closing'} count={count} selected={draft}
-          options={LAYOUTS[count] || []} pageAspect={pageAspect}
-          photos={[photoFor(slots[target])]}
-          onCount={c => { setCount(c); setDraft(`${c}-0`); setFlash(f => f + 1); }}
-          onPick={i => { setDraft(`${count}-${i}`); setFlash(f => f + 1); }}
+          closing={drawer === 'closing'} count={count}
+          selected={layMode === 'spread' ? spreadDraft : draft}
+          options={(layMode === 'spread' ? SPREAD_LAYOUTS : LAYOUTS)[count] || []} pageAspect={pageAspect}
+          photos={layMode === 'spread'
+            ? [photoFor(slots[target])].concat((uploaded || []).filter(ph => ph !== photoFor(slots[target])).slice(0, 5))
+            : [photoFor(slots[target])]}
+          mode={layMode} onMode={target > 0 ? m => {
+            setLayMode(m);
+            if (m === 'spread') setSpreadDraft(d => (Number(d.split('-')[0]) === count ? d : `${count}-0`));
+          } : undefined}
+          onCount={c => {
+            setCount(c);
+            if (layMode === 'spread') setSpreadDraft(`${c}-0`); else setDraft(`${c}-0`);
+            setFlash(f => f + 1);
+          }}
+          onPick={i => {
+            if (layMode === 'spread') setSpreadDraft(`${count}-${i}`); else setDraft(`${count}-${i}`);
+            setFlash(f => f + 1);
+          }}
           onClose={closeDrawer} onConfirm={confirmDrawer}
         />
       )}
@@ -4818,6 +5048,27 @@ function EditorScreen() {
   const removeSticker = (slot, key) => setStickers(prev => commitStickers(Object.assign({}, prev, {
     [slot]: (prev[slot] || []).filter(s => s.key !== key) })));
   const stickersCtx = useMemo(() => ({ items: stickers, canEdit: false, selKey: null, onSelect: null, onChange: null, onRemove: null }), [stickers]);
+  // Spread layouts (see SPREAD_LAYOUTS): { [spread index]: "<count>-<index>" }, kept in pb_spreads.
+  const [spreadLayouts, setSpreadLayouts] = useState(() => { try { return JSON.parse(sessionStorage.getItem('pb_spreads') || '{}') || {}; } catch (e) { return {}; } });
+  const setSpread = (i, id) => setSpreadLayouts(prev => {
+    const next = Object.assign({}, prev);
+    if (id) next[i] = id; else delete next[i];
+    try { sessionStorage.setItem('pb_spreads', JSON.stringify(next)); } catch (e) { /* best-effort */ }
+    return next;
+  });
+  // Lay-flat, upgraded from here: the book's own pb_book is rewritten (flag + price), so the upgrade page
+  // and the basket see it. `lfExtra` is what this session added to the total the book was opened with.
+  const [layflat, setLayflatOn] = useState(() => !!readBook().layflat);
+  const [lfExtra, setLfExtra] = useState(0);
+  const upgradeLayflat = () => {
+    if (layflat) return;
+    setLayflatOn(true); setLfExtra(LAYFLAT_ADD_PRICE);
+    try {
+      const raw = JSON.parse(sessionStorage.getItem('pb_book') || '{}');
+      sessionStorage.setItem('pb_book', JSON.stringify(Object.assign({}, raw, {
+        layflat: true, total: ((parseFloat(raw.total != null ? raw.total : book.total) || 0) + LAYFLAT_ADD_PRICE).toFixed(2) })));
+    } catch (e) { /* best-effort */ }
+  };
   const textsCtx = useMemo(() => ({ over: texts, canSelect: false, selId: null, onSelect: null }), [texts]);
   // The scripted low-quality moment: { src, n, stage } — see LowQNudge. Restored after a reload, except that
   // anything mid-flight counts as finished and a message that never got shown is shown straight away.
@@ -5320,7 +5571,7 @@ function EditorScreen() {
   }) : null;
 
   const pages = book.pages + added * 2;
-  const total = (parseFloat(book.total) + added * EXTRA_SPREAD_PRICE).toFixed(2);
+  const total = (parseFloat(book.total) + added * EXTRA_SPREAD_PRICE + lfExtra).toFixed(2);
 
   // The Style drawer's draft as a whole book. The cover keeps its own layout.
   const styleOpen = !!panel && !panel.closing && panel.kind === 'style';
@@ -5350,7 +5601,7 @@ function EditorScreen() {
           spacings: themePlan.spacings, colors: themePlan.colors, added }
       : { placed, cover, layouts, spacings, colors, added };
   const vPages = book.pages + v.added * 2;
-  const vTotal = (parseFloat(book.total) + v.added * EXTRA_SPREAD_PRICE).toFixed(2);
+  const vTotal = (parseFloat(book.total) + v.added * EXTRA_SPREAD_PRICE + lfExtra).toFixed(2);
   const spreads = spreadsFor(vPages);
   const bookTheme = THEMES[themesOpen ? themeDraft : theme] || null;
   // When the format's own page count is what decided the length (too few photos to
@@ -5429,6 +5680,7 @@ function EditorScreen() {
           coverDesignId={coverDesignId} onSetCoverDesign={setCoverDesign}
           fit={fit} onFit={setPhotoFit} onFitAll={setAllFit} onAi={openAi}
           texts={texts} onSetText={setText}
+          spreadLayouts={spreadLayouts} onSetSpread={setSpread} layflat={layflat} onUpgradeLayflat={upgradeLayflat}
           stickers={stickers} onAddSticker={addSticker} onChangeSticker={changeSticker} onRemoveSticker={removeSticker}
           onAdd={() => setAdded(n => n + 1)}
         />
@@ -5468,6 +5720,8 @@ function EditorScreen() {
                            it in page view, and placeholders are filled from there. */ />
             {spreads.map(([l, r], i) => (
               <SpreadBlock key={i} aspect={aspect} left={l} right={r} photos={v.placed} slotL={1 + 2 * i} slotR={2 + 2 * i}
+                           spread={spreadLayouts[i] && spreadLayoutById(spreadLayouts[i])
+                             ? { id: spreadLayouts[i], flat: layflat, photos: spreadPhotosFor(v.placed, l, r, spreadLayoutById(spreadLayouts[i]).length, uploaded) } : undefined}
                            showPlus={i < spreads.length - 1}
                            onAdd={() => setAdded(n => n + 1)}
                            pool={uploaded}
@@ -5500,7 +5754,7 @@ function EditorScreen() {
         // the product page's choice, not the editor's content.
         try {
           ['pb_placed', 'pb_uploaded', 'pb_photos', 'pb_groups', 'pb_cover_title', 'pb_fit', 'pb_layouts', 'pb_spacing', 'pb_cover',
-           'pb_theme', 'pb_theme_base', 'pb_style', 'pb_colors', 'pb_cover_design', 'pb_lowq', 'pb_texts', 'pb_stickers']
+           'pb_theme', 'pb_theme_base', 'pb_style', 'pb_colors', 'pb_cover_design', 'pb_lowq', 'pb_texts', 'pb_stickers', 'pb_spreads']
             .forEach(k => sessionStorage.removeItem(k));
           sessionStorage.setItem('pb_nav', 'pop');
         } catch (e) {}

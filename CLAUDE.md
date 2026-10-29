@@ -1491,6 +1491,39 @@ background rects (a `#2E2E2E` viewport fill and a 2200×2692 white canvas) — s
 data** (`Lnan nanL…`) that dropped the folder's yellow body and the cup — patched by deleting the `Lnan nan` segment. Check any
 re-export for both. Cleared with the rest on the editor's close button.
 
+#### Spread layouts + the lay-flat upsell (layout drawer) — not in the Figma
+The layout drawer has a **Page | Spread** switch (centred where "Choose layout" was; not on the cover). **Spread** offers layouts that
+span both pages and the fold — 1 photo: edge-to-edge, inset, wide band; 2, 3, 4, 5 photos in 3/3/2/2 arrangements (`SPREAD_LAYOUTS`, rects in
+% of the whole spread, margins built in). Cards are two pages wide with a fold line. The strip previews live; ✓ stores it in `pb_spreads`
+(`{ [spread index]: "<count>-<i>" }`). A spread has *either* page layouts or a spread layout — confirming Page clears the spread's, and the
+drawer reopens on Spread when one is set. It draws as `SpreadHalf`: the layout at 200% width inside each leaf, the right one slid left a leaf,
+so the halves meet at the fold; stickers, texts and the page number stay per page above it. Photos: what the two pages hold, in order, topped
+up from the upload (an empty spread stays empty). They **fill** their frames (`SPREAD_FIT`) even when the book keeps original proportions.
+Book view (`SpreadBlock` → `Leaf spread`) and page view both draw it; arrange mode and the 3D preview do not.
+**Fold treatment:** in the book view the layer is laid on the whole *leaf* — padding included. A leaf keeps 8px (outer) / 12px (gutter) of
+margin around its well, so a layer inside the well left a 24px blank strip at the fold and the picture never met. `SpreadHalf` also takes
+`flat` (the book's lay-flat state): lay-flat gets a hairline crease (3.5% wide, 8% black) and the spine art drops to 30%; a standard binding
+gets a wide dark curve (12%, 28% black) so the picture visibly dips into the spine. Both are what "Nothing lost in the fold" is selling.
+**Lay-flat upsell:** confirming a spread layout on a book that is not lay-flat applies it, then raises `LayflatSheet` — the product page's
+lay-flat card art (`pb-layflat.png`, mirrored and cropped as `LayFlatCard` does), "Upgrade to lay-flat", six benefit lines, **Upgrade · +€5.00**
+(the product page's `LAYFLAT_ADD`) and **Keep standard binding** (the layout stays either way). Upgrading rewrites `pb_book`
+(`layflat: true`, total + 5) so the upgrade page and basket see it, and the editor's price follows (`lfExtra`). Books already lay-flat skip the sheet.
+The sheet's "24 pages included / from €0.45 per extra page" is copy; the €0.45 is not wired to any price. Cleared by the close button.
+
+#### The cover is a cover, not a page spread — and its colour shows behind every spread
+`BookUnit` has two new props. `cover` draws the cover spread as a hardcover: two boards edge to edge (no inset, no stack of paper sheets
+behind it, outer corners eased, a 1px dark rim and a 3px lit rim) with a hinge groove down the middle, instead of white pages on the grey
+paper stack a page spread has. `board` is the cover's colour (`colors[0]`, set by the Color tool on the cover): page spreads redraw the
+exported book-block (two `#E3E3E3` halves + a lighter spine strip with an inner shadow — 310.67 | 16.35 | 310.67 of 637.69) as plain boxes
+in that colour, so the ~9px of cover that shows round every spread takes it. With no colour set the export is used, unchanged. The
+book view does the same through `Sheet`'s `board`: the 4px frame round each page spread, and the whole frame of the cover block (`CoverBlock`),
+so a coloured cover has no white sheet edge. The colour previews live while the Color drawer is open.
+
+⚠️ **Never put `overflow: hidden` (or auto/scroll) between a scroll-snap target and the page strip.** The cover's interior once had
+`overflow: hidden` for its rounded corners; that makes the box a scroll container, so the front cover's snap area stopped belonging to the
+strip, and the strip could never rest on the cover — it always snapped on to page 1 while the navigator showed "Cover" selected. The corners
+are `clip-path: inset(0 round 3px)` instead, which clips without creating a scroll container.
+
 #### AI help sheet
 The floating AI button opens `AiSheet` (an `ActionSheet`, ~54% of the screen) from the book view and the page view (`PageView` calls `onAi`).
 A scripted mock chat: after a beat of typing it greets you ("Hi! I'm your photo book assistant ✨ Your book has N photos across M pages…")
