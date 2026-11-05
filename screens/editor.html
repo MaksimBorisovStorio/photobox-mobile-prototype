@@ -9,7 +9,69 @@
   <meta name="apple-mobile-web-app-title" content="Photobox">
   <link rel="manifest" href="../manifest.json">
   <link rel="stylesheet" href="../shared/styles.css">
-  <style> html, body { margin:0; padding:0; background:#1B1B1B; } ::-webkit-scrollbar{display:none;} </style>
+  <style>
+    /* The editor follows the system appearance. Dark is the Figma editor; light is the app's own paper and ink.
+       Book content (pages, wells, covers, photos) is the same in both — only the editor's chrome changes. */
+    :root {
+      color-scheme: dark;
+      --ed-bg: #1B1B1B;
+      --ed-canvas: linear-gradient(90deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.2) 100%), linear-gradient(180deg, #272727 0%, #151515 100%);
+      --ed-dot: #272727;
+      --ed-text: #FFFFFF; --ed-text-2: #CCCCCC; --ed-text-3: #888888; --ed-nav-off: #777777;
+      --ed-card: #272727; --ed-card-line: #363636; --ed-tile: #272727; --ed-pill: #333333;
+      --ed-fill: rgba(255,255,255,0.1); --ed-fill-2: rgba(255,255,255,0.16); --ed-segment: rgba(255,255,255,0.07);
+      --ed-trough: rgba(0,0,0,0.45); --ed-trough-2: rgba(0,0,0,0.8); --ed-chip-off: rgba(0,0,0,0.1);
+      --ed-on: #F0F0F0; --ed-on-text: #222222; --ed-off-text: #DDDDDD;
+      --ed-sheet: #111111; --ed-drawer: #1C1C1C; --ed-panel: rgba(32,32,32,0.94); --ed-bubble: rgba(34,34,34,0.96);
+      --ed-rim: rgba(255,255,255,0.05); --ed-rim-2: rgba(255,255,255,0.09); --ed-grab: rgba(255,255,255,0.22);
+      --ed-divider: rgba(217,217,217,0.1); --ed-swatch-rim: rgba(255,255,255,0.22);
+      --ed-ring-gap: #1C1C1C; --ed-ring: #FFFFFF;
+      --ed-shade: rgba(0,0,0,0.6); --ed-sheet-shadow: rgba(0,0,0,0.65); --ed-pop-shadow: 0 16px 40px rgba(0,0,0,0.55);
+      --ed-head: linear-gradient(to bottom, rgba(20,20,20,0.55) 0.3%, rgba(16,16,16,0.22) 60%, rgba(12,12,12,0) 96%);
+      --ed-toolbar: linear-gradient(to bottom, rgba(27,27,27,0) 0.2%, rgb(19,19,19) 73.5%), linear-gradient(to bottom, rgba(27,27,27,0) 0.2%, rgb(27,27,27) 73.5%);
+      --ed-arr-head: linear-gradient(to bottom, rgb(20,20,20) 73.671%, rgba(39,39,39,0) 96.296%);
+      --ed-arr-band: linear-gradient(to bottom, rgba(0,0,0,0) 0.2%, rgb(27,27,27) 73.53%);
+      --ed-glass: rgba(0,0,0,0.25); --ed-accent: rgba(0,66,68,0.5); --ed-done: #00292A;
+      --ed-ico: none; --ed-ico-dim: none;
+      --ed-teal-text: #9BE3DC; --ed-warn-text: #FFC964; --ed-check: #5FE0CB;
+      --ed-ai-chip: rgba(0,127,112,0.16); --ed-ai-chip-rim: rgba(155,227,220,0.35);
+      --ed-thumb-bg: #111111; --ed-photo-bg: #333333;
+      --ed-btn-bg: #F0F0F0; --ed-btn-rim: #FFFFFF; --ed-btn-text: #333333; --ed-btn-ico: invert(1);
+      --ed-btn2-bg: #333333; --ed-btn2-rim: #464646;
+      --ed-tool-shadow: drop-shadow(0px 4px 2px rgba(0,0,0,0.25));
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        color-scheme: light;
+        --ed-bg: #EBEBEB;
+        --ed-canvas: linear-gradient(180deg, #F2F2F2 0%, #E6E6E6 100%);
+        --ed-dot: #D2D2D2;
+        --ed-text: #023C42; --ed-text-2: #4E6767; --ed-text-3: #6F8585; --ed-nav-off: #8A9C9C;
+        --ed-card: #FFFFFF; --ed-card-line: #E2E2E2; --ed-tile: #F2F2F2; --ed-pill: #FFFFFF;
+        --ed-fill: rgba(0,0,0,0.06); --ed-fill-2: rgba(0,0,0,0.14); --ed-segment: rgba(0,0,0,0.06);
+        --ed-trough: rgba(0,0,0,0.07); --ed-trough-2: rgba(0,0,0,0.08); --ed-chip-off: rgba(0,0,0,0.06);
+        --ed-on: #FFFFFF; --ed-on-text: #023C42; --ed-off-text: #4E6767;
+        --ed-sheet: #FFFFFF; --ed-drawer: #FFFFFF; --ed-panel: rgba(255,255,255,0.95); --ed-bubble: rgba(255,255,255,0.97);
+        --ed-rim: rgba(0,0,0,0.08); --ed-rim-2: rgba(0,0,0,0.10); --ed-grab: rgba(0,0,0,0.18);
+        --ed-divider: rgba(0,0,0,0.12); --ed-swatch-rim: rgba(0,0,0,0.18);
+        --ed-ring-gap: #FFFFFF; --ed-ring: #023C42;
+        --ed-shade: rgba(2,40,44,0.32); --ed-sheet-shadow: rgba(0,40,40,0.16); --ed-pop-shadow: 0 16px 40px rgba(0,40,40,0.18);
+        --ed-head: linear-gradient(to bottom, rgba(242,242,242,0.85) 0.3%, rgba(242,242,242,0.4) 60%, rgba(242,242,242,0) 96%);
+        --ed-toolbar: linear-gradient(to bottom, rgba(232,232,232,0) 0.2%, rgba(232,232,232,0.97) 73.5%);
+        --ed-arr-head: linear-gradient(to bottom, #F2F2F2 73.671%, rgba(242,242,242,0) 96.296%);
+        --ed-arr-band: linear-gradient(to bottom, rgba(232,232,232,0) 0.2%, rgba(232,232,232,0.97) 73.53%);
+        --ed-glass: rgba(255,255,255,0.6); --ed-accent: rgba(0,127,112,0.92); --ed-done: #007F70;
+        --ed-ico: brightness(0) invert(0.18); --ed-ico-dim: brightness(0) invert(0.18) opacity(0.3);
+        --ed-teal-text: #007F70; --ed-warn-text: #A3620A; --ed-check: #007F70;
+        --ed-ai-chip: rgba(0,127,112,0.08); --ed-ai-chip-rim: rgba(0,127,112,0.3);
+        --ed-thumb-bg: #E4E4E4; --ed-photo-bg: #DDDDDD;
+        --ed-btn-bg: #007F70; --ed-btn-rim: #00A389; --ed-btn-text: #FFFFFF; --ed-btn-ico: none;
+        --ed-btn2-bg: rgba(0,0,0,0.06); --ed-btn2-rim: rgba(0,0,0,0.10);
+        --ed-tool-shadow: none;
+      }
+    }
+    html, body { margin:0; padding:0; background: var(--ed-bg); } ::-webkit-scrollbar{display:none;}
+  </style>
   <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
@@ -31,16 +93,28 @@
       }, []);
       return m;
     }
+    function useDark() {
+      const q = '(prefers-color-scheme: dark)';
+      const [d, setD] = React.useState(() => window.matchMedia(q).matches);
+      React.useEffect(() => {
+        const mql = window.matchMedia(q);
+        const cb = e => setD(e.matches);
+        mql.addEventListener('change', cb);
+        return () => mql.removeEventListener('change', cb);
+      }, []);
+      return d;
+    }
     function App() {
       const mobile = useIsMobile();
+      const dark = useDark();
       if (mobile) return (
-        <div style={{position:'fixed', inset:0, background:'#1B1B1B', overflow:'hidden'}}>
+        <div style={{position:'fixed', inset:0, background:'var(--ed-bg)', overflow:'hidden'}}>
           <EditorScreen />
         </div>
       );
       return (
         <div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',background:'#1C1C1E'}}>
-          <IOSDevice width={402} height={874} dark>
+          <IOSDevice width={402} height={874} dark={dark}>
             <EditorScreen />
           </IOSDevice>
         </div>

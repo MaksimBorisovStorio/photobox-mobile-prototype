@@ -1404,6 +1404,13 @@ Photos, Add photo, Add text, Layout, Stickers, Smart Design, Ask AI (seven, laid
 `gap: 8` from the left rather than justified). Only the Photos icon was taken from it;
 the toolbar still follows `451:15574`.
 
+> ⚠️ **Superseded in look and behaviour: the prompt is now `FillSheet`** — a white sheet in the pattern of the summary page's / book-choose's option sheets
+> ("Fill your book", radio cards **Auto-fill my photos** · Recommended, and **Start from scratch**, **Continue**), not the dark Figma overlay. There is no scrim:
+> the book stays visible above, with room under it (`fillH` spacer) to scroll. Auto-fill is **applied the moment the sheet opens** (`applyFill`) and
+> chosen by default, so the page count and price update live; "Start from scratch" restores the book as it was (`fillRef` snapshot: placed, layouts, cover, added);
+> Continue just closes, and after a by-chapter fill starts the low-quality AI moment. `autoFill` / `autoFillGroups` now only return the placed list.
+> The text below describes the placement rules, which still hold. Cache `photobox-v101`.
+
 #### Auto-fill prompt (Figma `451:15751`) and the photo handoff
 The picker's Continue no longer jumps to the basket. It writes the selection to
 `sessionStorage.pb_photos` and returns to the editor, which then offers to place them.
@@ -2193,6 +2200,16 @@ uploaded photos: theme preview/apply/cancel, Style apply (150 photos → 32 page
 collage, 150 as one per page), tray jump to page view, themed arrange mode; no JS error,
 no horizontal overflow.
 
+#### Light mode — the editor follows the system appearance
+`editor.html` defines the editor's chrome as CSS custom properties (`--ed-*`) on `:root`: dark values by default (the Figma editor,
+unchanged), light values under `@media (prefers-color-scheme: light)` — a neutral grey canvas (`#F2F2F2` → `#E6E6E6`, grey dots), ink `#023C42` text, white cards and sheets,
+green accents. `editor.jsx` reads only the variables for chrome: canvas + dot grid, header/toolbar scrims, glass tint (`--ed-glass`),
+details card, drawers, sheets, panels, the AI bubble and chat, segmented controls, swatch rings, arrange header/Done. **Book content is
+not themed** — pages, wells, covers, photos and themes look the same in both. White glyph SVGs are darkened in light with
+`filter: var(--ed-ico)` (`edIco(file)` in the icon helpers skips the ones on the teal accent: ✓ and →; redo uses `--ed-ico-dim`).
+The desktop `IOSDevice` frame's `dark` follows the scheme too. ⚠️ New chrome colours in the editor must be a `var(--ed-…)`, or they
+will be wrong in one of the two modes. The 3D preview (`book-preview`) and the image picker are still dark-only. Cache `photobox-v104`.
+
 #### Header progressive blur — reused from the image picker
 `IOSProgressiveBlur` in `shared/ios-frame.jsx` is the image picker's header effect
 (`image-picker/image-picker.jsx` ~1850) extracted so the editor can share it rather
@@ -2650,11 +2667,25 @@ hard-wired to the Trip to Italy album, so choosing another collection in the chi
 
 ⚠️ **book-choose's middle is a carousel** of five suggestions (`BC_PRESETS`), each a complete cover/format/size *and* a cover style: the
 photo classic (recommended, landscape hardcover M), then four bold typographic covers drawn live in `BcCover` — Sorbet pink (portrait M),
-Aegean navy (portrait L), Garden green (soft square M), Full photo (layflat landscape L). Slides are 78% wide with 11% spacers, so slide *k* is
+Aegean navy (portrait L), Garden green (soft square M), Full photo (hardcover landscape L). Slides are 78% wide with 11% spacers, so slide *k* is
 centred at `scrollLeft = k × 0.78 × width`; swiping sets `sel` from the centred preset and the three rows follow it (editing a row turns the
 eyebrow to "CUSTOMISED"). Cover type is sized in container units (`cqw`/`cqh`) so it scales with the format. Create also writes
 `pb_cover_design` (classic / band / round / framed / bleed) and `pb_colors[0]` (the board colour) for the editor. The block scales down
 about its centre on short phones (min 0.4), so below ~700px tall it gets small.
+
+⚠️ **book-choose's option sheets preview live.** Tapping an option in Cover type / Format / Size picks it at once (no more close-on-tap) and the book
+above changes with it; **Done** closes. While a sheet is up the carousel gives up the sheet's extra height (`lift`, from `onHeight`) and scales the book
+into what is left, fades out the header and drops the title/price text so only the book shows (no scrim), and stops swiping. `BookHero` reads all three choices: size scales the box (`BC_BASE` × `BC_SCALE`, animated;
+Size also outlines the extra-large book dashed), softcover is a thin flexing book, hardcover a rigid board with a hinge groove and stacked thickness,
+**cut-out** is a teal board with a round window onto the photo. There are only three cover types (softcover, hardcover, cut-out) — lay-flat is a binding upgrade chosen on the summary page, not a cover. The sheets use the summary page's rows (radio on the left, outlined card, price right) and a 20px sheet. The price line adds the dimensions in cm. Cache is `photobox-v100`.
+
+⚠️ **"Photo book options" is book-choose in a second mode** (`book-choose.html?options&pages=N&extra=€`), opened by the editor's details-card
+settings icon. Title "Photo book options", one slide (the book itself, in the editor's cover style via `pb_cover_design`, with the editor's
+cover photo and title), no eyebrow, no dots, no swipe; the same three rows and live-preview sheets, plus a **Lay-flat pages · Premium** switch
+(+€5, `BC_LAYFLAT_ADD`). It starts from `pb_book` (`sel` if present, else inferred from pageW/pageH/cover — `bcFromBook`). **Save changes**
+rewrites `pb_book` (title, total = size + cover + lay-flat, page size, `layflat`, `sel`; `pages` kept), sets `pb_book_dirty` and pops; the
+editor's `pageshow` handler reloads on a bfcache restore when that flag is set, since it reads `pb_book` once on mount. The price line adds
+the editor's extra spreads (`extra`) so it matches the details card. Create in the normal mode now also writes `sel`. Cache `photobox-v103`.
 
 ### Home, first-time customer — `screens/home.html` + `home-new.jsx` (handoff "Home New Customer" 3a)
 `home.html` now shows the **new-customer** home; the previous Figma-verified home (order tracker,

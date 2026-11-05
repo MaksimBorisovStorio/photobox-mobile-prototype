@@ -27,7 +27,7 @@ const BC_MINT    = '#FFFFFF';
 const BC_COVERS = [
   { id: 'softcover', title: 'Softcover',            note: 'Light and flexible',          add: 0,  layflat: false },
   { id: 'hardcover', title: 'Hardcover',            note: 'Sturdy, with a rigid spine',  add: 10, layflat: false },
-  { id: 'layflat',   title: 'Hardcover · Layflat',  note: 'Opens flat, panoramas intact', add: 15, layflat: true },
+  { id: 'cutout',    title: 'Cut-out',              note: 'A shaped window onto your photo', add: 15, layflat: false },
 ];
 const BC_FORMATS = [
   { id: 'landscape', title: 'Landscape', ratio: 4 / 3 },
@@ -54,7 +54,7 @@ const BC_PRESETS = [
   { id: 'garden', design: 'garden', eyebrow: 'FRESH AND LIVELY',
     sel: { cover: 'softcover', format: 'square', size: 'm' }, editor: { design: 'framed', paper: '#2E9A57' } },
   { id: 'full', design: 'full', eyebrow: 'LET THE PHOTO SPEAK',
-    sel: { cover: 'layflat', format: 'landscape', size: 'l' }, editor: { design: 'bleed' } },
+    sel: { cover: 'hardcover', format: 'landscape', size: 'l' }, editor: { design: 'bleed' } },
 ];
 const BC_PICK = BC_PRESETS[0].sel;
 
@@ -66,6 +66,30 @@ const BC_ALBUM = {
   // every photo of the album, in group order — handed to the editor for auto-fill
   photos: BC_TRIP.groups.reduce((all, g) => all.concat(g.photos), []),
 };
+
+// ── "Photo book options": the same screen opened from the editor's details card (`book-choose.html?options`).
+// It edits the book you are already making — so no suggestions to swipe and no eyebrow, it starts from `pb_book`,
+// adds a Lay-flat toggle, and Save writes `pb_book` back and returns to the editor (which reloads to pick it up).
+const BC_Q = new URLSearchParams(location.search);
+const BC_OPTIONS = BC_Q.has('options');
+const BC_LAYFLAT_ADD = 5;                                 // the editor's LAYFLAT_ADD_PRICE
+const BC_EDITOR_DESIGN = { classic: 'classic', band: 'sorbet', round: 'aegean', framed: 'garden', bleed: 'full' };
+const bcRead = (k, d) => { try { const v = sessionStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } };
+const BC_BOOK = BC_OPTIONS ? bcRead('pb_book', {}) : {};
+function bcFromBook(b) {
+  if (b.sel) return b.sel;
+  const format = b.pageW > b.pageH ? 'landscape' : b.pageW < b.pageH ? 'portrait' : 'square';
+  const z = BC_SIZES[format].find(r => r[2] === b.pageW && r[3] === b.pageH);
+  const cov = BC_COVERS.find(c => b.cover && c.title.toLowerCase() === String(b.cover).toLowerCase().replace('soft cover', 'softcover'));
+  return { cover: cov ? cov.id : 'hardcover', format, size: z ? z[0] : 'l' };
+}
+if (BC_OPTIONS) {
+  // the book's own cover photo and title, as the editor has them
+  const cov = bcRead('pb_cover', []);
+  const ph = (Array.isArray(cov) ? cov : []).find(x => typeof x === 'string');
+  if (ph) BC_ALBUM.photo = ph;
+  try { BC_ALBUM.title = sessionStorage.getItem('pb_cover_title') || BC_ALBUM.title; } catch (e) {}
+}
 
 function bcSize(format, id) {
   const s = BC_SIZES[format].find(z => z[0] === id);
@@ -88,6 +112,16 @@ function BcCover({ design, album }) {
       lineHeight: 0.86, letterSpacing: '-0.035em', ...extra }}>{txt}</span>
   );
   const ph = album.place;
+  if (design === 'cutout') return (
+    <div style={{ position: 'absolute', inset: 0, background: '#0E6F66' }}>
+      <div style={{ position: 'absolute', left: '50%', top: '47%', width: '58cqmin', height: '58cqmin', transform: 'translate(-50%, -50%)',
+        borderRadius: '50%', overflow: 'hidden', boxShadow: '0 0 0 1.4cqmin #0A544D, 0 0 0 2cqmin rgba(255,255,255,.18)' }}>
+        <img src={album.photo} alt="" draggable={false} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+        <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', boxShadow: 'inset 0 1.2cqmin 2.6cqmin rgba(0,0,0,.5)' }} />
+      </div>
+      {word(album.title, { left: 0, right: 0, bottom: '6cqh', textAlign: 'center', fontSize: '6cqw', color: '#fff', fontWeight: 800, letterSpacing: '.06em' })}
+    </div>
+  );
   if (design === 'sorbet') return (
     <div style={{ position: 'absolute', inset: 0, background: '#F7A8C4' }}>
       {word('Trip to', { left: '8cqw', top: '7cqh', fontSize: '7cqw', color: '#B3123F', letterSpacing: '.02em' })}
@@ -129,28 +163,47 @@ function BcCover({ design, album }) {
   );
 }
 
-const BC_SPINE = { classic: null, sorbet: '#E88BAE', aegean: '#16276F', garden: '#1F7A40', full: null };
+const BC_SPINE = { cutout: '#0A544D', classic: null, sorbet: '#E88BAE', aegean: '#16276F', garden: '#1F7A40', full: null };
 
+// The book's size on screen: the format's extra-large size is the base, the others scale down from it.
+const BC_BASE = { landscape: [296, 222], portrait: [190, 253], square: [240, 240] };
+const BC_SCALE = { xl: 1, l: 0.9, m: 0.8 };
+function bcDims(sel) { const [w, h] = BC_BASE[sel.format]; const k = BC_SCALE[sel.size]; return [w * k, h * k]; }
+const BC_EASE = 'cubic-bezier(.2,.8,.2,1)';
+
+// The book as the choices describe it. Size and format animate the box; the cover type changes how the book
+// is built — softcover is thin and flexes, hardcover is a rigid board with real thickness, lay-flat is
+// a cut-out, with the photo running across the fold.
 function BookHero({ sel, design = 'classic' }) {
-  const fmt = BC_FORMATS.find(f => f.id === sel.format);
   const cov = BC_COVERS.find(c => c.id === sel.cover);
+  const [W, H] = bcDims(sel);
+  const look = cov.id === 'cutout' ? 'cutout' : design;     // a cut-out cover has its own drawing
+  const tint = BC_SPINE[look];
+  const grow = `width .35s ${BC_EASE}, height .35s ${BC_EASE}`;
+
   const soft = cov.id === 'softcover';
-  const W = fmt.ratio >= 1 ? (fmt.ratio > 1 ? 262 : 220) : 190;
-  const H = W / fmt.ratio;
-  const tint = BC_SPINE[design];
+  const spine = soft ? 8 : 14;
   return (
-    <div key={sel.format + sel.cover} style={{ position: 'relative', width: W, height: H, animation: 'bcPop .45s cubic-bezier(.2,.8,.2,1) both',
-      borderRadius: 4, background: '#fff', boxShadow: '0 22px 28px -10px rgba(0,40,40,.35), 0 3px 6px rgba(0,0,0,.12)' }}>
-      {/* spine */}
-      <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: soft ? 9 : 14, borderRadius: '4px 0 0 4px',
+    <div key={sel.format + sel.cover} style={{ position: 'relative', width: W, height: H, transition: grow,
+      animation: 'bcPop .45s cubic-bezier(.2,.8,.2,1) both',
+      borderRadius: soft ? 3 : 2, background: '#fff',
+      boxShadow: soft
+        ? '0 16px 22px -10px rgba(0,40,40,.28), 0 1px 2px rgba(0,0,0,.16)'
+        : '1px 1px 0 #d4dbdb, 2px 2px 0 #c9d1d1, 3px 3px 0 #bec7c7, 4px 4px 0 #b3bdbd, 6px 26px 28px -10px rgba(0,40,40,.38)' }}>
+      {/* spine: a soft crease for softcover, a rigid hinge groove for hardcover */}
+      <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: spine, borderRadius: soft ? '3px 0 0 3px' : '2px 0 0 2px',
         background: tint ? `linear-gradient(90deg, ${tint}, ${tint} 60%, rgba(0,0,0,.18))`
           : 'linear-gradient(90deg, #cfd6d6, #f4f6f6 40%, #dfe5e5 70%, #c4cccc)' }} />
-      {/* cover */}
-      <div style={{ position: 'absolute', left: soft ? 9 : 14, top: 0, right: 0, bottom: 0, borderRadius: '0 4px 4px 0',
+      {!soft && <div style={{ position: 'absolute', left: spine - 1, top: 0, bottom: 0, width: 3,
+        background: 'linear-gradient(90deg, rgba(0,0,0,.28), rgba(255,255,255,.35) 55%, rgba(0,0,0,0))' }} />}
+      <div style={{ position: 'absolute', left: spine, top: 0, right: 0, bottom: 0, borderRadius: soft ? '0 3px 3px 0' : '0 2px 2px 0',
         overflow: 'hidden', containerType: 'size' }}>
-        <BcCover design={design} album={BC_ALBUM} />
-        {/* page-edge sheen */}
+        <BcCover design={look} album={BC_ALBUM} />
+        {/* page-edge sheen, plus a flexing highlight on softcover and a hard rim on hardcover */}
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, rgba(0,0,0,.10), rgba(0,0,0,0) 8%)' }} />
+        {soft
+          ? <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(118deg, rgba(255,255,255,.30), rgba(255,255,255,0) 34%, rgba(0,0,0,.07) 100%)' }} />
+          : <div style={{ position: 'absolute', inset: 0, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.14), inset -2px -2px 0 rgba(0,0,0,.06)' }} />}
       </div>
     </div>
   );
@@ -172,43 +225,79 @@ function BcRow({ icon, label, value, onTap, last }) {
   );
 }
 
-// ── Option sheet: slides up, tap an option to choose it ──
-function BcSheet({ title, options, value, onPick, onClose }) {
+// ── The Lay-flat row (options screen only): a premium upgrade, so a switch rather than a sheet ──
+function BcToggleRow({ on, onToggle }) {
+  return (
+    <div role="switch" aria-checked={on} onClick={onToggle} style={{ display: 'flex', alignItems: 'center', gap: 10, height: 56, padding: '0 16px',
+      boxSizing: 'border-box', cursor: 'pointer', borderTop: '1px solid rgba(0,75,83,.08)', WebkitTapHighlightColor: 'transparent' }}>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={BC_DEEP} strokeWidth="1.7" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+        <path d="M2.5 6.5c3-1.6 6.2-1.6 9.5 0 3.3-1.6 6.5-1.6 9.5 0v11c-3-1.6-6.2-1.6-9.5 0-3.3-1.6-6.5-1.6-9.5 0z" /><path d="M12 6.5v11" />
+      </svg>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, fontFamily: BC_TEXT, fontSize: 15 }}>
+        <span style={{ fontWeight: 700, color: BC_DEEP, whiteSpace: 'nowrap' }}>Lay-flat pages</span>
+        <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 8px', borderRadius: 10, background: '#F6EBC8', color: '#7A5A12' }}>Premium</span>
+      </div>
+      <span style={{ fontFamily: BC_TEXT, fontSize: 15, fontWeight: 600, color: BC_TEAL }}>+€{BC_LAYFLAT_ADD}</span>
+      <span aria-hidden style={{ position: 'relative', width: 51, height: 31, borderRadius: 16, flexShrink: 0, transition: 'background .2s ease',
+        background: on ? BC_TEAL : 'rgba(2,60,66,.16)' }}>
+        <span style={{ position: 'absolute', top: 2, left: on ? 22 : 2, width: 27, height: 27, borderRadius: 14, background: '#fff',
+          boxShadow: '0 2px 4px rgba(0,0,0,.18)', transition: `left .2s ${BC_EASE}` }} />
+      </span>
+    </div>
+  );
+}
+
+// ── Option sheet: tapping an option chooses it at once and the book above changes with it; Done closes ──
+function BcSheet({ title, options, value, onPick, onClose, onHeight }) {
   const [closing, setClosing] = React.useState(false);
-  const close = pick => {
+  const panel = React.useRef(null);
+  React.useLayoutEffect(() => {
+    const el = panel.current;
+    if (!el) return undefined;
+    const report = () => onHeight(el.offsetHeight);
+    report();
+    const ro = new ResizeObserver(report);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const close = () => {
     setClosing(true);
-    setTimeout(() => { if (pick !== undefined) onPick(pick); onClose(); }, 220);
+    onHeight(0);                       // the book above starts coming back down with the sheet
+    setTimeout(onClose, 240);
   };
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 30 }}>
-      <div onClick={() => close()} style={{ position: 'absolute', inset: 0, background: 'rgba(0,30,34,.5)',
+      <div onClick={close} style={{ position: 'absolute', inset: 0, background: 'transparent',
         animation: `${closing ? 'bcFadeOut' : 'bcFade'} .22s ease both` }} />
-      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, background: '#fff', borderRadius: '30px 30px 0 0',
-        padding: '8px 16px calc(env(safe-area-inset-bottom, 0px) + 20px)', boxShadow: '0 -12px 30px rgba(0,50,52,.18)',
+      <div ref={panel} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, background: '#fff', borderRadius: '24px 24px 0 0',
+        padding: '20px 20px calc(20px + env(safe-area-inset-bottom, 0px))', boxShadow: '0 -8px 30px -8px rgba(0,50,50,.25)',
         animation: `${closing ? 'bcDown' : 'bcUp'} .28s cubic-bezier(.2,.8,.2,1) both` }}>
-        <div style={{ width: 36, height: 5, borderRadius: 3, background: '#DCE6E6', margin: '0 auto 14px' }} />
-        <div style={{ fontFamily: BC_DISPLAY, fontWeight: 700, fontSize: 24, letterSpacing: '-0.3px', color: BC_DEEP, padding: '0 4px 12px' }}>{title}</div>
-        {options.map(o => {
-          const on = o.id === value;
-          return (
-            <div key={o.id} role="button" onClick={() => close(o.id)} {...press(0.97)} style={{ display: 'flex', alignItems: 'center', gap: 12,
-              padding: '12px 14px', marginBottom: 8, borderRadius: 20, cursor: 'pointer', background: on ? '#DDF0EC' : PB_PAPER,
-              boxShadow: on ? `inset 0 0 0 2px ${BC_TEAL}` : 'inset 0 0 0 1px #fff', transition: 'transform 140ms ease, background 200ms ease',
-              WebkitTapHighlightColor: 'transparent' }}>
-              {o.thumb}
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <span style={{ fontFamily: BC_TEXT, fontSize: 16, fontWeight: 700, color: BC_DEEP }}>{o.title}</span>
-                {o.note && <span style={{ fontFamily: BC_TEXT, fontSize: 13, color: '#5f7777' }}>{o.note}</span>}
+        <div style={{ width: 36, height: 5, borderRadius: 3, background: '#D5E0E0', margin: '-8px auto 14px' }} />
+        <div style={{ fontFamily: BC_DISPLAY, fontSize: 20, fontWeight: 700, color: BC_DEEP, marginBottom: 4 }}>{title}</div>
+        <div style={{ fontFamily: BC_TEXT, fontSize: 14, color: '#5E7575', marginBottom: 16 }}>Watch the book above as you choose.</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {options.map(o => {
+            const on = o.id === value;
+            return (
+              <div key={o.id} role="button" onClick={() => onPick(o.id)} {...press(0.98)} style={{ display: 'flex', alignItems: 'center', gap: 12,
+                padding: 14, borderRadius: 16, cursor: 'pointer', border: `2px solid ${on ? BC_TEAL : '#DCE8E8'}`, background: on ? '#F2F8F8' : '#fff',
+                transition: 'transform 140ms ease, border-color 200ms, background 200ms', WebkitTapHighlightColor: 'transparent' }}>
+                <div style={{ width: 22, height: 22, borderRadius: 11, boxSizing: 'border-box', border: `2px solid ${on ? BC_TEAL : '#B9C9C9'}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  {on && <div style={{ width: 11, height: 11, borderRadius: 6, background: BC_TEAL }} />}
+                </div>
+                {o.thumb}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: BC_TEXT, fontSize: 16, fontWeight: 700, color: BC_DEEP }}>{o.title}</div>
+                  {o.note && <div style={{ fontFamily: BC_TEXT, fontSize: 13, color: '#5E7575', lineHeight: '18px', marginTop: 2 }}>{o.note}</div>}
+                </div>
+                {o.tag && <span style={{ fontFamily: BC_TEXT, fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap',
+                  color: o.tag === 'Included' ? '#5E7575' : BC_DEEP }}>{o.tag}</span>}
               </div>
-              {o.tag && <span style={{ fontFamily: BC_TEXT, fontSize: 14, fontWeight: 600, color: BC_TEAL }}>{o.tag}</span>}
-              <span style={{ width: 22, height: 22, borderRadius: 11, boxSizing: 'border-box', flexShrink: 0,
-                border: on ? 'none' : '2px solid #B8CACA', background: on ? BC_TEAL : 'transparent',
-                display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {on && <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="m3 8.5 3.2 3.2L13 4.8" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg>}
-              </span>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
+        <button onClick={close} {...press(0.97)} style={{ ...pbButton('primary'), width: '100%', marginTop: 18 }}>Done</button>
       </div>
     </div>
   );
@@ -224,26 +313,30 @@ const bcSame = (a, b) => a.cover === b.cover && a.format === b.format && a.size 
 
 // One slide of the carousel: the book, its eyebrow, name and price. Slides beside the centre one
 // sit back — a little smaller and dimmer, text hidden — so only the book hints at the next suggestion.
-function BcSlide({ preset, sel, active }) {
-  const { cov, fmt, price } = bcSpec(sel);
+function BcSlide({ preset, sel, active, ghost, compact, plain, layflat, extra = 0, pages = 24 }) {
+  const { cov, fmt, siz, price } = bcSpec(sel);
+  const [gw, gh] = bcDims({ ...sel, size: 'xl' });
   const stock = bcSame(sel, preset.sel);
   return (
     <div style={{ flex: '0 0 78%', scrollSnapAlign: 'center', scrollSnapStop: 'always', display: 'flex', flexDirection: 'column',
       alignItems: 'center', gap: 20, minWidth: 0 }}>
-      <div style={{ height: 256, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      <div style={{ position: 'relative', height: 256, display: 'flex', alignItems: 'center', justifyContent: 'center',
         transform: active ? 'none' : 'scale(0.86)', opacity: active ? 1 : 0.7, transition: 'transform .3s ease, opacity .3s ease' }}>
+        {/* while Size is open, the largest size is outlined so the others read as smaller */}
+        {ghost && active && <div style={{ position: 'absolute', left: '50%', top: '50%', width: gw + 8, height: gh + 8,
+          transform: 'translate(-50%, -50%)', boxSizing: 'border-box', border: '1.5px dashed rgba(0,127,112,.5)', borderRadius: 6, pointerEvents: 'none' }} />}
         <BookHero sel={sel} design={preset.design} />
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, textAlign: 'center',
+      <div style={{ display: compact ? 'none' : 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, textAlign: 'center',
         opacity: active ? 1 : 0, transition: 'opacity .25s ease' }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: BC_TEXT, fontSize: 12, fontWeight: 700, letterSpacing: '.14em', color: BC_TEAL }}>
+        <span style={{ display: compact || plain ? 'none' : 'flex', alignItems: 'center', gap: 6, fontFamily: BC_TEXT, fontSize: 12, fontWeight: 700, letterSpacing: '.14em', color: BC_TEAL }}>
           <svg width="14" height="14" viewBox="0 0 24 24"><path d="M10 2.5c.4 3.9 2.1 5.6 6 6-3.9.4-5.6 2.1-6 6-.4-3.9-2.1-5.6-6-6 3.9-.4 5.6-2.1 6-6Zm8 10c.25 2.2 1.3 3.25 3.5 3.5-2.2.25-3.25 1.3-3.5 3.5-.25-2.2-1.3-3.25-3.5-3.5 2.2-.25 3.25-1.3 3.5-3.5Z" fill="currentColor" /></svg>
           {stock ? preset.eyebrow : 'CUSTOMISED'}
         </span>
         <span style={{ fontFamily: BC_DISPLAY, fontWeight: 700, fontSize: 26, lineHeight: 1.1, letterSpacing: '-0.4px' }}>
-          {cov.title.replace(' · Layflat', '')} {fmt.title}<br />Photo book{cov.layflat ? ' with Layflat' : ''}
+          {cov.title} {fmt.title}<br />Photo book{layflat ? ' · Lay-flat' : ''}
         </span>
-        <span style={{ fontFamily: BC_TEXT, fontSize: 16, color: '#6b8080' }}>€{price.toFixed(2)} · 24 pages</span>
+        <span style={{ fontFamily: BC_TEXT, fontSize: 16, color: '#6b8080' }}>€{(price + (layflat ? BC_LAYFLAT_ADD : 0) + extra).toFixed(2)} · {pages} pages · {siz.w} × {siz.h} cm</span>
       </div>
     </div>
   );
@@ -251,23 +344,55 @@ function BcSlide({ preset, sel, active }) {
 
 function BookChooseScreen() {
   const [idx, setIdx] = React.useState(0);               // the suggestion in the middle of the carousel
-  const [sel, setSel] = React.useState(BC_PICK);          // its cover / format / size, plus any change made below
+  const [sel, setSel] = React.useState(() => (BC_OPTIONS ? bcFromBook(BC_BOOK) : BC_PICK));  // its cover / format / size, plus any change made below
+  const [layflat, setLayflat] = React.useState(!!BC_BOOK.layflat);   // options screen only
   const [open, setOpen] = React.useState(null);   // 'cover' | 'format' | 'size'
+  const [sheetH, setSheetH] = React.useState(0);   // how tall the open sheet is — the book is lifted clear of it
+  const bottom = React.useRef(null), head = React.useRef(null);
   const scroller = React.useRef(null);
   const area = React.useRef(null), inner = React.useRef(null);
   const [fit, setFit] = React.useState(1);
+  // the sheet is taller than the rows + button it covers; the carousel gives up the difference
+  const lift = open ? Math.max(0, sheetH - (bottom.current ? bottom.current.offsetHeight : 0)) : 0;
   // The carousel is ~400 tall; on a short phone it scales down about its centre rather than clip.
   React.useLayoutEffect(() => {
     const a = area.current, n = inner.current;
     if (!a || !n) return undefined;
-    const measure = () => setFit(Math.max(0.4, Math.min(1, (a.clientHeight - 16) / n.offsetHeight)));
+    const measure = () => {
+      const pad = parseFloat(getComputedStyle(a).paddingBottom) || 0;
+      setFit(Math.max(0.4, Math.min(1, (a.clientHeight - pad - 8) / n.offsetHeight)));
+    };
     measure();
     const ro = new ResizeObserver(measure);
-    ro.observe(a);
+    ro.observe(a); ro.observe(n);
     return () => ro.disconnect();
-  }, []);
+  }, [lift]);
   const { cov, fmt, siz, price } = bcSpec(sel);
   const preset = BC_PRESETS[idx];
+  // On the options screen the one slide is the book itself, drawn in the editor's cover style.
+  const mine = React.useMemo(() => {
+    let d = 'classic';
+    try { d = BC_EDITOR_DESIGN[sessionStorage.getItem('pb_cover_design')] || 'classic'; } catch (e) {}
+    return Object.assign({}, BC_PRESETS.find(p => p.design === d) || BC_PRESETS[0], { sel: bcFromBook(BC_BOOK) });
+  }, []);
+  const extra = BC_OPTIONS ? parseFloat(BC_Q.get('extra')) || 0 : 0;
+  const pages = BC_OPTIONS ? parseInt(BC_Q.get('pages'), 10) || BC_BOOK.pages || 24 : 24;
+
+  const save = () => {
+    try {
+      sessionStorage.setItem('pb_book', JSON.stringify(Object.assign({}, BC_BOOK, {
+        title: `${siz.title} ${fmt.title} photo book`, total: (price + (layflat ? BC_LAYFLAT_ADD : 0)).toFixed(2),
+        pageW: siz.w, pageH: siz.h, layflat, cover: cov.title, sel,
+      })));
+      // a cut-out cover takes the editor's round-window design in its teal board
+      if (cov.id === 'cutout' && bcFromBook(BC_BOOK).cover !== 'cutout') {
+        sessionStorage.setItem('pb_cover_design', 'round');
+        sessionStorage.setItem('pb_colors', JSON.stringify(Object.assign(bcRead('pb_colors', {}), { 0: '#0E6F66' })));
+      }
+      sessionStorage.setItem('pb_book_dirty', '1');     // the editor reloads on return to pick the new book up
+    } catch (e) {}
+    window.navigation.pop();
+  };
 
   // Slides are 78% of the scroller with an 11% spacer either side, so slide k is centred at
   // scrollLeft = k × slide width. Moving to another slide takes that suggestion's choices.
@@ -285,7 +410,7 @@ function BookChooseScreen() {
     try {
       sessionStorage.setItem('pb_book', JSON.stringify({
         title: `${siz.title} ${fmt.title} photo book`, pages: 24, total: price.toFixed(2),
-        pageW: siz.w, pageH: siz.h, layflat: cov.layflat, cover: cov.title,
+        pageW: siz.w, pageH: siz.h, layflat: false, cover: cov.title, sel,
       }));
       // pb_photos is the flat upload; pb_groups tells the editor's auto-fill how to lay it out,
       // one chapter at a time, and which photo goes on the cover
@@ -295,8 +420,10 @@ function BookChooseScreen() {
       sessionStorage.setItem('pb_cover_title', BC_TRIP.title);
       sessionStorage.setItem('pb_fit', 'contain');
       // the chosen suggestion's cover style: the editor's matching design, and the board colour for the bold ones
-      sessionStorage.setItem('pb_cover_design', preset.editor.design);
-      sessionStorage.setItem('pb_colors', JSON.stringify(preset.editor.paper ? { 0: preset.editor.paper } : {}));
+      // a cut-out cover starts on the editor's round-window design, in its teal board
+      const ed = cov.id === 'cutout' ? { design: 'round', paper: '#0E6F66' } : preset.editor;
+      sessionStorage.setItem('pb_cover_design', ed.design);
+      sessionStorage.setItem('pb_colors', JSON.stringify(ed.paper ? { 0: ed.paper } : {}));
     } catch (e) {}
     window.navigation.push('editor.html');
   };
@@ -323,22 +450,28 @@ function BookChooseScreen() {
       `}</style>
 
       {/* header — the shared glass back button, title centred on it */}
-      <div style={{ position: 'relative', flexShrink: 0, paddingTop: PB_BACK_TOP, height: 44, boxSizing: 'content-box',
-        display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div ref={head} style={{ position: 'relative', flexShrink: 0, paddingTop: PB_BACK_TOP, height: 44, boxSizing: 'content-box',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        // while an option sheet is up only the book is shown: the header fades out and gives its room to the book
+        opacity: open ? 0 : 1, pointerEvents: open ? 'none' : 'auto', marginBottom: open && head.current ? -head.current.offsetHeight : 0,
+        transition: 'opacity .2s ease' }}>
         <PbBackButton style={{ top: PB_BACK_TOP }} />
-        <span style={{ fontFamily: BC_DISPLAY, fontWeight: 700, fontSize: 17, letterSpacing: '-0.2px' }}>Choose your photo book</span>
+        <span style={{ fontFamily: BC_DISPLAY, fontWeight: 700, fontSize: 17, letterSpacing: '-0.2px' }}>{BC_OPTIONS ? 'Photo book options' : 'Choose your photo book'}</span>
       </div>
 
       {/* the middle of the page: a carousel of suggestions — swipe for another cover style */}
-      <div ref={area} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 0 8px' }}>
-       <div ref={inner} style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, transform: `scale(${fit})`, transformOrigin: 'center' }}>
-        <div ref={scroller} onScroll={onScroll} style={{ display: 'flex', width: '100%', overflowX: 'auto', overflowY: 'hidden',
+      <div ref={area} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        boxSizing: 'border-box', padding: `0 0 ${8 + lift}px` }}>
+       <div ref={inner} style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, transform: `scale(${fit})`, transformOrigin: 'center', transition: `transform .28s ${BC_EASE}` }}>
+        <div ref={scroller} onScroll={onScroll} style={{ display: 'flex', width: '100%', overflowX: 'auto', overflowY: 'hidden', pointerEvents: open ? 'none' : 'auto',
           scrollSnapType: 'x mandatory', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
           <div aria-hidden style={{ flex: '0 0 11%' }} />
-          {BC_PRESETS.map((p, i) => <BcSlide key={p.id} preset={p} sel={i === idx ? sel : p.sel} active={i === idx} />)}
+          {BC_OPTIONS
+            ? <BcSlide preset={mine} sel={sel} active ghost={open === 'size'} compact={!!open} plain layflat={layflat} extra={extra} pages={pages} />
+            : BC_PRESETS.map((p, i) => <BcSlide key={p.id} preset={p} sel={i === idx ? sel : p.sel} active={i === idx} ghost={open === 'size'} compact={!!open} />)}
           <div aria-hidden style={{ flex: '0 0 11%' }} />
         </div>
-        <div role="tablist" aria-label="Suggestions" style={{ display: 'flex', gap: 8 }}>
+        <div role="tablist" aria-label="Suggestions" style={{ display: open || BC_OPTIONS ? 'none' : 'flex', gap: 8 }}>
           {BC_PRESETS.map((p, i) => (
             <button key={p.id} role="tab" aria-selected={i === idx} aria-label={`Suggestion ${i + 1} of ${BC_PRESETS.length}`} onClick={() => goTo(i)}
               style={{ width: i === idx ? 22 : 8, height: 8, padding: 0, border: 'none', borderRadius: 4, cursor: 'pointer',
@@ -349,16 +482,17 @@ function BookChooseScreen() {
       </div>
 
       {/* choices + CTA: a floating card with margins, as home's cards */}
-      <div style={{ flexShrink: 0, padding: '0 16px calc(env(safe-area-inset-bottom, 0px) + 20px)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div ref={bottom} style={{ flexShrink: 0, padding: '0 16px calc(env(safe-area-inset-bottom, 0px) + 20px)', display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ background: '#fff', borderRadius: 24, boxShadow: 'inset 0 0 0 1px #fff, 0 4px 16px -1px rgba(0,77,74,.12)', overflow: 'hidden' }}>
-          <BcRow icon="bc-icon-photobook.svg" label="Cover type" value={cov.title.replace(' · ', ' + ')} onTap={() => setOpen('cover')} />
+          <BcRow icon="bc-icon-photobook.svg" label="Cover type" value={cov.title} onTap={() => setOpen('cover')} />
           <BcRow icon="bc-icon-crop.svg" label="Format" value={fmt.title} onTap={() => setOpen('format')} />
           <BcRow icon="bc-icon-size.svg" label="Size" value={`${siz.title} (${siz.w}x${siz.h} cm)`} onTap={() => setOpen('size')} last />
+          {BC_OPTIONS && <BcToggleRow on={layflat} onToggle={() => setLayflat(v => !v)} />}
         </div>
-        <button onClick={create} {...press(0.97)} style={pbButton('primary')}>Create</button>
+        <button onClick={BC_OPTIONS ? save : create} {...press(0.97)} style={pbButton('primary')}>{BC_OPTIONS ? 'Save changes' : 'Create'}</button>
       </div>
 
-      {open && <BcSheet key={open} {...sheets[open]} onPick={v => pick(open, v)} onClose={() => setOpen(null)} />}
+      {open && <BcSheet key={open} {...sheets[open]} onPick={v => pick(open, v)} onHeight={setSheetH} onClose={() => { setOpen(null); setSheetH(0); }} />}
     </div>
   );
 }

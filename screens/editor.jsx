@@ -1471,7 +1471,7 @@ function LayoutWell({ layout, photos, iconSize = 24, style, onSelect, selected, 
 function Caption({ left, right }) {
   const s = {
     fontFamily: TEXT, fontSize: 12, lineHeight: '20px',
-    color: '#FFFFFF', opacity: 0.35,
+    color: 'var(--ed-text)', opacity: 0.35,
   };
   return (
     <div aria-hidden style={{
@@ -1495,7 +1495,7 @@ function AddSpreadButton({ onClick }) {
       style={{
         position: 'absolute', left: 'calc(50% - 28px)', bottom: -31,
         width: 56, height: 38, borderRadius: 24, border: 'none', padding: 0,
-        background: 'var(--colour-foreground-fg-black, #333333)',
+        background: 'var(--ed-pill)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         cursor: 'pointer', transition: 'transform 140ms ease',
         WebkitTapHighlightColor: 'transparent',
@@ -1601,33 +1601,33 @@ function SpreadBlock({ aspect, left, right, showPlus, onAdd, photos, onOpen,
 // ── Details card — node 451:15649. Title and price come from the selection made
 // on the product page; the node's own copy is the fallback.
 // The settings icon is inert in this build — no options sheet exists in the Figma.
-function DetailsCard({ title, pages, total }) {
+function DetailsCard({ title, pages, total, onSettings }) {
   return (
     <div style={{
       margin: '0 16px', boxSizing: 'border-box',
-      background: '#272727', border: '1px solid #363636', borderRadius: 12,
+      background: 'var(--ed-card)', border: '1px solid var(--ed-card-line)', borderRadius: 12,
       padding: '12px 16px 12px 12px',
       display: 'flex', alignItems: 'center', gap: 4,
     }}>
       <div style={{ flex: '1 1 0', minWidth: 0, display: 'flex', flexDirection: 'column' }}>
         <p style={{
           margin: 0, fontFamily: TEXT, fontWeight: 600, fontSize: 13, lineHeight: '18px',
-          letterSpacing: '-0.08px', color: '#FFFFFF',
+          letterSpacing: '-0.08px', color: 'var(--ed-text)',
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
         }}>{title}</p>
         <p style={{
           margin: 0, fontFamily: TEXT, fontSize: 12, lineHeight: '16px',
-          color: 'var(--colour-foreground-fg-grey, #CCCCCC)',
+          color: 'var(--ed-text-2)',
         }}>{pages} pages • €{total}</p>
       </div>
-      <button type="button" aria-label="Book settings" {...press(0.9)}
+      <button type="button" aria-label="Book settings" onClick={onSettings} {...press(0.9)}
         style={{
           flex: '0 0 auto', width: 24, height: 24, border: 'none', padding: 0,
           background: 'transparent', cursor: 'pointer',
           transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
         }}>
         <img src={`${A}/pb-editor-options.svg`} alt="" width={24} height={24}
-             style={{ display: 'block' }} />
+             style={{ display: 'block', filter: 'var(--ed-ico)' }} />
       </button>
     </div>
   );
@@ -1650,16 +1650,20 @@ function DetailsCard({ title, pages, total }) {
 //     nothing, which rendered the button at (42,139,142) — ~3x too bright.
 // rgba(0,66,68,0.5) over the header's (24,24,24) lands on (12,45,46), the mean of
 // the node's interior. Still 50% translucent, so it keeps reacting to its backdrop.
+// White glyphs on the editor's neutral surfaces darken in light mode (--ed-ico); the ones that sit on the teal
+// accent (confirm ✓, Continue →) stay white in both.
+const edIco = file => (/check|next/.test(file) ? undefined : /redo/.test(file) ? 'var(--ed-ico-dim)' : 'var(--ed-ico)');
+
 const CONTINUE_ACCENT = (
   <div aria-hidden style={{
     position: 'absolute', inset: 0, borderRadius: 'inherit',
-    background: 'rgba(0,66,68,0.5)', pointerEvents: 'none',
+    background: 'var(--ed-accent)', pointerEvents: 'none',
   }} />
 );
 
 function Header({ onClose }) {
   const icon = file => (
-    <img src={`${A}/${file}`} alt="" width={24} height={24} style={{ display: 'block' }} />
+    <img src={`${A}/${file}`} alt="" width={24} height={24} style={{ display: 'block', filter: edIco(file) }} />
   );
   return (
     <div style={{
@@ -1682,8 +1686,8 @@ function Header({ onClose }) {
           this reads the same; the difference only shows when a white spread scrolls
           under it, which is exactly when the blur should be visible. */}
       <IOSProgressiveBlur scrim={
-        'linear-gradient(to bottom, rgba(20,20,20,0.55) 0.3%,' +
-        ' rgba(16,16,16,0.22) 60%, rgba(12,12,12,0) 96%)'
+        'var(--ed-head)'
+        
       } />
       <div style={{
         position: 'absolute', left: 0, right: 0,
@@ -1692,7 +1696,7 @@ function Header({ onClose }) {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         pointerEvents: 'auto',
       }}>
-        <GlassIconButton label="Close editor" tint="rgba(0,0,0,0.25)" gloss onClick={onClose}>
+        <GlassIconButton label="Close editor" tint="var(--ed-glass)" gloss onClick={onClose}>
           {icon('pb-editor-close.svg')}
         </GlassIconButton>
 
@@ -1700,7 +1704,7 @@ function Header({ onClose }) {
             Inert here — nothing has been edited yet, which is also why the node's
             own redo glyph ships in its #333 disabled state. Split it into two
             buttons once there is an edit history to walk. */}
-        <GlassIconButton label="Undo and redo" width={88} tint="rgba(0,0,0,0.25)" gloss>
+        <GlassIconButton label="Undo and redo" width={88} tint="var(--ed-glass)" gloss>
           <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {icon('pb-editor-undo.svg')}
             {icon('pb-editor-redo.svg')}
@@ -1852,17 +1856,17 @@ function Tool({ label, icon, glyph, children, onClick }) {
       display: 'flex', flexDirection: 'column', alignItems: 'center',
       justifyContent: 'center', gap: 4,
       transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
-      filter: 'drop-shadow(0px 4px 2px rgba(0,0,0,0.25))',
+      filter: 'var(--ed-tool-shadow)',
     }}>
       {children || (glyph ? (
-        <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>{glyph}</svg>
+        <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block', color: 'var(--ed-text)' }}>{glyph}</svg>
       ) : (
-        <img src={`${A}/${icon}`} alt="" width={24} height={24} style={{ display: 'block' }} />
+        <img src={`${A}/${icon}`} alt="" width={24} height={24} style={{ display: 'block', filter: 'var(--ed-ico)' }} />
       ))}
       <span style={{
         fontFamily: '-apple-system, "SF Pro", system-ui, sans-serif', fontWeight: 510,
         fontSize: 12, lineHeight: '20px', whiteSpace: 'nowrap',
-        color: 'var(--colour-foreground-fg-grey, #CCCCCC)',
+        color: 'var(--ed-text-2)',
       }}>{label}</span>
     </button>
   );
@@ -1901,7 +1905,7 @@ function AiFab({ onClick, alert }) {
         mixBlendMode: 'plus-lighter', display: 'block', pointerEvents: 'none' }} />
       {alert && (
         <span aria-hidden style={{ position: 'absolute', top: -2, right: -2, width: 14, height: 14, borderRadius: 7, background: '#FFB020',
-          boxShadow: '0 0 0 2px #1B1B1B', animation: 'pbPulse 1.8s ease-in-out infinite' }} />
+          boxShadow: '0 0 0 2px var(--ed-bg)', animation: 'pbPulse 1.8s ease-in-out infinite' }} />
       )}
     </button>
   );
@@ -1929,8 +1933,8 @@ function Toolbar({ photos, tools = TOOLS, gap = 10, padX = 8, onTool }) {
       <div aria-hidden style={{
         position: 'absolute', inset: 0,
         backgroundImage:
-          'linear-gradient(to bottom, rgba(27,27,27,0) 0.2%, rgb(19,19,19) 73.5%),' +
-          ' linear-gradient(to bottom, rgba(27,27,27,0) 0.2%, rgb(27,27,27) 73.5%)',
+          'var(--ed-toolbar)'
+          ,
       }} />
       <div style={{
         position: 'absolute', left: 0, right: 0,
@@ -1954,7 +1958,7 @@ function Toolbar({ photos, tools = TOOLS, gap = 10, padX = 8, onTool }) {
           t.divider ? (
             <span key={`divider-${i}`} aria-hidden style={{
               flex: '0 0 auto', alignSelf: 'stretch', width: 1,
-              background: 'rgba(217,217,217,0.1)',
+              background: 'var(--ed-divider)',
             }} />
           ) : (
             <Tool key={t.id} {...t} onClick={onTool && (() => onTool(t.id))}>
@@ -1999,8 +2003,8 @@ function LowQNudge({ lq }) {
   const chip = (label, onClick, primary) => (
     <button type="button" onClick={onClick} {...press(0.97)} style={{
       flex: 1, height: 40, borderRadius: 20, border: 'none', cursor: 'pointer', padding: '0 12px', whiteSpace: 'nowrap',
-      background: primary ? '#007F70' : 'rgba(255,255,255,0.1)', color: '#fff',
-      boxShadow: primary ? 'inset 0 0 0 1px #00A389' : 'inset 0 0 0 1px rgba(255,255,255,0.14)',
+      background: primary ? '#007F70' : 'var(--ed-fill)', color: primary ? '#fff' : 'var(--ed-text)',
+      boxShadow: primary ? 'inset 0 0 0 1px #00A389' : 'inset 0 0 0 1px var(--ed-rim-2)',
       fontFamily: TEXT, fontSize: 14, fontWeight: 600, letterSpacing: '-0.2px', transition: 'transform 140ms ease',
       WebkitTapHighlightColor: 'transparent' }}>{label}</button>
   );
@@ -2009,33 +2013,33 @@ function LowQNudge({ lq }) {
       position: 'absolute', right: 16, width: 'min(320px, calc(100% - 32px))', boxSizing: 'border-box', zIndex: 3,
       bottom: 'calc(max(37px, calc(env(safe-area-inset-bottom, 0px) + 8px)) + 4px + 48px + 14px)',
       padding: 14, borderRadius: 22, pointerEvents: 'auto',
-      background: 'rgba(34,34,34,0.96)', backdropFilter: 'blur(20px) saturate(140%)', WebkitBackdropFilter: 'blur(20px) saturate(140%)',
-      boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.09), 0 16px 40px rgba(0,0,0,0.55)',
+      background: 'var(--ed-bubble)', backdropFilter: 'blur(20px) saturate(140%)', WebkitBackdropFilter: 'blur(20px) saturate(140%)',
+      boxShadow: 'inset 0 0 0 1px var(--ed-rim-2), var(--ed-pop-shadow)',
       display: 'flex', flexDirection: 'column', gap: 12, animation: 'pbBubbleIn 320ms cubic-bezier(.2,.9,.3,1.2) both', transformOrigin: 'bottom right',
     }}>
-      <span aria-hidden style={{ position: 'absolute', right: 24, bottom: -6, width: 14, height: 14, background: 'rgba(34,34,34,0.96)',
+      <span aria-hidden style={{ position: 'absolute', right: 24, bottom: -6, width: 14, height: 14, background: 'var(--ed-bubble)',
         transform: 'rotate(45deg)', borderRadius: 3, boxShadow: '2px 2px 0 rgba(255,255,255,0.05)' }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <span aria-hidden style={{ width: 24, height: 24, borderRadius: 12, background: '#007F70', display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: '0 0 10px rgba(0,163,137,0.55)' }}>
           <img src={`${A}/pb-editor-fab-star.svg`} alt="" width={14} height={13} style={{ display: 'block' }} />
         </span>
-        <span style={{ flex: 1, fontFamily: TEXT, fontSize: 13, fontWeight: 700, letterSpacing: '.02em', color: '#9BE3DC' }}>AI help</span>
+        <span style={{ flex: 1, fontFamily: TEXT, fontSize: 13, fontWeight: 700, letterSpacing: '.02em', color: 'var(--ed-teal-text)' }}>AI help</span>
         {!done && stage !== 'upscaling' && (
           <button type="button" aria-label="Close" onClick={lq.onClose} {...press(0.9)} style={{ width: 28, height: 28, borderRadius: 14, border: 'none', cursor: 'pointer', padding: 0,
-            background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 140ms ease' }}>
-            <img src={`${A}/pb-editor-close.svg`} alt="" width={16} height={16} style={{ display: 'block' }} />
+            background: 'var(--ed-fill)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 140ms ease' }}>
+            <img src={`${A}/pb-editor-close.svg`} alt="" width={16} height={16} style={{ display: 'block', filter: 'var(--ed-ico)' }} />
           </button>
         )}
       </div>
 
-      <p style={{ margin: 0, fontFamily: TEXT, fontSize: 15, lineHeight: '21px', letterSpacing: '-0.24px', color: '#fff' }}>{body}</p>
+      <p style={{ margin: 0, fontFamily: TEXT, fontSize: 15, lineHeight: '21px', letterSpacing: '-0.24px', color: 'var(--ed-text)' }}>{body}</p>
 
       {(stage === 'open' || stage === 'upscaling' || stage === 'fixed') && (
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <button type="button" aria-label={lq.canShow ? 'Show this photo on its page' : 'The photo'} onClick={lq.canShow ? lq.onShow : undefined}
             {...press(0.97)} style={{ position: 'relative', flex: 'none', width: 72, height: 72, padding: 0, border: 'none', borderRadius: 12, overflow: 'hidden',
-              cursor: lq.canShow ? 'pointer' : 'default', background: '#111', transition: 'transform 140ms ease' }}>
+              cursor: lq.canShow ? 'pointer' : 'default', background: 'var(--ed-thumb-bg)', transition: 'transform 140ms ease' }}>
             <img src={src} alt="" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block',
               filter: sharp ? 'none' : 'blur(1.1px) contrast(.95)', transition: 'filter 1.6s ease' }} />
             {!sharp && <span style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(0,0,0,.12) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,.12) 1px, transparent 1px)',
@@ -2044,11 +2048,11 @@ function LowQNudge({ lq }) {
               background: ok ? '#00A389' : '#FFB020', color: ok ? '#fff' : '#2A1A00', fontFamily: TEXT, fontWeight: 800, fontSize: 13, transition: 'background .3s ease' }}>{ok ? '✓' : '!'}</span>
           </button>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
-            <span style={{ fontFamily: TEXT, fontSize: 15, fontWeight: 600, letterSpacing: '-0.24px', color: '#fff' }}>Page {n}</span>
-            <span style={{ fontFamily: TEXT, fontSize: 13, lineHeight: '17px', color: ok ? '#9BE3DC' : '#FFC964', transition: 'color .3s ease' }}>
+            <span style={{ fontFamily: TEXT, fontSize: 15, fontWeight: 600, letterSpacing: '-0.24px', color: 'var(--ed-text)' }}>Page {n}</span>
+            <span style={{ fontFamily: TEXT, fontSize: 13, lineHeight: '17px', color: ok ? 'var(--ed-teal-text)' : 'var(--ed-warn-text)', transition: 'color .3s ease' }}>
               {ok ? '2560 × 1707 px · print-ready' : stage === 'upscaling' ? 'Upscaling to 2560 × 1707 px…' : '640 × 427 px · too small to print'}</span>
             {stage === 'upscaling' && (
-              <span aria-hidden style={{ marginTop: 4, height: 4, width: 120, borderRadius: 2, background: 'rgba(255,255,255,0.14)', overflow: 'hidden' }}>
+              <span aria-hidden style={{ marginTop: 4, height: 4, width: 120, borderRadius: 2, background: 'var(--ed-fill-2)', overflow: 'hidden' }}>
                 <span style={{ display: 'block', height: '100%', background: '#00C2A8', transformOrigin: 'left', animation: 'pbBar 1.8s ease-in-out both' }} />
               </span>
             )}
@@ -2060,7 +2064,7 @@ function LowQNudge({ lq }) {
         <div style={{ display: 'flex', gap: 8 }}>
           {alts.map(a => (
             <button key={a} type="button" aria-label="Use this photo" onClick={() => lq.onPick(a)} {...press(0.95)} style={{ flex: 1, minWidth: 0, aspectRatio: '1', padding: 0, border: 'none',
-              borderRadius: 10, overflow: 'hidden', cursor: 'pointer', background: '#111', transition: 'transform 140ms ease' }}>
+              borderRadius: 10, overflow: 'hidden', cursor: 'pointer', background: 'var(--ed-thumb-bg)', transition: 'transform 140ms ease' }}>
               <img src={a} alt="" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
             </button>
           ))}
@@ -2091,7 +2095,7 @@ function LowQNudge({ lq }) {
 // ⚠️ Flattened to solid on request. The node's centre stop was translucent, so the
 // blurred editor showed through the top of the sheet and its edge washed out. The
 // node's gradient was: radial-gradient(98.45% 30.66% at 50.13% 0%, rgba(0,0,0,0.2) 0%, #111111 100%)
-const SHEET_FILL = '#111111';
+const SHEET_FILL = 'var(--ed-sheet)';
 
 // Node 451:16017/16018 and 451:15885/15886. The two sheets style their buttons
 // slightly differently — the upload sheet's carry a rim and an inset shadow, the
@@ -2111,7 +2115,7 @@ function SheetButton({ label, onClick, style }) {
 // A 1px 5% white rim on every bottom sheet. The sheets are near-black on a near-black
 // page, so without it the top edge disappears. An inset shadow rather than a border, so
 // the sheet's size does not change. Raise the alpha here if it needs to read stronger.
-const SHEET_RIM = 'inset 0 0 0 1px rgba(255,255,255,0.05)';
+const SHEET_RIM = 'inset 0 0 0 1px var(--ed-rim)';
 
 function ActionSheet({ closing, minHeight, onDismiss, labelledBy, children }) {
   return (
@@ -2120,7 +2124,7 @@ function ActionSheet({ closing, minHeight, onDismiss, labelledBy, children }) {
       onClick={onDismiss}
       style={{
         position: 'absolute', inset: 0, zIndex: 20,
-        background: 'rgba(0,0,0,0.6)',
+        background: 'var(--ed-shade)',
         backdropFilter: 'blur(5px)', WebkitBackdropFilter: 'blur(5px)',
         animation: closing ? 'pbScrimOut 300ms ease both' : 'pbScrimIn 300ms ease both',
       }}
@@ -2133,7 +2137,7 @@ function ActionSheet({ closing, minHeight, onDismiss, labelledBy, children }) {
           minHeight, boxSizing: 'border-box',
           borderRadius: '24px 24px 0 0', boxShadow: SHEET_RIM,
           background: SHEET_FILL,
-          filter: 'drop-shadow(0px -12px 9.3px rgba(0,0,0,0.65))',
+          filter: 'drop-shadow(0px -12px 9.3px var(--ed-sheet-shadow))',
           display: 'flex', flexDirection: 'column',
           animation: closing
             ? 'pbSheetOut 320ms cubic-bezier(0.4,0,0.2,1) both'
@@ -2147,13 +2151,13 @@ function ActionSheet({ closing, minHeight, onDismiss, labelledBy, children }) {
 }
 
 const SHEET_TITLE = {
-  margin: 0, width: '100%', textAlign: 'center', color: '#FFFFFF',
+  margin: 0, width: '100%', textAlign: 'center', color: 'var(--ed-text)',
   fontFamily: DISPLAY, fontWeight: 700, fontSize: 22, lineHeight: '28px',
   letterSpacing: '0.35px',
 };
 const SHEET_BODY = {
   margin: 0, width: '100%', textAlign: 'center',
-  color: 'var(--colour-foreground-fg-grey, #CCCCCC)',
+  color: 'var(--ed-text-2)',
   fontFamily: TEXT, fontSize: 16, lineHeight: '21px', letterSpacing: '-0.32px',
 };
 
@@ -2168,7 +2172,7 @@ function UploadSheet({ closing, onSelect, onSkip }) {
         alignItems: 'center', padding: '43px 20px 0',
       }}>
         <img src={`${A}/pb-editor-upload.svg`} alt="" width={24} height={24}
-             style={{ display: 'block' }} />
+             style={{ display: 'block', filter: 'var(--ed-ico)' }} />
         <p id="pb-sheet-title" style={SHEET_TITLE}>Upload your photos</p>
         <p style={SHEET_BODY}>
           Upload at least 24 photos. We’ll offer to place them across your book for you.
@@ -2183,50 +2187,73 @@ function UploadSheet({ closing, onSelect, onSkip }) {
         paddingBottom: 'max(24px, calc(env(safe-area-inset-bottom, 0px) + 8px))',
       }}>
         <SheetButton label="Select photos" onClick={onSelect}
-          style={{ background: '#F0F0F0', border: '1px solid #FFFFFF',
-                   color: 'var(--colour-foreground-fg-black, #333333)' }} />
+          style={{ background: 'var(--ed-btn-bg)', border: '1px solid var(--ed-btn-rim)',
+                   color: 'var(--ed-btn-text)' }} />
         <SheetButton label="Start from empty book" onClick={onSkip}
-          style={{ background: 'var(--colour-foreground-fg-black, #333333)',
-                   border: '1px solid #464646', color: '#FFFFFF',
+          style={{ background: 'var(--ed-btn2-bg)',
+                   border: '1px solid var(--ed-btn2-rim)', color: 'var(--ed-text)',
                    boxShadow: 'inset 0px 0px 27px rgba(0,0,0,0.25)' }} />
       </div>
     </ActionSheet>
   );
 }
 
-// ── Auto-fill prompt — node 451:15751. Shown on returning from the picker with a
-// selection. The node's copy reads "n photos"; n is the real count.
-function AutofillSheet({ closing, count, onYes, onNo }) {
+// ── Auto-fill prompt. Shown on returning from the picker (or from the Trip to Italy flow) with a selection.
+// Not an overlay any more: a white sheet in the pattern of the summary page's option sheets, with the
+// book left visible and live above it. "Auto-fill" is chosen — and already applied — when it opens; tapping
+// "Start from scratch" empties the book again, so the two can be compared before continuing.
+function FillSheet({ closing, count, chapters, choice, onChoice, onContinue, onHeight }) {
+  const panel = React.useRef(null);
+  React.useLayoutEffect(() => {
+    const el = panel.current;
+    if (!el) return undefined;
+    const report = () => onHeight(el.offsetHeight);
+    report();
+    const ro = new ResizeObserver(report);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const opts = [
+    { id: 'fill', name: 'Auto-fill my photos', tag: 'Recommended',
+      line: chapters
+        ? `All ${count} photos, grouped into ${chapters} chapters with titles`
+        : `All ${count} photo${count === 1 ? '' : 's'}, one per page in chronological order` },
+    { id: 'scratch', name: 'Start from scratch', line: 'An empty book — you place every photo yourself' },
+  ];
   return (
-    <ActionSheet closing={closing} minHeight={332} onDismiss={onNo}
-                 labelledBy="pb-autofill-title">
-      {/* node 451:15880 — bottom-anchored, py 32, gap 35 between copy and buttons */}
-      <div style={{
-        marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 35,
-        paddingTop: 32,
-        paddingBottom: 'max(32px, calc(env(safe-area-inset-bottom, 0px) + 12px))',
-      }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 24, padding: '0 20px' }}>
-          <p id="pb-autofill-title" style={SHEET_TITLE}>Auto-fill your book?</p>
-          <p style={SHEET_BODY}>
-            You uploaded{' '}
-            <span style={{ fontWeight: 600, color: '#FFFFFF' }}>
-              {count} photo{count === 1 ? '' : 's'}
-            </span>
-            . Want to place them all in chronological order? You can always change the
-            order later.
-          </p>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '0 18px' }}>
-          <SheetButton label="Yes, auto-fill" onClick={onYes}
-            style={{ background: 'var(--colour-foreground-fg-white, #FFFFFF)',
-                     color: 'var(--colour-foreground-fg-black, #333333)' }} />
-          <SheetButton label="No, I’ll place them myself" onClick={onNo}
-            style={{ background: 'var(--colour-foreground-fg-black, #333333)',
-                     color: '#FFFFFF' }} />
-        </div>
+    <div ref={panel} role="dialog" aria-labelledby="pb-fill-title" style={{
+      position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 20, background: '#fff', borderRadius: '24px 24px 0 0',
+      padding: '20px 20px calc(20px + env(safe-area-inset-bottom, 0px))', boxShadow: '0 -8px 30px -8px rgba(0,0,0,.45)',
+      animation: closing ? 'pbSheetOut 320ms cubic-bezier(0.4,0,0.2,1) both' : 'pbSheetIn 380ms cubic-bezier(0.34,1.05,0.64,1) both' }}>
+      <div style={{ width: 36, height: 5, borderRadius: 3, background: '#D5E0E0', margin: '-8px auto 14px' }} />
+      <div id="pb-fill-title" style={{ fontFamily: PB_DISPLAY, fontSize: 20, fontWeight: 700, color: PB_INK, marginBottom: 4 }}>Fill your book</div>
+      <div style={{ fontFamily: PB_DISPLAY, fontSize: 14, color: '#5E7575', marginBottom: 16 }}>Preview your book above, then choose how to start.</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {opts.map(o => {
+          const on = o.id === choice;
+          return (
+            <div key={o.id} role="button" onClick={() => onChoice(o.id)} {...press(0.98)} style={{
+              display: 'flex', alignItems: 'center', gap: 12, padding: 14, borderRadius: 16, cursor: 'pointer',
+              border: `2px solid ${on ? PB_GREEN : '#DCE8E8'}`, background: on ? '#F2F8F8' : '#fff',
+              transition: 'transform 140ms ease, border-color 200ms, background 200ms', WebkitTapHighlightColor: 'transparent' }}>
+              <div style={{ width: 22, height: 22, borderRadius: 11, boxSizing: 'border-box', border: `2px solid ${on ? PB_GREEN : '#B9C9C9'}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                {on && <div style={{ width: 11, height: 11, borderRadius: 6, background: PB_GREEN }} />}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontFamily: PB_DISPLAY, fontSize: 16, fontWeight: 700, color: PB_INK }}>{o.name}</span>
+                  {o.tag && <span style={{ fontFamily: PB_DISPLAY, fontSize: 12, fontWeight: 700, padding: '3px 8px', borderRadius: 10,
+                    background: '#F6EBC8', color: '#7A5A12' }}>{o.tag}</span>}
+                </div>
+                <div style={{ fontFamily: PB_DISPLAY, fontSize: 13, color: '#5E7575', lineHeight: '18px', marginTop: 2 }}>{o.line}</div>
+              </div>
+            </div>
+          );
+        })}
       </div>
-    </ActionSheet>
+      <button onClick={onContinue} {...press(0.97)} style={Object.assign({}, pbButton('primary'), { width: '100%', marginTop: 18 })}>Continue</button>
+    </div>
   );
 }
 
@@ -2494,7 +2521,7 @@ function NavThumb({ photo, active, label, spine, onClick, itemRef,
       </span>
       <span aria-hidden style={{
         fontFamily: TEXT, fontWeight: 500, fontSize: 11, lineHeight: '20px',
-        textAlign: 'center', color: active ? '#FFFFFF' : '#777777',
+        textAlign: 'center', color: active ? 'var(--ed-text)' : 'var(--ed-nav-off)',
       }}>{label || ' '}</span>
     </button>
   );
@@ -2508,7 +2535,7 @@ function NavAdd({ onClick }) {
       style={{
         flex: '0 0 auto', marginTop: (NAV_ROW - NAV_ADD) / 2,
         width: NAV_ADD, height: NAV_ADD, borderRadius: 12, padding: 0,
-        background: '#272727', border: '1px solid #363636',
+        background: 'var(--ed-card)', border: '1px solid var(--ed-card-line)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         cursor: 'pointer', transition: 'transform 140ms ease',
         WebkitTapHighlightColor: 'transparent',
@@ -2652,13 +2679,13 @@ function AiSheet({ closing, onClose, photoCount, pageCount, onFitAll }) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: mine ? 'flex-end' : 'flex-start', gap: 8 }}>
         <div style={{ maxWidth: '86%', padding: '10px 14px', borderRadius: mine ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-          background: mine ? '#007F70' : '#272727', color: '#fff', fontFamily: TEXT, fontSize: 15, lineHeight: '21px', letterSpacing: '-0.24px' }}>{m.text}</div>
+          background: mine ? '#007F70' : 'var(--ed-card)', color: mine ? '#fff' : 'var(--ed-text)', fontFamily: TEXT, fontSize: 15, lineHeight: '21px', letterSpacing: '-0.24px' }}>{m.text}</div>
         {m.next && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, maxWidth: '100%' }}>
             {m.next.map(id => (
               <button key={id} type="button" onClick={() => send(label(id), id)} {...press(0.97)} style={{
-                height: 36, padding: '0 14px', borderRadius: 18, border: 'none', cursor: 'pointer', color: '#9BE3DC',
-                background: 'rgba(0,127,112,0.16)', boxShadow: 'inset 0 0 0 1px rgba(155,227,220,0.35)',
+                height: 36, padding: '0 14px', borderRadius: 18, border: 'none', cursor: 'pointer', color: 'var(--ed-teal-text)',
+                background: 'var(--ed-ai-chip)', boxShadow: 'inset 0 0 0 1px var(--ed-ai-chip-rim)',
                 fontFamily: TEXT, fontSize: 14, fontWeight: 600, letterSpacing: '-0.2px', whiteSpace: 'nowrap',
                 transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent' }}>{label(id)}</button>
             ))}
@@ -2676,16 +2703,16 @@ function AiSheet({ closing, onClose, photoCount, pageCount, onFitAll }) {
             boxShadow: '0 0 12px rgba(0,163,137,0.55)' }}>
             <img src={`${A}/pb-editor-fab-star.svg`} alt="" width={18} height={17} style={{ display: 'block' }} />
           </span>
-          <p id="pb-ai-title" style={{ margin: 0, flex: 1, fontFamily: TEXT, fontSize: 17, fontWeight: 700, color: '#fff', letterSpacing: '-0.3px' }}>AI help</p>
+          <p id="pb-ai-title" style={{ margin: 0, flex: 1, fontFamily: TEXT, fontSize: 17, fontWeight: 700, color: 'var(--ed-text)', letterSpacing: '-0.3px' }}>AI help</p>
           <button type="button" aria-label="Close" onClick={onClose} {...press(0.9)} style={{ width: 32, height: 32, borderRadius: 16, border: 'none', cursor: 'pointer',
-            background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, transition: 'transform 140ms ease' }}>
-            <img src={`${A}/pb-editor-close.svg`} alt="" width={20} height={20} style={{ display: 'block' }} />
+            background: 'var(--ed-fill)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, transition: 'transform 140ms ease' }}>
+            <img src={`${A}/pb-editor-close.svg`} alt="" width={20} height={20} style={{ display: 'block', filter: 'var(--ed-ico)' }} />
           </button>
         </div>
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', scrollbarWidth: 'none', padding: '4px 16px 12px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           {msgs.map((m, i) => <React.Fragment key={i}>{bubble(m)}</React.Fragment>)}
           {typing && (
-            <div aria-label="Assistant is typing" style={{ alignSelf: 'flex-start', padding: '14px 16px', borderRadius: '18px 18px 18px 4px', background: '#272727', display: 'flex', gap: 5 }}>
+            <div aria-label="Assistant is typing" style={{ alignSelf: 'flex-start', padding: '14px 16px', borderRadius: '18px 18px 18px 4px', background: 'var(--ed-card)', display: 'flex', gap: 5 }}>
               {[0, 1, 2].map(d => <span key={d} style={{ width: 7, height: 7, borderRadius: 4, background: '#9a9a9a', animation: `pbAiDot 1s ${d * 0.15}s infinite ease-in-out` }} />)}
             </div>
           )}
@@ -2695,7 +2722,7 @@ function AiSheet({ closing, onClose, photoCount, pageCount, onFitAll }) {
           padding: '8px 16px max(16px, calc(env(safe-area-inset-bottom, 0px) + 8px))' }}>
           <input value={draft} onChange={e => setDraft(e.target.value)} placeholder="Ask about your book…" aria-label="Message"
             style={{ flex: 1, height: 44, borderRadius: 22, border: 'none', outline: 'none', padding: '0 16px', boxSizing: 'border-box',
-              background: '#272727', color: '#fff', fontFamily: TEXT, fontSize: 16, letterSpacing: '-0.24px', boxShadow: 'inset 0 0 0 1px #363636' }} />
+              background: 'var(--ed-card)', color: 'var(--ed-text)', fontFamily: TEXT, fontSize: 16, letterSpacing: '-0.24px', boxShadow: 'inset 0 0 0 1px var(--ed-card-line)' }} />
           <button type="submit" aria-label="Send" disabled={!draft.trim() || typing} {...press(0.92)} style={{ width: 44, height: 44, borderRadius: 22, border: 'none', cursor: 'pointer',
             background: '#007F70', opacity: draft.trim() && !typing ? 1 : 0.4, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
             transition: 'transform 140ms ease, opacity 160ms ease' }}>
@@ -2725,7 +2752,7 @@ function LayflatSheet({ closing, onUpgrade, onKeep }) {
     <ActionSheet closing={closing} minHeight="70%" onDismiss={onKeep} labelledBy="pb-lf-title">
       <div style={{ display: 'flex', flexDirection: 'column', maxHeight: '88vh', overflowY: 'auto', scrollbarWidth: 'none',
         padding: '14px 20px max(20px, calc(env(safe-area-inset-bottom, 0px) + 12px))', gap: 16 }}>
-        <span aria-hidden style={{ alignSelf: 'center', width: 36, height: 5, borderRadius: 3, background: 'rgba(255,255,255,0.22)', flex: 'none' }} />
+        <span aria-hidden style={{ alignSelf: 'center', width: 36, height: 5, borderRadius: 3, background: 'var(--ed-grab)', flex: 'none' }} />
         {/* the art: the product page's lay-flat card image, same mirroring and crop */}
         <div style={{ position: 'relative', flex: 'none', height: 168, borderRadius: 20, background: '#F4F4F4', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%) scaleX(-1)', width: 356, height: 183, overflow: 'hidden' }}>
@@ -2734,15 +2761,15 @@ function LayflatSheet({ closing, onUpgrade, onKeep }) {
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 'none' }}>
-          <p id="pb-lf-title" style={{ margin: 0, fontFamily: DISPLAY, fontWeight: 700, fontSize: 24, lineHeight: '30px', letterSpacing: '0.2px', color: '#fff' }}>Upgrade to lay-flat</p>
-          <p style={{ margin: 0, fontFamily: TEXT, fontSize: 15, lineHeight: '20px', letterSpacing: '-0.24px', color: '#CCCCCC' }}>
+          <p id="pb-lf-title" style={{ margin: 0, fontFamily: DISPLAY, fontWeight: 700, fontSize: 24, lineHeight: '30px', letterSpacing: '0.2px', color: 'var(--ed-text)' }}>Upgrade to lay-flat</p>
+          <p style={{ margin: 0, fontFamily: TEXT, fontSize: 15, lineHeight: '20px', letterSpacing: '-0.24px', color: 'var(--ed-text-2)' }}>
             Your photo runs across both pages. Lay-flat binding keeps all of it.</p>
         </div>
         <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10, flex: 'none' }}>
           {LAYFLAT_POINTS.map(t => (
-            <li key={t} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontFamily: TEXT, fontSize: 15, lineHeight: '20px', letterSpacing: '-0.24px', color: '#fff' }}>
+            <li key={t} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontFamily: TEXT, fontSize: 15, lineHeight: '20px', letterSpacing: '-0.24px', color: 'var(--ed-text)' }}>
               <span aria-hidden style={{ flex: 'none', width: 20, height: 20, borderRadius: 10, background: 'rgba(0,163,137,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 0 }}>
-                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#5FE0CB" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M3.5 8.4l3 3 6-6.4" /></svg>
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" style={{ color: 'var(--ed-check)' }} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M3.5 8.4l3 3 6-6.4" /></svg>
               </span>{t}
             </li>
           ))}
@@ -2750,9 +2777,9 @@ function LayflatSheet({ closing, onUpgrade, onKeep }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 'none', marginTop: 4 }}>
           <button type="button" onClick={onUpgrade} {...press(0.97)} style={Object.assign({}, pbButton('primary'), { width: '100%' })}>
             Upgrade to lay-flat · +€{LAYFLAT_ADD_PRICE.toFixed(2)}</button>
-          <button type="button" onClick={onKeep} {...press(0.97)} style={{ height: 48, borderRadius: 16, border: 'none', cursor: 'pointer', background: 'rgba(255,255,255,0.1)',
-            color: '#fff', fontFamily: PB_UI, fontWeight: 700, fontSize: 16, transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent' }}>Keep standard binding</button>
-          <p style={{ margin: 0, textAlign: 'center', fontFamily: TEXT, fontSize: 12, lineHeight: '16px', color: '#9a9a9a' }}>
+          <button type="button" onClick={onKeep} {...press(0.97)} style={{ height: 48, borderRadius: 16, border: 'none', cursor: 'pointer', background: 'var(--ed-fill)',
+            color: 'var(--ed-text)', fontFamily: PB_UI, fontWeight: 700, fontSize: 16, transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent' }}>Keep standard binding</button>
+          <p style={{ margin: 0, textAlign: 'center', fontFamily: TEXT, fontSize: 12, lineHeight: '16px', color: 'var(--ed-text-3)' }}>
             With a standard binding, a little of the picture is lost in the fold.</p>
         </div>
       </div>
@@ -2766,12 +2793,12 @@ function StickerSheet({ closing, onClose, onPick }) {
   return (
     <ActionSheet closing={closing} minHeight="64%" onDismiss={onClose} labelledBy="pb-stk-title">
       <div style={{ display: 'flex', flexDirection: 'column', height: '64vh', minHeight: 420, maxHeight: '100%' }}>
-        <span aria-hidden style={{ alignSelf: 'center', width: 36, height: 5, borderRadius: 3, background: 'rgba(255,255,255,0.22)', margin: '8px 0 0' }} />
+        <span aria-hidden style={{ alignSelf: 'center', width: 36, height: 5, borderRadius: 3, background: 'var(--ed-grab)', margin: '8px 0 0' }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px 12px' }}>
-          <p id="pb-stk-title" style={{ margin: 0, flex: 1, fontFamily: TEXT, fontSize: 20, fontWeight: 700, color: '#fff', letterSpacing: '-0.3px' }}>Stickers</p>
+          <p id="pb-stk-title" style={{ margin: 0, flex: 1, fontFamily: TEXT, fontSize: 20, fontWeight: 700, color: 'var(--ed-text)', letterSpacing: '-0.3px' }}>Stickers</p>
           <button type="button" aria-label="Close" onClick={onClose} {...press(0.9)} style={{ width: 32, height: 32, borderRadius: 16, border: 'none', cursor: 'pointer',
-            background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, transition: 'transform 140ms ease' }}>
-            <img src={`${A}/pb-editor-close.svg`} alt="" width={20} height={20} style={{ display: 'block' }} />
+            background: 'var(--ed-fill)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, transition: 'transform 140ms ease' }}>
+            <img src={`${A}/pb-editor-close.svg`} alt="" width={20} height={20} style={{ display: 'block', filter: 'var(--ed-ico)' }} />
           </button>
         </div>
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch',
@@ -2779,8 +2806,8 @@ function StickerSheet({ closing, onClose, onPick }) {
           display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, alignContent: 'start' }}>
           {STICKERS.map(([id, name]) => (
             <button key={id} type="button" aria-label={name} onClick={() => onPick(id)} {...press(0.94)} style={{
-              aspectRatio: '1', padding: 0, border: 'none', borderRadius: 20, cursor: 'pointer', background: '#272727',
-              boxShadow: 'inset 0 0 0 1px #363636', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              aspectRatio: '1', padding: 0, border: 'none', borderRadius: 20, cursor: 'pointer', background: 'var(--ed-tile)',
+              boxShadow: 'inset 0 0 0 1px var(--ed-card-line)', display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent' }}>
               <img src={stickerSrc(id)} alt="" draggable={false} loading="lazy" style={{ maxWidth: '78%', maxHeight: '78%', objectFit: 'contain', display: 'block' }} />
             </button>
@@ -2798,8 +2825,8 @@ function TextPanel({ kind, onKind, text, ov, ideas, onChange, onClose }) {
   const shell = {
     position: 'absolute', left: 16, right: 16, zIndex: 8, bottom: 'calc(139px + env(safe-area-inset-bottom, 0px) + 6px)',
     padding: 8, borderRadius: 22, boxSizing: 'border-box',
-    background: 'rgba(32,32,32,0.94)', backdropFilter: 'blur(20px) saturate(140%)', WebkitBackdropFilter: 'blur(20px) saturate(140%)',
-    boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.08), 0 12px 30px rgba(0,0,0,0.5)',
+    background: 'var(--ed-panel)', backdropFilter: 'blur(20px) saturate(140%)', WebkitBackdropFilter: 'blur(20px) saturate(140%)',
+    boxShadow: 'inset 0 0 0 1px var(--ed-rim-2), var(--ed-pop-shadow)',
     display: 'flex', flexDirection: 'column', gap: 8, animation: 'pbFadeIn 160ms ease both',
   };
   const row = { display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', padding: '2px 2px' };
@@ -2808,7 +2835,7 @@ function TextPanel({ kind, onKind, text, ov, ideas, onChange, onClose }) {
   const isSeg = (on, extra) => Object.assign({
     flex: 1, height: 44, borderRadius: 12, border: 'none', cursor: 'pointer', padding: 0,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: on ? '#F0F0F0' : 'transparent', color: on ? '#222' : '#DDD',
+    background: on ? 'var(--ed-on)' : 'transparent', color: on ? 'var(--ed-on-text)' : 'var(--ed-off-text)',
     transition: 'transform 140ms ease, background 160ms ease', WebkitTapHighlightColor: 'transparent',
   }, extra);
   const body = (() => {
@@ -2818,19 +2845,19 @@ function TextPanel({ kind, onKind, text, ov, ideas, onChange, onClose }) {
           <input autoFocus value={shown} aria-label="Text" onChange={e => onChange({ text: e.target.value })}
             onFocus={e => e.target.select()}
             style={{ flex: 1, minWidth: 0, height: 44, borderRadius: 14, border: 'none', outline: 'none', padding: '0 14px', boxSizing: 'border-box',
-              background: '#272727', color: '#fff', fontFamily: TEXT, fontSize: 17, letterSpacing: '-0.3px', boxShadow: 'inset 0 0 0 1px #363636' }} />
+              background: 'var(--ed-card)', color: 'var(--ed-text)', fontFamily: TEXT, fontSize: 17, letterSpacing: '-0.3px', boxShadow: 'inset 0 0 0 1px var(--ed-card-line)' }} />
           <button type="button" aria-label="Done" onClick={onClose} {...press(0.92)} style={{ width: 44, height: 44, borderRadius: 22, border: 'none', cursor: 'pointer',
             background: '#007F70', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, transition: 'transform 140ms ease' }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
           </button>
         </div>
         <div style={Object.assign({ alignItems: 'center' }, row)}>
-          <span aria-hidden style={{ flex: 'none', display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 6, fontFamily: TEXT, fontSize: 13, fontWeight: 700, color: '#9BE3DC', whiteSpace: 'nowrap' }}>
+          <span aria-hidden style={{ flex: 'none', display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 6, fontFamily: TEXT, fontSize: 13, fontWeight: 700, color: 'var(--ed-teal-text)', whiteSpace: 'nowrap' }}>
             <img src={`${A}/pb-editor-fab-star.svg`} alt="" width={16} height={15} style={{ display: 'block' }} />Ideas
           </span>
           {ideas.map(idea => (
             <button key={idea} type="button" onClick={() => onChange({ text: idea })} {...press(0.97)} style={{ flex: 'none', height: 36, padding: '0 14px', borderRadius: 18,
-              border: 'none', cursor: 'pointer', color: '#9BE3DC', background: 'rgba(0,127,112,0.16)', boxShadow: 'inset 0 0 0 1px rgba(155,227,220,0.35)',
+              border: 'none', cursor: 'pointer', color: 'var(--ed-teal-text)', background: 'var(--ed-ai-chip)', boxShadow: 'inset 0 0 0 1px var(--ed-ai-chip-rim)',
               fontFamily: TEXT, fontSize: 14, fontWeight: 600, letterSpacing: '-0.2px', whiteSpace: 'nowrap', transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent' }}>{idea}</button>
           ))}
         </div>
@@ -2843,7 +2870,7 @@ function TextPanel({ kind, onKind, text, ov, ideas, onChange, onClose }) {
           return (
             <button key={f.id} type="button" aria-pressed={on} onClick={() => onChange({ font: f.id === 'theme' ? null : f.id })} {...press(0.97)} style={{
               flex: 'none', width: 92, height: 64, borderRadius: 14, border: 'none', cursor: 'pointer', padding: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
-              background: on ? '#F0F0F0' : 'rgba(255,255,255,0.08)', color: on ? '#222' : '#fff', transition: 'transform 140ms ease, background 160ms ease', WebkitTapHighlightColor: 'transparent' }}>
+              background: on ? 'var(--ed-on)' : 'var(--ed-fill)', color: on ? 'var(--ed-on-text)' : 'var(--ed-text)', transition: 'transform 140ms ease, background 160ms ease', WebkitTapHighlightColor: 'transparent' }}>
               <span style={{ fontFamily: f.css || 'inherit', fontWeight: f.weight || 700, fontSize: 24, lineHeight: '28px' }}>Aa</span>
               <span style={{ fontFamily: TEXT, fontSize: 11, fontWeight: 600, opacity: .75 }}>{f.label}</span>
             </button>
@@ -2853,16 +2880,16 @@ function TextPanel({ kind, onKind, text, ov, ideas, onChange, onClose }) {
     );
     if (kind === 'size') return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 10px' }}>
-        <span aria-hidden style={{ fontFamily: TEXT, fontWeight: 700, fontSize: 13, color: '#ccc' }}>A</span>
+        <span aria-hidden style={{ fontFamily: TEXT, fontWeight: 700, fontSize: 13, color: 'var(--ed-text-2)' }}>A</span>
         <input className="pb-range" type="range" min="50" max="200" step="5" value={Math.round(size * 100)} aria-label="Text size"
           onChange={e => onChange({ size: Number(e.target.value) / 100 })}
           style={{ '--v': `${((size * 100 - 50) / 150) * 100}%` }} />
-        <span aria-hidden style={{ fontFamily: TEXT, fontWeight: 700, fontSize: 22, color: '#ccc' }}>A</span>
-        <span style={{ flex: 'none', width: 44, textAlign: 'right', fontFamily: TEXT, fontSize: 14, fontWeight: 600, color: '#fff' }}>{Math.round(size * 100)}%</span>
+        <span aria-hidden style={{ fontFamily: TEXT, fontWeight: 700, fontSize: 22, color: 'var(--ed-text-2)' }}>A</span>
+        <span style={{ flex: 'none', width: 44, textAlign: 'right', fontFamily: TEXT, fontSize: 14, fontWeight: 600, color: 'var(--ed-text)' }}>{Math.round(size * 100)}%</span>
       </div>
     );
     if (kind === 'align') return (
-      <div style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 16, background: 'rgba(0,0,0,0.45)' }}>
+      <div style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 16, background: 'var(--ed-trough)' }}>
         {[['left', 'M4 7h16M4 12h10M4 17h14'], ['center', 'M4 7h16M7 12h10M5 17h14'], ['right', 'M4 7h16M10 12h10M6 17h14']].map(([a, d]) => (
           <button key={a} type="button" aria-label={`Align ${a}`} aria-pressed={(ov.align || 'default') === a} onClick={() => onChange({ align: a })} {...press(0.97)} style={isSeg((ov.align || 'default') === a)}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d={d} /></svg>
@@ -2873,25 +2900,25 @@ function TextPanel({ kind, onKind, text, ov, ideas, onChange, onClose }) {
     return (
       <div style={Object.assign({ alignItems: 'center' }, row)}>
         <button type="button" aria-label="Automatic colour" aria-pressed={!ov.color} onClick={() => onChange({ color: null })} {...press(0.95)} style={{ flex: 'none', height: 36, padding: '0 14px', borderRadius: 18,
-          border: 'none', cursor: 'pointer', background: !ov.color ? '#F0F0F0' : 'rgba(255,255,255,0.1)', color: !ov.color ? '#222' : '#fff',
+          border: 'none', cursor: 'pointer', background: !ov.color ? 'var(--ed-on)' : 'var(--ed-fill)', color: !ov.color ? 'var(--ed-on-text)' : 'var(--ed-text)',
           fontFamily: TEXT, fontSize: 14, fontWeight: 600, transition: 'transform 140ms ease' }}>Auto</button>
         {TEXT_COLORS.map(c => (
           <button key={c} type="button" aria-label={`Colour ${c}`} aria-pressed={ov.color === c} onClick={() => onChange({ color: c })} {...press(0.92)} style={{ flex: 'none', width: 36, height: 36, borderRadius: 18,
             border: 'none', cursor: 'pointer', padding: 0, background: c, transition: 'transform 140ms ease',
-            boxShadow: ov.color === c ? '0 0 0 2px #1F1F1F, 0 0 0 4px #FFFFFF' : 'inset 0 0 0 1px rgba(255,255,255,0.25)' }} />
+            boxShadow: ov.color === c ? '0 0 0 2px var(--ed-ring-gap), 0 0 0 4px var(--ed-ring)' : 'inset 0 0 0 1px var(--ed-swatch-rim)' }} />
         ))}
       </div>
     );
   })();
   return (
     <div role="dialog" aria-label="Text" onClick={e => e.stopPropagation()} style={shell}>
-      <div role="tablist" style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 16, background: 'rgba(0,0,0,0.45)' }}>
+      <div role="tablist" style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 16, background: 'var(--ed-trough)' }}>
         {TEXT_TABS.map(t => {
           const on = kind === t.id;
           return (
             <button key={t.id} type="button" role="tab" aria-selected={on} onClick={() => onKind(t.id)} {...press(0.95)} style={{
               flex: 1, minWidth: 0, height: 48, borderRadius: 12, border: 'none', cursor: 'pointer', padding: 0, display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center', gap: 2, background: on ? '#F0F0F0' : 'transparent', color: on ? '#222' : '#DDD',
+              alignItems: 'center', justifyContent: 'center', gap: 2, background: on ? 'var(--ed-on)' : 'transparent', color: on ? 'var(--ed-on-text)' : 'var(--ed-off-text)',
               transition: 'transform 140ms ease, background 160ms ease', WebkitTapHighlightColor: 'transparent' }}>
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{t.glyph}</svg>
               <span style={{ fontFamily: TEXT, fontSize: 11, fontWeight: 600, letterSpacing: '-0.1px' }}>{t.label}</span>
@@ -2916,7 +2943,7 @@ function FitPanel({ mode, onMode, onAll, onClose }) {
       <button type="button" onClick={() => { setDone(false); onMode(id); }} aria-pressed={on} {...press(0.97)} style={{
         flex: 1, height: 44, borderRadius: 12, border: 'none', cursor: 'pointer', padding: '0 8px',
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-        background: on ? '#F0F0F0' : 'transparent', color: on ? '#222' : '#DDD',
+        background: on ? 'var(--ed-on)' : 'transparent', color: on ? 'var(--ed-on-text)' : 'var(--ed-off-text)',
         fontFamily: TEXT, fontSize: 15, fontWeight: 600, letterSpacing: '-0.24px', whiteSpace: 'nowrap',
         transition: 'transform 140ms ease, background 160ms ease', WebkitTapHighlightColor: 'transparent',
       }}>{glyph}{label}</button>
@@ -2934,17 +2961,17 @@ function FitPanel({ mode, onMode, onAll, onClose }) {
       position: 'absolute', left: 16, right: 16, zIndex: 8,
       bottom: 'calc(139px + env(safe-area-inset-bottom, 0px) + 6px)',
       padding: 8, borderRadius: 22, boxSizing: 'border-box',
-      background: 'rgba(32,32,32,0.94)', backdropFilter: 'blur(20px) saturate(140%)', WebkitBackdropFilter: 'blur(20px) saturate(140%)',
-      boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.08), 0 12px 30px rgba(0,0,0,0.5)',
+      background: 'var(--ed-panel)', backdropFilter: 'blur(20px) saturate(140%)', WebkitBackdropFilter: 'blur(20px) saturate(140%)',
+      boxShadow: 'inset 0 0 0 1px var(--ed-rim-2), var(--ed-pop-shadow)',
       display: 'flex', flexDirection: 'column', gap: 8, animation: 'pbFadeIn 160ms ease both',
     }}>
-      <div style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 16, background: 'rgba(0,0,0,0.45)' }}>
+      <div style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 16, background: 'var(--ed-trough)' }}>
         {seg('contain', 'Original ratio', frame(false))}
         {seg('cover', 'Fill frame', frame(true))}
       </div>
       <button type="button" {...press(0.97)} onClick={() => { onAll(); setDone(true); }} style={{
         height: 44, borderRadius: 12, border: 'none', cursor: 'pointer', fontFamily: TEXT, fontSize: 15, fontWeight: 600,
-        letterSpacing: '-0.24px', color: done ? '#9BE3DC' : '#FFFFFF', background: 'rgba(255,255,255,0.1)',
+        letterSpacing: '-0.24px', color: done ? 'var(--ed-teal-text)' : 'var(--ed-text)', background: 'var(--ed-fill)',
         transition: 'transform 140ms ease, color 160ms ease', WebkitTapHighlightColor: 'transparent',
       }}>{done ? '✓ Applied to all pages' : 'Apply to all pages'}</button>
     </div>
@@ -2954,7 +2981,7 @@ function FitPanel({ mode, onMode, onAll, onClose }) {
 function PageViewHeader({ onBack, controls = true,
                           height = 'calc(env(safe-area-inset-top, 44px) + 103px)' }) {
   const icon = file => (
-    <img src={`${A}/${file}`} alt="" width={24} height={24} style={{ display: 'block' }} />
+    <img src={`${A}/${file}`} alt="" width={24} height={24} style={{ display: 'block', filter: edIco(file) }} />
   );
   return (
     <div style={{
@@ -2963,8 +2990,8 @@ function PageViewHeader({ onBack, controls = true,
       pointerEvents: 'none',
     }}>
       <IOSProgressiveBlur scrim={
-        'linear-gradient(to bottom, rgba(20,20,20,0.55) 0.3%,' +
-        ' rgba(16,16,16,0.22) 60%, rgba(12,12,12,0) 96%)'
+        'var(--ed-head)'
+        
       } />
       {controls && (
       <div style={{
@@ -2974,10 +3001,10 @@ function PageViewHeader({ onBack, controls = true,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         pointerEvents: 'auto',
       }}>
-        <GlassIconButton label="Back to book" tint="rgba(0,0,0,0.25)" gloss onClick={onBack}>
+        <GlassIconButton label="Back to book" tint="var(--ed-glass)" gloss onClick={onBack}>
           {icon('pb-src-back.svg')}
         </GlassIconButton>
-        <GlassIconButton label="Undo and redo" width={88} tint="rgba(0,0,0,0.25)" gloss>
+        <GlassIconButton label="Undo and redo" width={88} tint="var(--ed-glass)" gloss>
           <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {icon('pb-editor-undo.svg')}
             {icon('pb-editor-redo.svg')}
@@ -3013,7 +3040,7 @@ const PV_DRAWER_H = 'calc(min(406px, 50%) + env(safe-area-inset-bottom, 0px))';
 // centre stop only 20% black, so the page preview read through the drawer's top edge.
 // ⚠️ Flattened to solid on request, like SHEET_FILL — the edge washed out against the
 // page. It stays a gradient only because the drawers apply it as `backgroundImage`.
-const DRAWER_FILL = 'linear-gradient(#1C1C1C, #1C1C1C)';
+const DRAWER_FILL = 'linear-gradient(var(--ed-drawer), var(--ed-drawer))';
 
 // node 451:14988 (unselected) / 451:14990 (selected). The selected chip is a fixed
 // 80×34 in the node; kept auto-width here so a chip does not resize as the
@@ -3026,11 +3053,11 @@ function CountChip({ label, active, onClick }) {
         flex: '0 0 auto', position: 'relative', overflow: 'hidden',
         padding: '8px 12px', border: 'none', cursor: 'pointer',
         borderRadius: active ? 42 : 22,
-        background: active ? 'transparent' : 'rgba(0,0,0,0.1)',
+        background: active ? 'transparent' : 'var(--ed-chip-off)',
         fontFamily: TEXT, fontWeight: active ? 600 : 500,
         fontSize: 13, lineHeight: '18px', letterSpacing: '-0.08px',
         whiteSpace: 'nowrap',
-        color: active ? '#FFFFFF' : 'var(--colour-foreground-fg-grey, #CCCCCC)',
+        color: active ? '#FFFFFF' : 'var(--ed-text-2)',
         transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
       }}>
       {active && CONTINUE_ACCENT}
@@ -3112,7 +3139,7 @@ function LayoutDrawer({ closing, count, selected, options, photos, pageAspect,
     : (spreadMode ? LAYOUT_CARD_W * 2 : LAYOUT_CARD_W);
 
   const icon = file => (
-    <img src={`${A}/${file}`} alt="" width={24} height={24} style={{ display: 'block' }} />
+    <img src={`${A}/${file}`} alt="" width={24} height={24} style={{ display: 'block', filter: edIco(file) }} />
   );
   return (
     <div ref={root} role="dialog" aria-labelledby="pb-layout-title" style={{
@@ -3129,7 +3156,7 @@ function LayoutDrawer({ closing, count, selected, options, photos, pageAspect,
         padding: '0 16px', boxSizing: 'border-box',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
-        <GlassIconButton label="Close layouts" tint="rgba(0,0,0,0.25)" gloss
+        <GlassIconButton label="Close layouts" tint="var(--ed-glass)" gloss
                          onClick={onClose}>
           {icon('pb-editor-close.svg')}
         </GlassIconButton>
@@ -3138,11 +3165,11 @@ function LayoutDrawer({ closing, count, selected, options, photos, pageAspect,
         {onMode ? (
           // Page | Spread. Only offered where a spread exists (not on the cover).
           <div role="tablist" id="pb-layout-title" aria-label="Layout for" style={{ position: 'absolute', left: '50%', top: 4, transform: 'translateX(-50%)',
-            display: 'flex', gap: 2, padding: 3, borderRadius: 16, background: 'rgba(0,0,0,0.45)' }}>
+            display: 'flex', gap: 2, padding: 3, borderRadius: 16, background: 'var(--ed-trough)' }}>
             {[['page', 'Page'], ['spread', 'Spread']].map(([id, label]) => (
               <button key={id} type="button" role="tab" aria-selected={mode === id} onClick={() => onMode(id)} {...press(0.97)} style={{
                 height: 30, padding: '0 16px', borderRadius: 13, border: 'none', cursor: 'pointer', fontFamily: DISPLAY, fontWeight: 700, fontSize: 13,
-                background: mode === id ? '#F0F0F0' : 'transparent', color: mode === id ? '#222' : '#DDD',
+                background: mode === id ? 'var(--ed-on)' : 'transparent', color: mode === id ? 'var(--ed-on-text)' : 'var(--ed-off-text)',
                 transition: 'transform 140ms ease, background 160ms ease', WebkitTapHighlightColor: 'transparent' }}>{label}</button>
             ))}
           </div>
@@ -3151,7 +3178,7 @@ function LayoutDrawer({ closing, count, selected, options, photos, pageAspect,
           position: 'absolute', left: 0, right: 0, top: 12, margin: 0,
           textAlign: 'center', pointerEvents: 'none',
           fontFamily: DISPLAY, fontWeight: 700, fontSize: 14, lineHeight: '20px',
-          color: '#FFFFFF',
+          color: 'var(--ed-text)',
         }}>Choose layout</p>
         )}
         <GlassIconButton label="Apply layout" tint="transparent"
@@ -3214,15 +3241,15 @@ function SpacingDrawer({ closing, value, all, onChange, onAll, onClose, onSave }
         padding: '0 16px', boxSizing: 'border-box',
         display: 'flex', alignItems: 'center',
       }}>
-        <GlassIconButton label="Close spacing" tint="rgba(0,0,0,0.25)" gloss onClick={onClose}>
+        <GlassIconButton label="Close spacing" tint="var(--ed-glass)" gloss onClick={onClose}>
           <img src={`${A}/pb-editor-close.svg`} alt="" width={24} height={24}
-               style={{ display: 'block' }} />
+               style={{ display: 'block', filter: 'var(--ed-ico)' }} />
         </GlassIconButton>
         <p id="pb-spacing-title" style={{
           position: 'absolute', left: 0, right: 0, top: 12, margin: 0,
           textAlign: 'center', pointerEvents: 'none',
           fontFamily: DISPLAY, fontWeight: 700, fontSize: 14, lineHeight: '20px',
-          color: '#FFFFFF',
+          color: 'var(--ed-text)',
         }}>Spacing</p>
       </div>
       <div style={{ position: 'absolute', left: 0, right: 0, top: 84, padding: '0 24px' }}>
@@ -3232,17 +3259,17 @@ function SpacingDrawer({ closing, value, all, onChange, onAll, onClose, onSave }
                style={{ '--v': `${value * 100}%` }} />
         <div style={{
           display: 'flex', justifyContent: 'space-between', marginTop: 8,
-          fontFamily: TEXT, fontSize: 12, lineHeight: '16px', color: '#999',
+          fontFamily: TEXT, fontSize: 12, lineHeight: '16px', color: 'var(--ed-text-3)',
         }}><span>None</span><span>Wide</span></div>
         <label style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          marginTop: 18, fontFamily: TEXT, fontSize: 16, lineHeight: '24px', color: '#FFFFFF',
+          marginTop: 18, fontFamily: TEXT, fontSize: 16, lineHeight: '24px', color: 'var(--ed-text)',
         }}>
           Apply to all pages
           <button type="button" role="switch" aria-checked={all} onClick={() => onAll(!all)}
                   style={{
                     width: 51, height: 31, borderRadius: 16, border: 0, padding: 2,
-                    background: all ? '#00A8AE' : 'rgba(255,255,255,0.16)',
+                    background: all ? '#00A8AE' : 'var(--ed-fill-2)',
                     transition: 'background 160ms ease', cursor: 'pointer',
                     WebkitTapHighlightColor: 'transparent',
                   }}>
@@ -3281,7 +3308,7 @@ const THEME_LEAF_W = 76;
 
 function DrawerHead({ title, titleId, closeLabel, onClose, confirmLabel, onConfirm }) {
   const icon = file => (
-    <img src={`${A}/${file}`} alt="" width={24} height={24} style={{ display: 'block' }} />
+    <img src={`${A}/${file}`} alt="" width={24} height={24} style={{ display: 'block', filter: edIco(file) }} />
   );
   return (
     <div style={{
@@ -3289,14 +3316,14 @@ function DrawerHead({ title, titleId, closeLabel, onClose, confirmLabel, onConfi
       padding: '0 16px', boxSizing: 'border-box',
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     }}>
-      <GlassIconButton label={closeLabel} tint="rgba(0,0,0,0.25)" gloss onClick={onClose}>
+      <GlassIconButton label={closeLabel} tint="var(--ed-glass)" gloss onClick={onClose}>
         {icon('pb-editor-close.svg')}
       </GlassIconButton>
       <p id={titleId} style={{
         position: 'absolute', left: 0, right: 0, top: 12, margin: 0,
         textAlign: 'center', pointerEvents: 'none',
         fontFamily: DISPLAY, fontWeight: 700, fontSize: 14, lineHeight: '20px',
-        color: '#FFFFFF',
+        color: 'var(--ed-text)',
       }}>{title}</p>
       {onConfirm ? (
         <GlassIconButton label={confirmLabel} tint="transparent"
@@ -3350,10 +3377,10 @@ function ThemeCard({ theme, selected, onClick, pageAspect, photo }) {
       </span>
       <span style={{
         marginTop: 8, fontFamily: TEXT, fontWeight: 600, fontSize: 13, lineHeight: '18px',
-        color: '#FFFFFF', whiteSpace: 'nowrap',
+        color: 'var(--ed-text)', whiteSpace: 'nowrap',
       }}>{theme.name}</span>
       <span style={{
-        fontFamily: TEXT, fontSize: 11, lineHeight: '14px', color: '#888888',
+        fontFamily: TEXT, fontSize: 11, lineHeight: '14px', color: 'var(--ed-text-3)',
         whiteSpace: 'nowrap',
       }}>{theme.meta}</span>
     </button>
@@ -3401,7 +3428,7 @@ function ThemesDrawer({ closing, cat, onCat, selected, onPick, onClose, onConfir
       </div>
       <p style={{
         margin: 'auto 24px 0', paddingBottom: 'max(20px, calc(env(safe-area-inset-bottom, 0px) + 4px))',
-        textAlign: 'center', fontFamily: TEXT, fontSize: 12, lineHeight: '17px', color: '#888888',
+        textAlign: 'center', fontFamily: TEXT, fontSize: 12, lineHeight: '17px', color: 'var(--ed-text-3)',
       }}>Changes the look and layouts of every page. Your photos stay on their pages.</p>
     </div>
   );
@@ -3442,10 +3469,10 @@ function CoverCard({ design, selected, onClick, pageAspect, photos, layout }) {
       </span>
       <span style={{
         marginTop: 8, fontFamily: TEXT, fontWeight: 600, fontSize: 13, lineHeight: '18px',
-        color: '#FFFFFF', whiteSpace: 'nowrap',
+        color: 'var(--ed-text)', whiteSpace: 'nowrap',
       }}>{design.name}</span>
       <span style={{
-        fontFamily: TEXT, fontSize: 11, lineHeight: '14px', color: '#888888', whiteSpace: 'nowrap',
+        fontFamily: TEXT, fontSize: 11, lineHeight: '14px', color: 'var(--ed-text-3)', whiteSpace: 'nowrap',
       }}>{design.meta}</span>
     </button>
   );
@@ -3478,7 +3505,7 @@ function CoversDrawer({ closing, selected, onPick, onClose, onConfirm, pageAspec
       </div>
       <p style={{
         margin: 'auto 24px 0', paddingBottom: 'max(20px, calc(env(safe-area-inset-bottom, 0px) + 4px))',
-        textAlign: 'center', fontFamily: TEXT, fontSize: 12, lineHeight: '17px', color: '#888888',
+        textAlign: 'center', fontFamily: TEXT, fontSize: 12, lineHeight: '17px', color: 'var(--ed-text-3)',
       }}>{t === CLASSIC
         ? 'Suggestions use your cover photo and title.'
         : `Suggestions in the ${t.name} theme, with your cover photo.`}</p>
@@ -3519,8 +3546,8 @@ function ColorDrawer({ closing, value, all, cover, onChange, onAll, onClose, onS
               cursor: 'pointer', border: 'none',
               background: c || 'conic-gradient(#F6F1E7 0 25%, #E3EADF 0 50%, #DDEBF2 0 75%, #F9E1E0 0)',
               boxShadow: on
-                ? '0 0 0 2px #1C1C1C, 0 0 0 4px #FFFFFF'
-                : 'inset 0 0 0 1px rgba(255,255,255,0.18)',
+                ? '0 0 0 2px var(--ed-ring-gap), 0 0 0 4px var(--ed-ring)'
+                : 'inset 0 0 0 1px var(--ed-swatch-rim)',
               transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
             }} />
           );
@@ -3528,13 +3555,13 @@ function ColorDrawer({ closing, value, all, cover, onChange, onAll, onClose, onS
       </div>
       <label style={{
         flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        margin: '14px 24px 0', fontFamily: TEXT, fontSize: 16, lineHeight: '24px', color: '#FFFFFF',
+        margin: '14px 24px 0', fontFamily: TEXT, fontSize: 16, lineHeight: '24px', color: 'var(--ed-text)',
       }}>
         {cover ? 'Also apply to all pages' : 'Apply to all pages'}
         <button type="button" role="switch" aria-checked={all} onClick={() => onAll(!all)}
                 style={{
                   width: 51, height: 31, borderRadius: 16, border: 0, padding: 2,
-                  background: all ? '#00A8AE' : 'rgba(255,255,255,0.16)',
+                  background: all ? '#00A8AE' : 'var(--ed-fill-2)',
                   transition: 'background 160ms ease', cursor: 'pointer',
                   WebkitTapHighlightColor: 'transparent',
                 }}>
@@ -3581,7 +3608,7 @@ function Segmented({ label, options, value, onChange }) {
   return (
     <div role="radiogroup" aria-label={label} style={{
       display: 'flex', gap: 2, padding: 3, borderRadius: 14,
-      background: 'rgba(255,255,255,0.07)',
+      background: 'var(--ed-segment)',
     }}>
       {options.map(o => {
         const on = o.id === value;
@@ -3590,8 +3617,8 @@ function Segmented({ label, options, value, onChange }) {
                   onClick={() => onChange(o.id)} {...press(0.97)} style={{
             flex: '1 1 0', minWidth: 0, minHeight: 44, padding: '4px', border: 'none',
             borderRadius: 11, cursor: 'pointer',
-            background: on ? '#FFFFFF' : 'transparent',
-            color: on ? '#222222' : '#CCCCCC',
+            background: on ? 'var(--ed-on)' : 'transparent',
+            color: on ? 'var(--ed-on-text)' : 'var(--ed-text-2)',
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             textAlign: 'center',
             fontFamily: TEXT, fontWeight: on ? 600 : 500, fontSize: 13, lineHeight: '16px',
@@ -3601,7 +3628,7 @@ function Segmented({ label, options, value, onChange }) {
             <span>{o.label}</span>
             {o.sub && (
               <span style={{ fontSize: 10.5, lineHeight: '13px', fontWeight: 400,
-                             color: on ? '#666666' : '#888888' }}>{o.sub}</span>
+                             color: on ? '#666666' : 'var(--ed-text-3)' }}>{o.sub}</span>
             )}
           </button>
         );
@@ -3617,10 +3644,10 @@ function StyleDrawer({ closing, value, onChange, summary, onClose, onApply }) {
     <div style={{
       display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between',
       alignItems: 'baseline', columnGap: 8, margin: '0 0 8px', whiteSpace: 'nowrap', fontFamily: TEXT, fontWeight: 600, fontSize: 13, lineHeight: '18px',
-      color: '#999999',
+      color: 'var(--ed-text-3)',
     }}>
       <span>{text}</span>
-      {extra && <span style={{ fontWeight: 500, color: '#7FD6D9', textAlign: 'right' }}>{extra}</span>}
+      {extra && <span style={{ fontWeight: 500, color: 'var(--ed-teal-text)', textAlign: 'right' }}>{extra}</span>}
     </div>
   );
   const set = k => v => onChange(Object.assign({}, value, { [k]: v }));
@@ -3658,7 +3685,7 @@ function StyleDrawer({ closing, value, onChange, summary, onClose, onApply }) {
         </div>
         <p style={{
           margin: 0, textAlign: 'center', fontFamily: TEXT, fontSize: 12, lineHeight: '17px',
-          color: '#888888',
+          color: 'var(--ed-text-3)',
         }}>Applies to every page. You can still change any page’s layout afterwards.</p>
       </div>
       <div style={{
@@ -3686,7 +3713,7 @@ function PhotoTray({ closing, photos, used = {}, onPick, onClose, onUpload,
       position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 20,
       height: 'calc(min(440px, 62%) + env(safe-area-inset-bottom, 0px))',
       boxSizing: 'border-box', overflow: 'hidden',
-      borderRadius: '24px 24px 0 0', boxShadow: SHEET_RIM, backgroundImage: DRAWER_FILL, backgroundColor: '#1A1A1A',
+      borderRadius: '24px 24px 0 0', boxShadow: SHEET_RIM, backgroundImage: DRAWER_FILL, backgroundColor: 'var(--ed-drawer)',
       animation: closing
         ? 'pbSheetOut 320ms cubic-bezier(0.4,0,0.2,1) both'
         : 'pbSheetIn 380ms cubic-bezier(0.34,1.05,0.64,1) both',
@@ -3695,21 +3722,21 @@ function PhotoTray({ closing, photos, used = {}, onPick, onClose, onUpload,
         position: 'absolute', left: 0, right: 0, top: 16, height: 40,
         padding: '0 16px', boxSizing: 'border-box', display: 'flex', alignItems: 'center',
       }}>
-        <GlassIconButton label="Close" tint="rgba(0,0,0,0.25)" gloss onClick={onClose}>
+        <GlassIconButton label="Close" tint="var(--ed-glass)" gloss onClick={onClose}>
           <img src={`${A}/pb-editor-close.svg`} alt="" width={24} height={24}
-               style={{ display: 'block' }} />
+               style={{ display: 'block', filter: 'var(--ed-ico)' }} />
         </GlassIconButton>
         <p style={{
           position: 'absolute', left: 0, right: 0, top: 12, margin: 0,
           textAlign: 'center', pointerEvents: 'none',
           fontFamily: DISPLAY, fontWeight: 700, fontSize: 14, lineHeight: '20px',
-          color: '#FFFFFF',
+          color: 'var(--ed-text)',
         }}>{title}</p>
         {subtitle && (
           <p style={{
             position: 'absolute', left: 0, right: 0, top: 32, margin: 0,
             textAlign: 'center', pointerEvents: 'none',
-            fontFamily: TEXT, fontSize: 12, lineHeight: '16px', color: '#999',
+            fontFamily: TEXT, fontSize: 12, lineHeight: '16px', color: 'var(--ed-text-3)',
           }}>{subtitle}</p>
         )}
       </div>
@@ -3720,13 +3747,13 @@ function PhotoTray({ closing, photos, used = {}, onPick, onClose, onUpload,
       }}>
         <button type="button" onClick={onUpload} {...press(0.97)} style={{
           width: '100%', height: 48, marginBottom: 12, borderRadius: 55,
-          border: '1px solid #FFF', background: '#F0F0F0', color: '#222', cursor: 'pointer',
+          border: '1px solid var(--ed-btn-rim)', background: 'var(--ed-btn-bg)', color: 'var(--ed-btn-text)', cursor: 'pointer',
           fontFamily: DISPLAY, fontWeight: 700, fontSize: 16,
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
           transition: 'transform 140ms ease', WebkitTapHighlightColor: 'transparent',
         }}>
           <img src={`${A}/pb-editor-tool-addphoto.svg`} alt="" width={20} height={20}
-               style={{ display: 'block', filter: 'invert(1)' }} />
+               style={{ display: 'block', filter: 'var(--ed-btn-ico)' }} />
           Upload photos
         </button>
         {photos.length ? (
@@ -3735,7 +3762,7 @@ function PhotoTray({ closing, photos, used = {}, onPick, onClose, onUpload,
               <button key={k} type="button" onClick={() => onPick(ph)} {...press(0.97)}
                       aria-label={`Photo ${k + 1}`} style={{
                         position: 'relative', padding: 0, border: 0, aspectRatio: '1', borderRadius: 4,
-                        overflow: 'hidden', background: '#333', cursor: 'pointer',
+                        overflow: 'hidden', background: 'var(--ed-photo-bg)', cursor: 'pointer',
                         transition: 'transform 140ms ease',
                         WebkitTapHighlightColor: 'transparent',
                       }}>
@@ -3758,7 +3785,7 @@ function PhotoTray({ closing, photos, used = {}, onPick, onClose, onUpload,
           </div>
         ) : (
           <p style={{ margin: '24px 0 0', textAlign: 'center', fontFamily: TEXT,
-                      fontSize: 15, color: '#CCC' }}>
+                      fontSize: 15, color: 'var(--ed-text-2)' }}>
             You haven't uploaded any photos yet.
           </p>
         )}
@@ -4421,7 +4448,7 @@ const ARR_ACCENT = '#00C2C9';
 // ⚠️ The consequence is that the button no longer brightens where light content sits
 // behind it: the node samples (0,69,74) where a white sheet shows through its
 // translucent band. Chasing that back would mean re-introducing the blend.
-const DONE_FILL = '#00292A';
+const DONE_FILL = 'var(--ed-done)';
 
 const HOLD_MS = 250;
 const MOVE_TOL = 8;
@@ -4444,10 +4471,10 @@ function ArrangeSwitcher({ tab, onTab }) {
         style={{
           flex: '1 0 0', minWidth: 0, height: '100%', padding: 4,
           border: 'none', borderRadius: 12, cursor: 'pointer',
-          background: on ? 'var(--colour-foreground-fg-white, #FFFFFF)' : 'transparent',
+          background: on ? 'var(--ed-on)' : 'transparent',
           fontFamily: TEXT, fontWeight: 600, fontSize: 15, lineHeight: '20px',
           letterSpacing: '-0.24px', textAlign: 'center',
-          color: on ? 'var(--colour-foreground-fg-black, #333333)' : '#FFFFFF',
+          color: on ? 'var(--ed-on-text)' : 'var(--ed-text)',
           WebkitTapHighlightColor: 'transparent',
         }}>{label}</button>
     );
@@ -4456,7 +4483,7 @@ function ArrangeSwitcher({ tab, onTab }) {
     <div role="tablist" aria-label="Arrange what" style={{
       display: 'flex', alignItems: 'center', height: 40, padding: 4,
       boxSizing: 'border-box', borderRadius: 16,
-      background: 'rgba(0,0,0,0.8)',
+      background: 'var(--ed-trough-2)',
       backdropFilter: 'blur(10.95px)', WebkitBackdropFilter: 'blur(10.95px)',
     }}>
       {seg('photos', 'Photos')}
@@ -4480,19 +4507,19 @@ function ArrangeHeader({ tab, onTab }) {
       height: 'calc(env(safe-area-inset-top, 44px) + 192px)',
       backdropFilter: 'blur(5px)', WebkitBackdropFilter: 'blur(5px)',
       backgroundImage:
-        'linear-gradient(to bottom, rgb(20,20,20) 73.671%, rgba(39,39,39,0) 96.296%)',
+        'var(--ed-arr-head)',
     }}>
       {/* node 451:15253 / 451:15254 — title at 68, body at 97, both 334 wide */}
       <p style={{
         position: 'absolute', left: 0, right: 0, top, margin: 0, textAlign: 'center',
         fontFamily: TEXT, fontWeight: 600, fontSize: 16, lineHeight: '21px',
-        letterSpacing: '-0.32px', color: '#FFFFFF',
+        letterSpacing: '-0.32px', color: 'var(--ed-text)',
       }}>Arrange mode</p>
       <p style={{
         position: 'absolute', left: 0, right: 0, top: `calc(${top} + 29px)`,
         margin: '0 auto', maxWidth: 334, textAlign: 'center',
         fontFamily: TEXT, fontSize: 16, lineHeight: '21px', letterSpacing: '-0.32px',
-        color: 'var(--colour-foreground-fg-grey, #CCCCCC)',
+        color: 'var(--ed-text-2)',
       }}>
         {/* The node's own line break on the Photos tab. The Pages copy is an
             addition — the node only draws the Photos tab. */}
@@ -4590,7 +4617,7 @@ function ArrangeLeaf({ side, n, photos, layout, holeSlot, ringSlot,
 function ArrangeCaption({ left, right, onAdd }) {
   const s = {
     fontFamily: TEXT, fontSize: 12, lineHeight: '28px',
-    color: '#FFFFFF', opacity: 0.35,
+    color: 'var(--ed-text)', opacity: 0.35,
   };
   return (
     <div style={{
@@ -4609,7 +4636,7 @@ function ArrangeCaption({ left, right, onAdd }) {
             position: 'absolute', left: `calc(50% - ${ARR_ADD.w / 2}px)`,
             top: (ARR_CAPTION - ARR_ADD.h) / 2,
             width: ARR_ADD.w, height: ARR_ADD.h, borderRadius: 24, padding: 0,
-            border: 'none', background: 'var(--colour-foreground-fg-black, #333333)',
+            border: 'none', background: 'var(--ed-pill)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: 'pointer', transition: 'transform 140ms ease',
             WebkitTapHighlightColor: 'transparent',
@@ -4957,7 +4984,7 @@ function ArrangeView({ aspect, pages, placed, uploaded, layouts, spacings, cover
         height: 'calc(161px + env(safe-area-inset-bottom, 0px))',
         pointerEvents: 'none',
         backgroundImage:
-          'linear-gradient(to bottom, rgba(0,0,0,0) 0.2%, rgb(27,27,27) 73.53%)',
+          'var(--ed-arr-band)',
       }}>
         {/* ⚠️ Centred with `left/right: 0` + `margin: auto`, NOT
             `left: 50%; transform: translateX(-50%)`. press() assigns
@@ -5069,6 +5096,17 @@ function EditorScreen() {
         layflat: true, total: ((parseFloat(raw.total != null ? raw.total : book.total) || 0) + LAYFLAT_ADD_PRICE).toFixed(2) })));
     } catch (e) { /* best-effort */ }
   };
+  // Coming back from "Photo book options" (the details card's settings icon): the book's format, size, cover or
+  // binding may have changed in pb_book, which is read once on mount — so a bfcache restore reloads to pick it up.
+  useEffect(() => {
+    const h = e => {
+      let dirty = false;
+      try { dirty = !!sessionStorage.getItem('pb_book_dirty'); sessionStorage.removeItem('pb_book_dirty'); } catch (err) {}
+      if (dirty && e.persisted) window.location.reload();
+    };
+    window.addEventListener('pageshow', h);
+    return () => window.removeEventListener('pageshow', h);
+  }, []);
   const textsCtx = useMemo(() => ({ over: texts, canSelect: false, selId: null, onSelect: null }), [texts]);
   // The scripted low-quality moment: { src, n, stage } — see LowQNudge. Restored after a reload, except that
   // anything mid-flight counts as finished and a message that never got shown is shown straight away.
@@ -5486,12 +5524,42 @@ function EditorScreen() {
     setTimeout(() => setSheet('gone'), 320);
   };
 
+  // The fill prompt previews live: auto-fill is applied the moment the sheet opens and "Start from scratch" puts the
+  // book back as it was. `fillRef` holds that book (and, once applied, the list of placed photos). Continue just
+  // closes the sheet — and, after an auto-fill by chapter, starts the scripted low-quality moment.
+  const fillRef = useRef(null);
+  const [fillChoice, setFillChoice] = useState('fill');
+  const [fillH, setFillH] = useState(0);
+  const applyFill = () => { fillRef.current.list = autoFill(); };
+  const chooseFill = id => {
+    if (id === fillChoice) return;
+    setFillChoice(id);
+    if (id === 'fill') { applyFill(); return; }
+    const b = fillRef.current;
+    setPlaced(b.placed); setLayouts(b.layouts); setCover(b.cover); setAdded(b.added);
+    try {
+      sessionStorage.setItem('pb_placed', JSON.stringify(b.placed));
+      sessionStorage.setItem('pb_layouts', JSON.stringify(b.layouts));
+      sessionStorage.setItem('pb_cover', JSON.stringify(b.cover));
+    } catch (e) { /* best-effort */ }
+  };
+  const continueFill = () => {
+    dismissSheet();
+    setFillH(0);
+    if (fillChoice === 'fill' && incomingGroups) startLowQ(fillRef.current.list);
+  };
+  useEffect(() => {
+    if (sheet !== 'open' || !incoming || fillRef.current) return;
+    fillRef.current = { placed, layouts, cover, added };
+    applyFill();
+  }, [sheet]);
+
   // "Yes, auto-fill" — one photo per page, in the order the picker handed them over
   // (chronological, which is what the prompt promises). The first photo goes on the
   // cover and the rest one per page, so page n holds photo n + 1. A selection longer
   // than the book grows it by whole spreads, priced like any other added spread.
   const autoFill = () => {
-    if (incomingGroups) { autoFillGroups(); return; }
+    if (incomingGroups) return autoFillGroups();
     const rest = incoming.slice(1);
     setPlaced(rest);
     sessionStorage.setItem('pb_placed', JSON.stringify(rest));
@@ -5503,7 +5571,7 @@ function EditorScreen() {
     });
     const needed = Math.ceil((rest.length - book.pages) / 2);
     if (needed > 0) setAdded(a => Math.max(a, needed));
-    dismissSheet();
+    return rest;
   };
 
   // The chapter flow: titles, then each chapter's photos two pages at a time. See planGroups.
@@ -5524,8 +5592,7 @@ function EditorScreen() {
     });
     const needed = Math.ceil((plan.placed.length - book.pages) / 2);
     if (needed > 0) setAdded(a => Math.max(a, needed));
-    dismissSheet();
-    startLowQ(plan.placed);
+    return plan.placed;
   };
 
   // The scripted moment: flag the sixth photo in the book and, once the book has settled, have the AI say so.
@@ -5625,8 +5692,8 @@ function EditorScreen() {
       // node 451:15574 — a 20% black wash over the vertical grey ramp. Anchored to
       // the viewport rather than the content so the ramp always reads top-light,
       // however long the book gets.
-      background: 'linear-gradient(90deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.2) 100%),' +
-                  ' linear-gradient(180deg, #272727 0%, #151515 100%)',
+      background: 'var(--ed-canvas)',
+                  
     }}>
       <style>{`
         @keyframes pbSheetIn  { from { transform: translateY(100%); } to { transform: translateY(0); } }
@@ -5642,9 +5709,9 @@ function EditorScreen() {
         .pb-range { -webkit-appearance: none; appearance: none; width: 100%; height: 28px;
           margin: 0; background: transparent; touch-action: pan-y; }
         .pb-range::-webkit-slider-runnable-track { height: 16px; border-radius: 8px;
-          background: linear-gradient(to right, #00A8AE var(--v), rgba(255,255,255,0.16) var(--v)); }
+          background: linear-gradient(to right, #00A8AE var(--v), var(--ed-fill-2) var(--v)); }
         .pb-range::-moz-range-track { height: 16px; border-radius: 8px;
-          background: linear-gradient(to right, #00A8AE var(--v), rgba(255,255,255,0.16) var(--v)); }
+          background: linear-gradient(to right, #00A8AE var(--v), var(--ed-fill-2) var(--v)); }
         .pb-range::-webkit-slider-thumb { -webkit-appearance: none; width: 28px; height: 28px;
           margin-top: -6px; border-radius: 14px; background: #fff; border: 0;
           box-shadow: 0 2px 6px rgba(0,0,0,0.4); }
@@ -5697,11 +5764,12 @@ function EditorScreen() {
             re-phase the grid against the safe-area padding above. */}
         <div style={{
           paddingTop: 'max(144px, calc(env(safe-area-inset-top, 44px) + 100px))',
-          backgroundImage: 'radial-gradient(circle at 1px 1px, #272727 0, #272727 1px, rgba(0,0,0,0) 1px)',
+          backgroundImage: 'radial-gradient(circle at 1px 1px, var(--ed-dot) 0, var(--ed-dot) 1px, rgba(0,0,0,0) 1px)',
           backgroundSize: '18px 18px', backgroundPosition: '4px 4px',
           backgroundOrigin: 'border-box',
         }}>
-          <DetailsCard title={book.title} pages={vPages} total={vTotal} />
+          <DetailsCard title={book.title} pages={vPages} total={vTotal}
+            onSettings={() => window.navigation.push(`book-choose.html?options&pages=${pages}&extra=${(added * EXTRA_SPREAD_PRICE).toFixed(2)}`)} />
 
           {/* 23px from the card to the cover, per the node (card ends 202, cover 225) */}
           <div style={{ height: 23 }} />
@@ -5741,7 +5809,9 @@ function EditorScreen() {
           <div aria-hidden style={{
             height: panel
               ? (panel.kind === 'style' ? STYLE_DRAWER_H : THEME_DRAWER_H)
-              : 'calc(139px + env(safe-area-inset-bottom, 0px))',
+              : incoming && sheet === 'open' && fillH
+                ? fillH + 16
+                : 'calc(139px + env(safe-area-inset-bottom, 0px))',
           }} />
         </div>
       </div>
@@ -5785,10 +5855,9 @@ function EditorScreen() {
 
       {(sheet === 'open' || sheet === 'closing') && (
         incoming ? (
-          <AutofillSheet
-            closing={sheet === 'closing'} count={incoming.length}
-            onYes={autoFill} onNo={dismissSheet}
-          />
+          <FillSheet closing={sheet === 'closing'} count={incoming.length}
+            chapters={incomingGroups ? incomingGroups.groups.length : 0}
+            choice={fillChoice} onChoice={chooseFill} onContinue={continueFill} onHeight={setFillH} />
         ) : (
           <UploadSheet
             closing={sheet === 'closing'}
